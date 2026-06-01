@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Backfill missing 5-min bar slots with flat candles — bulk version."""
+
+import sys, os
+from datetime import datetime, timedelta, timezone, date
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+import psycopg2
+from psycopg2.extras import execute_values
+
+conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
+conn.autocommit = False
+cur = conn.cursor()
+
+TF = 300  # 5 min
+DAY_START_H, DAY_START_M = 5, 55
+DAY_END_H, DAY_END_M = 20, 45
+SLOTS_PER_DAY = ((DAY_END_H - DAY_START_H) * 60 + (DAY_END_M - DAY_START_M)) // 5 + 1  # 179
+
+def gen_day_slots(d: date) -> list[datetime]:
+    base = datetime(d.year, d.month, d.day, DAY_START_H, DAY_START_M)
+    return [base + timedelta(seconds=i * TF) for i in range(SLOTS_PER_DAY)]
+
+# Get all symbols
+cur.execute("SELECT DISTINCT symbol FROM moex_prices_5m ORDER BY symbol")
+symbols = [r[0] for r in cur.fetchall()]
+print(f"Processing {len(symbols)} symbols...")
+
+total_flat = 0
+for sym in symbols:
+    # 1) Load ALL existing timestamps for this symbol (fast single query)
+    cur.execute("SELECT DISTINCT time FROM moex_prices_5m WHERE symbol = %s", (sym,))
+    existing_times = set(r[0] for r in cur.fetchall())
+
+    # 2) Load all real candles (volume > 0), ordered
+    cur.execute("""
+        SELECT time, close
+        FROM moex_prices_5m
+        WHERE symbol = %s AND volume > 0
+        ORDER BY time
+    """, (sym,))
+    real_candles = cur.fetchall()
+
+    if not real_candles:
+        continue
+
+    # 3) Group by day
+    day_data = {}
+    for c in real_candles:
+        day_data.setdefault(c[0].date(), []).append((c[0], c[1]))
+
+    inserts = []
+    for day in sorted(day_data.keys()):
+        dc = day_data[day]
+        prev_close = dc[0][1]
+
+        for slot in gen_day_slots(day):
+            if slot in existing_times:
+                # Update prev_close from this existing candle
+                # Find if this slot has a real candle
+                for t, cl in dc:
+                    rt = t.replace(second=0, microsecond=0)
+                    rt = rt - timedelta(minutes=rt.minute % 5)
+                    if rt == slot:
+                        prev_close = cl
+                        break
+                continue
+
+            inserts.append((sym, slot, prev_close, prev_close, prev_close, prev_close, 0, ''))
+
+    if inserts:
+        print(f"  {sym}: {len(inserts)} flat candles")
+        for i in range(0, len(inserts), 10000):
+            batch = inserts[i:i + 10000]
+            execute_values(cur,
+                "INSERT INTO moex_prices_5m (symbol, time, open, high, low, close, volume, contract) VALUES %s "
+                "ON CONFLICT (symbol, time) DO NOTHING",
+                batch
+            )
+            conn.commit()
+        total_flat += len(inserts)
+
+print(f"\nDone: {total_flat} flat candles inserted")
+conn.close()
