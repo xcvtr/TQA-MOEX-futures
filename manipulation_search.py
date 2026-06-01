@@ -109,6 +109,75 @@ def load_oi_data(symbol: str, days: int) -> pd.DataFrame:
     return oi
 
 
+def load_oi_daily(symbol: str, days: int) -> pd.DataFrame:
+    """Загрузить OI (FIZ и YUR), агрегированный по дням.
+
+    OI на MOEX меняется раз в сутки (после клиринга).
+    Берём последнее значение каждого дня для каждой группы.
+    Возвращает одну строку на торговый день.
+    """
+    conn = psycopg2.connect(
+        host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
+        user=DB_USER, password=DB_PASSWORD
+    )
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    df = pd.read_sql("""
+        SELECT time, clgroup, buy_orders, sell_orders
+        FROM openinterest_moex
+        WHERE symbol = %s AND time >= %s
+        ORDER BY time ASC
+    """, conn, params=(symbol, since))
+    conn.close()
+
+    if df.empty:
+        return pd.DataFrame()
+
+    # Агрегировать по дате: последняя запись каждого дня для FIZ и YUR
+    df['date'] = df['time'].dt.date
+    df['side'] = df['clgroup'].map({0: 'fiz', 1: 'yur'})
+
+    # Для каждой группы берём последнюю запись дня
+    daily = df.groupby(['date', 'side']).last().reset_index()
+    oi = daily.pivot_table(
+        index='date', columns='side',
+        values=['buy_orders', 'sell_orders'],
+        aggfunc='first'
+    )
+    short = {'buy_orders': 'buy', 'sell_orders': 'sell'}
+    oi.columns = [f'{side}_{short[s]}' for s, side in oi.columns]
+    oi = oi.reset_index()
+    oi['time'] = pd.to_datetime(oi['date']).astype('datetime64[ns]')
+    oi = oi.drop(columns=['date']).sort_values('time')
+    return oi
+
+
+def load_price_daily(symbol: str, days: int) -> pd.DataFrame:
+    """Загрузить D1 свечи из moex_prices (ISS API).
+
+    Таблица уже дневная, с OI (общий, без разделения FIZ/YUR).
+    """
+    conn = psycopg2.connect(
+        host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
+        user=DB_USER, password=DB_PASSWORD
+    )
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    df = pd.read_sql("""
+        SELECT time, open, high, low, last, volume, open_interest
+        FROM moex_prices
+        WHERE symbol = %s AND time >= %s
+        ORDER BY time ASC
+    """, conn, params=(symbol, since))
+    conn.close()
+
+    if df.empty:
+        return df
+
+    df = df.rename(columns={'last': 'close'})
+    df['time'] = df['time'].dt.floor('1D')
+    df['time'] = df['time'].astype('datetime64[ns]')  # unify dtype
+    return df
+
+
 def prepare_data(df_prices: pd.DataFrame, df_oi: pd.DataFrame, symbol: str) -> pd.DataFrame:
     """
     Объединить цены и OI по (symbol, time), добавить метрики.
@@ -153,6 +222,51 @@ def prepare_data(df_prices: pd.DataFrame, df_oi: pd.DataFrame, symbol: str) -> p
         series = df[f'{prefix}_net']
         mean = series.rolling(OI_ROLLING_WINDOW, min_periods=50).mean()
         std = series.rolling(OI_ROLLING_WINDOW, min_periods=50).std()
+        df[f'{prefix}_zscore'] = ((series - mean) / std.replace(0, np.nan)).fillna(0)
+
+    df['fiz_bias'] = np.sign(df['fiz_net'])
+    return df
+
+
+# ── D1 path (OI меняется раз в день, z-score имеет смысл только на D1) ──
+
+OI_DAILY_WINDOW = 20  # rolling z-score окно в днях
+
+def prepare_oi_daily(df_prices: pd.DataFrame, df_oi: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    """Объединить D1 цены с дневным OI, вычислить метрики.
+
+    Использует 20-дневное rolling окно для z-score (осмысленно на D1).
+    """
+    import re
+    if df_oi.empty:
+        df = df_prices.copy()
+        df['has_oi'] = False
+        return df
+
+    df_prices['symbol'] = symbol
+    df_oi['symbol'] = symbol
+
+    df = pd.merge_asof(
+        df_prices.sort_values(['symbol', 'time']),
+        df_oi.sort_values(['symbol', 'time']),
+        on='time', by='symbol', direction='backward',
+    )
+    oi_max_time = df_oi['time'].max() if not df_oi.empty else pd.NaT
+    df['has_oi'] = df['time'] <= oi_max_time if not pd.isna(oi_max_time) else False
+
+    for col in ['fiz_buy', 'fiz_sell', 'yur_buy', 'yur_sell']:
+        if col in df.columns:
+            df[col] = df[col].fillna(0.0)
+
+    # OI метрики на D1
+    for prefix in ['fiz', 'yur']:
+        df[f'{prefix}_net'] = df[f'{prefix}_buy'] - df[f'{prefix}_sell']
+        df[f'{prefix}_net_delta'] = df[f'{prefix}_net'].diff()  # дневное изменение
+
+        # 20-дневное rolling z-score (осмысленно на D1 с ежедневным OI)
+        series = df[f'{prefix}_net']
+        mean = series.rolling(OI_DAILY_WINDOW, min_periods=10).mean()
+        std = series.rolling(OI_DAILY_WINDOW, min_periods=10).std()
         df[f'{prefix}_zscore'] = ((series - mean) / std.replace(0, np.nan)).fillna(0)
 
     df['fiz_bias'] = np.sign(df['fiz_net'])
@@ -672,18 +786,16 @@ def calc_atr(df: pd.DataFrame, period: int = 14) -> np.ndarray:
     return pd.Series(tr).rolling(period, min_periods=period).mean().values
 
 
-def detect_all(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD,
-               use_oi: bool = True) -> list:
+def detect_all_5m(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD) -> list:
     """
-    Запустить все детекторы. Вернуть список паттернов.
+    Детекция на 5-минутных барах.
 
-    Args:
-        df: DataFrame с ценами, OI, свинговыми уровнями
-        zscore_threshold: порог z-score для OI_EXTREME
-        use_oi: если False — только ценовые паттерны
+    Ценовые паттерны (VOL_CLIMAX, STOP_HUNT, FALSE_BREAK)
+    + потоковые OI-паттерны (FLOW_EXTREME, FLOW_DIVERGENCE) — работают
+    с 5-минутным потоком fiz_flow, который имеет смысл на 5m.
 
-    Returns:
-        list[dict] — паттерны, отсортированные по времени
+    OI-уровневые паттерны (OI_EXTREME, OI_TRAP, OI_DIVERGENCE)
+    вынесены в detect_all_d1 — OI меняется раз в день.
     """
     df = find_swing_points(df)
     patterns = []
@@ -691,20 +803,16 @@ def detect_all(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD,
     patterns.extend(detect_stop_hunts(df))
     patterns.extend(detect_volume_climax(df))
 
-    if use_oi and 'fiz_net' in df.columns and df['has_oi'].any():
-        patterns.extend(detect_oi_traps(df))
-        patterns.extend(detect_oi_extreme(df, zscore_threshold))
+    if 'fiz_flow_zscore' in df.columns and df['has_oi'].any():
         patterns.extend(detect_flow_extreme(df, zscore_threshold))
         patterns.extend(detect_flow_divergence(df, zscore_threshold))
 
-    # Forward return verification (для OI-паттернов)
+    # Forward return + ATR-фильтр
     patterns = add_forward_returns(patterns, df)
-
-    # ATR-фильтр (только ценовые паттерны)
     atr = calc_atr(df)
     filtered = []
     for p in patterns:
-        if p['type'] in ('OI_TRAP', 'OI_DIVERGENCE', 'OI_EXTREME', 'FLOW_EXTREME', 'FLOW_DIVERGENCE'):
+        if p['type'] in ('FLOW_EXTREME', 'FLOW_DIVERGENCE'):
             filtered.append(p)
             continue
         idx = p['swing_idx']
@@ -725,7 +833,6 @@ def detect_all(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD,
             if r >= max(0.05, atr_pct * 0.4):
                 filtered.append(p)
 
-    # Дедупликация
     seen = set()
     result = []
     for p in sorted(filtered, key=lambda x: x['time']):
@@ -733,8 +840,96 @@ def detect_all(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD,
         if key not in seen:
             seen.add(key)
             result.append(p)
-
     return result
+
+
+def detect_all_d1(df_daily: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD) -> list:
+    """
+    Детекция на дневных барах с корректным OI z-score.
+
+    OI меняется раз в день — только на D1 z-score имеет смысл.
+    OI_EXTREME, OI_TRAP, OI_DIVERGENCE.
+    """
+    patterns = []
+    if 'fiz_net' not in df_daily.columns or not df_daily['has_oi'].any():
+        return patterns
+
+    patterns.extend(detect_oi_traps(df_daily))
+    patterns.extend(detect_oi_extreme(df_daily, zscore_threshold))
+
+    # OI_DIVERGENCE уже добавляется внутри detect_oi_traps
+
+    # Forward return на D1 (1 день = 1 бар)
+    patterns = _add_forward_returns_daily(patterns, df_daily)
+
+    seen = set()
+    result = []
+    for p in sorted(patterns, key=lambda x: x['time']):
+        key = (p['type'], str(p['time']))
+        if key not in seen:
+            seen.add(key)
+            result.append(p)
+    return result
+
+
+def _add_forward_returns_daily(patterns: list, df: pd.DataFrame) -> list:
+    """Forward return на дневных барах: 1d, 3d, 5d, 10d."""
+    closes = df['close'].values
+    n = len(closes)
+    horizons = {'1d': 1, '3d': 3, '5d': 5, '10d': 10}
+
+    for p in patterns:
+        idx = p['swing_idx']
+        entry_price = float(closes[idx])
+        p['entry_price'] = entry_price
+
+        for label, bars in horizons.items():
+            fwd_idx = idx + bars
+            if fwd_idx < n:
+                ret = (closes[fwd_idx] - entry_price) / entry_price * 100
+                p[f'fwd_ret_{label}'] = round(float(ret), 2)
+            else:
+                p[f'fwd_ret_{label}'] = None
+
+        direction = p['direction']
+        if direction == 'BEAR':
+            p['success'] = any(
+                p.get(f'fwd_ret_{label}', 0) is not None and p[f'fwd_ret_{label}'] < -0.3
+                for label in horizons
+            )
+        elif direction == 'BULL':
+            p['success'] = any(
+                p.get(f'fwd_ret_{label}', 0) is not None and p[f'fwd_ret_{label}'] > 0.3
+                for label in horizons
+            )
+        else:
+            p['success'] = None
+    return patterns
+
+
+def detect_all(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD,
+               use_oi: bool = True, df_daily: pd.DataFrame = None) -> list:
+    """
+    Запустить все детекторы на 5m и (опционально) D1.
+
+    Args:
+        df: 5-min bars DataFrame
+        zscore_threshold: порог z-score
+        use_oi: загружать OI-паттерны
+        df_daily: D1 bars DataFrame (для OI-уровней). Если None — OI-уровневые
+                  паттерны не детектятся.
+
+    Returns:
+        list[dict] — паттерны, отсортированные по времени
+    """
+    patterns_5m = detect_all_5m(df, zscore_threshold)
+
+    patterns_d1 = []
+    if use_oi and df_daily is not None and not df_daily.empty:
+        patterns_d1 = detect_all_d1(df_daily, zscore_threshold)
+
+    merged = sorted(patterns_5m + patterns_d1, key=lambda x: x['time'])
+    return merged
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -860,7 +1055,15 @@ def main():
     df = prepare_data(df_prices, df_oi, symbol)
     oi_info = oi_summary(df)
 
-    patterns = detect_all(df, args.zscore, use_oi=not args.no_oi and not df_oi.empty)
+    # D1 data for OI-level patterns
+    df_daily = None
+    if not args.no_oi:
+        df_p_daily = load_price_daily(symbol, args.days)
+        df_o_daily = load_oi_daily(symbol, args.days)
+        if not df_p_daily.empty:
+            df_daily = prepare_oi_daily(df_p_daily, df_o_daily, symbol)
+
+    patterns = detect_all(df, args.zscore, use_oi=not args.no_oi and not df_oi.empty, df_daily=df_daily)
     print_report(symbol, df, patterns, oi_info)
 
 

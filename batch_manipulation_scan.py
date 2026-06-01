@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from manipulation_search import (
     load_price_data, load_oi_data, prepare_data,
+    load_price_daily, load_oi_daily, prepare_oi_daily,
     detect_all, oi_summary, resolve_symbol, ZSCORE_THRESHOLD
 )
 
@@ -41,7 +42,13 @@ def run_scan(tickers: list, days: int, zscore: float) -> list:
         df_o = load_oi_data(sym, days)
         df = prepare_data(df_p, df_o, sym)
         oi = oi_summary(df)
-        patterns = detect_all(df, zscore, use_oi=not df_o.empty)
+
+        # D1 data for OI-level patterns
+        df_p_daily = load_price_daily(sym, days)
+        df_o_daily = load_oi_daily(sym, days)
+        df_daily = prepare_oi_daily(df_p_daily, df_o_daily, sym) if not df_p_daily.empty else None
+
+        patterns = detect_all(df, zscore, use_oi=not df_o.empty, df_daily=df_daily)
 
         r = {
             'symbol': t,

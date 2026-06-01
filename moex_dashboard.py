@@ -3,10 +3,12 @@
 MOEX Manipulation Dashboard — сервер.
 """
 import sys, os, json, argparse
+from datetime import timedelta
 from pathlib import Path
 
 from manipulation_search import (
     load_price_data, load_oi_data, prepare_data,
+    load_price_daily, load_oi_daily, prepare_oi_daily,
     detect_all, resolve_symbol, ZSCORE_THRESHOLD
 )
 
@@ -45,7 +47,13 @@ def load_cache(symbol: str, days: int, zscore: float):
         fm = df['yur_flow'].rolling(288, min_periods=50).mean()
         fs = df['yur_flow'].rolling(288, min_periods=50).std()
         df['yur_flow_zscore'] = ((df['yur_flow'] - fm) / fs.replace(0, np.nan)).fillna(0)
-    patterns = detect_all(df, zscore, use_oi=('fiz_net' in df.columns and df['has_oi'].any()))
+
+    # D1 data for OI-level patterns
+    df_p_daily = load_price_daily(symbol, days)
+    df_o_daily = load_oi_daily(symbol, days)
+    df_daily = prepare_oi_daily(df_p_daily, df_o_daily, symbol) if not df_p_daily.empty else None
+
+    patterns = detect_all(df, zscore, use_oi=('fiz_net' in df.columns and df['has_oi'].any()), df_daily=df_daily)
     _cache.update({'key': key, 'df': df, 'patterns': patterns, 'symbol': symbol, 'days': days, 'error': None})
     print(f"  {len(df)} bars, {len(patterns)} patterns")
 
@@ -79,22 +87,36 @@ def calc_equity(patterns, capital=10000):
     """Calculate equity curve trading 1 lot at pattern signals.
     BULL → long, BEAR → short. Exit at 6h forward return.
     For Si: 1 lot notional ≈ entry_price RUB.
+
+    Non-overlapping: не более 1 сделки в 6-часовом окне,
+    чтобы не засчитывать одно движение цены многократно.
     """
     trades = []
-    for p in patterns:
+    last_entry = None
+    for p in sorted(patterns, key=lambda x: x.get('time', '')):
         direction = p.get('direction')
         if direction not in ('BULL', 'BEAR'):
             continue
         fwd = p.get('fwd_ret_6h')
         if fwd is None:
             continue
+        # Пропустить сигналы, перекрывающиеся с предыдущей сделкой
+        t = p.get('time')
+        if isinstance(t, pd.Timestamp) or isinstance(t, str):
+            if isinstance(t, str):
+                pt = pd.Timestamp(t)
+            else:
+                pt = t
+            if last_entry is not None and pt - last_entry < timedelta(hours=6):
+                continue
+            last_entry = pt
+
         sign = 1 if direction == 'BULL' else -1
         entry = p.get('entry_price', 0)
         # 1 lot Si: notional = entry_price * 1 (price in RUB per 1000 USD)
         pnl_pct = sign * fwd / 100.0
         pnl_rub = entry * pnl_pct  # 1 lot
         capital += pnl_rub
-        t = p.get('time')
         if isinstance(t, pd.Timestamp):
             t = t.isoformat()
         trades.append({
