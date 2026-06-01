@@ -164,25 +164,32 @@ def prepare_data(df_prices: pd.DataFrame, df_oi: pd.DataFrame, symbol: str) -> p
 # ══════════════════════════════════════════════════════════════════════
 
 def find_swing_points(df: pd.DataFrame, window: int = SWING_WINDOW) -> pd.DataFrame:
-    """Найти свинг-хаи и свинг-лои."""
+    """Найти свинг-хаи и свинг-лои.
+
+    Backward-looking: свинг на баре j считается подтверждённым на баре j+window,
+    когда известны window баров после него. Никакого заглядывания в будущее.
+    """
     highs = df['high'].values
     lows = df['low'].values
     n = len(highs)
     swing_highs = np.full(n, np.nan)
     swing_lows = np.full(n, np.nan)
 
-    for i in range(window, n - window):
-        if highs[i] == max(highs[i - window:i + window + 1]):
-            left_avg = np.mean(highs[i - window:i])
-            right_avg = np.mean(highs[i + 1:i + window + 1])
-            if highs[i] > max(left_avg, right_avg) * 1.001:
-                swing_highs[i] = highs[i]
+    # На баре i подтверждаем свинг на баре j = i - window
+    for i in range(2 * window, n):
+        j = i - window  # кандидат в свинг, now confirmed with window bars after it
 
-        if lows[i] == min(lows[i - window:i + window + 1]):
-            left_avg = np.mean(lows[i - window:i])
-            right_avg = np.mean(lows[i + 1:i + window + 1])
-            if lows[i] < min(left_avg, right_avg) * 0.999:
-                swing_lows[i] = lows[i]
+        if highs[j] == max(highs[j - window:j + window + 1]):
+            left_avg = np.mean(highs[j - window:j])
+            right_avg = np.mean(highs[j + 1:j + window + 1])
+            if highs[j] > max(left_avg, right_avg) * 1.001:
+                swing_highs[j] = highs[j]
+
+        if lows[j] == min(lows[j - window:j + window + 1]):
+            left_avg = np.mean(lows[j - window:j])
+            right_avg = np.mean(lows[j + 1:j + window + 1])
+            if lows[j] < min(left_avg, right_avg) * 0.999:
+                swing_lows[j] = lows[j]
 
     df = df.copy()
     df['swing_high'] = swing_highs
@@ -223,7 +230,7 @@ def detect_false_breakouts(df: pd.DataFrame) -> list:
                     patterns.append({
                         'type': 'FALSE_BREAK', 'direction': 'BEAR',
                         'time': pd.Timestamp(times[j_break]),
-                        'swing_idx': int(idx), 'swing_level': float(sh),
+                        'swing_idx': int(j_break), 'swing_level': float(sh),
                         'rejection_pct': round((peak - sh) / sh * 100, 2),
                         'has_oi': bool(df.iloc[j_break]['has_oi']),
                     })
@@ -245,7 +252,7 @@ def detect_false_breakouts(df: pd.DataFrame) -> list:
                     patterns.append({
                         'type': 'FALSE_BREAK', 'direction': 'BULL',
                         'time': pd.Timestamp(times[j_break]),
-                        'swing_idx': int(idx), 'swing_level': float(sl),
+                        'swing_idx': int(j_break), 'swing_level': float(sl),
                         'rejection_pct': round((sl - trough) / sl * 100, 2),
                         'has_oi': bool(df.iloc[j_break]['has_oi']),
                     })
@@ -254,7 +261,11 @@ def detect_false_breakouts(df: pd.DataFrame) -> list:
 
 
 def detect_stop_hunts(df: pd.DataFrame) -> list:
-    """Охота за стопами."""
+    """Охота за стопами.
+
+    Чисто ценовой паттерн: длинный фитиль у свингового уровня.
+    Без подтверждения будущими барами — forward return проверит исход.
+    """
     patterns = []
     n = len(df)
     highs = df['high'].values; lows = df['low'].values
@@ -262,7 +273,7 @@ def detect_stop_hunts(df: pd.DataFrame) -> list:
     times = df['time'].values
     swing_highs = df['swing_high'].values; swing_lows = df['swing_low'].values
 
-    for i in range(1, n - 3):
+    for i in range(1, n):
         body = abs(closes[i] - opens[i])
         if body == 0: continue
         upper_wick = highs[i] - max(opens[i], closes[i])
@@ -270,7 +281,7 @@ def detect_stop_hunts(df: pd.DataFrame) -> list:
 
         if upper_wick > body * WICK_BODY_RATIO and upper_wick > lower_wick:
             wick_r = upper_wick / (upper_wick + lower_wick) if (upper_wick + lower_wick) > 0 else 0
-            if wick_r > 0.65 and _near_swing_high(i, highs, swing_highs) and _down_conf(closes, i):
+            if wick_r > 0.65 and _near_swing_high(i, highs, swing_highs):
                 patterns.append({
                     'type': 'STOP_HUNT', 'direction': 'BEAR',
                     'time': pd.Timestamp(times[i]),
@@ -280,7 +291,7 @@ def detect_stop_hunts(df: pd.DataFrame) -> list:
 
         if lower_wick > body * WICK_BODY_RATIO and lower_wick > upper_wick:
             wick_r = lower_wick / (upper_wick + lower_wick) if (upper_wick + lower_wick) > 0 else 0
-            if wick_r > 0.65 and _near_swing_low(i, lows, swing_lows) and _up_conf(closes, i):
+            if wick_r > 0.65 and _near_swing_low(i, lows, swing_lows):
                 patterns.append({
                     'type': 'STOP_HUNT', 'direction': 'BULL',
                     'time': pd.Timestamp(times[i]),
@@ -308,16 +319,12 @@ def _near_swing_low(i, lows, swing_lows, window=SWING_WINDOW):
     return False
 
 
-def _down_conf(closes, i):
-    return i + 3 < len(closes) and closes[i + 1] < closes[i] and closes[i + 2] < closes[i + 1]
-
-
-def _up_conf(closes, i):
-    return i + 3 < len(closes) and closes[i + 1] > closes[i] and closes[i + 2] > closes[i + 1]
-
-
 def detect_volume_climax(df: pd.DataFrame) -> list:
-    """Объёмный климакс + откат."""
+    """Объёмный климакс.
+
+    Аномальный объём (без подтверждения будущими барами).
+    Forward return покажет, был ли откат.
+    """
     patterns = []
     n = len(df)
     volumes = df['volume'].values.astype(float)
@@ -326,7 +333,7 @@ def detect_volume_climax(df: pd.DataFrame) -> list:
     times = df['time'].values
     vol_ma = pd.Series(volumes).rolling(VOLUME_WINDOW, min_periods=VOLUME_WINDOW // 2).mean().values
 
-    for i in range(1, n - 3):
+    for i in range(1, n):
         if np.isnan(vol_ma[i]) or vol_ma[i] == 0: continue
         vol_r = volumes[i] / vol_ma[i]
         if vol_r < VOLUME_THRESHOLD: continue
@@ -335,30 +342,22 @@ def detect_volume_climax(df: pd.DataFrame) -> list:
         rpct = tr / ((highs[i] + lows[i]) / 2)
         if rpct < 0.001: continue
 
-        if closes[i] > opens[i]:
-            if i + 3 < n and closes[i + 1] < closes[i] and closes[i + 2] < closes[i + 1]:
-                patterns.append({
-                    'type': 'VOL_CLIMAX', 'direction': 'BEAR',
-                    'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
-                    'volume_ratio': round(float(vol_r), 1),
-                    'range_pct': round(float(rpct * 100), 3),
-                    'has_oi': bool(df.iloc[i]['has_oi']),
-                })
-        else:
-            if i + 3 < n and closes[i + 1] > closes[i] and closes[i + 2] > closes[i + 1]:
-                patterns.append({
-                    'type': 'VOL_CLIMAX', 'direction': 'BULL',
-                    'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
-                    'volume_ratio': round(float(vol_r), 1),
-                    'range_pct': round(float(rpct * 100), 3),
-                    'has_oi': bool(df.iloc[i]['has_oi']),
-                })
+        direction = 'BEAR' if closes[i] > opens[i] else 'BULL'
+        patterns.append({
+            'type': 'VOL_CLIMAX', 'direction': direction,
+            'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
+            'volume_ratio': round(float(vol_r), 1),
+            'range_pct': round(float(rpct * 100), 3),
+            'has_oi': bool(df.iloc[i]['has_oi']),
+        })
     return patterns
 
 
 def detect_oi_traps(df: pd.DataFrame) -> list:
     """
     OI-ловушки: цена и FIZ в одном направлении, затем разворот.
+
+    Сигнал ставится на бар ПОДТВЕРЖДЕНИЯ (k), а не на триггер (i).
     """
     patterns = []
     if 'fiz_net' not in df.columns or 'fiz_net_delta' not in df.columns:
@@ -387,7 +386,9 @@ def detect_oi_traps(df: pd.DataFrame) -> list:
                 if closes[k] < closes[i] * 0.998:
                     patterns.append({
                         'type': 'OI_TRAP', 'direction': 'BEAR',
-                        'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
+                        'time': pd.Timestamp(times[k]),
+                        'swing_idx': int(k),
+                        'trigger_time': pd.Timestamp(times[i]),
                         'fiz_net': float(fiz_net[i]),
                         'fiz_delta': float(fiz_delta[i]),
                         'has_oi': True,
@@ -398,14 +399,16 @@ def detect_oi_traps(df: pd.DataFrame) -> list:
                 if closes[k] > closes[i] * 1.002:
                     patterns.append({
                         'type': 'OI_TRAP', 'direction': 'BULL',
-                        'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
+                        'time': pd.Timestamp(times[k]),
+                        'swing_idx': int(k),
+                        'trigger_time': pd.Timestamp(times[i]),
                         'fiz_net': float(fiz_net[i]),
                         'fiz_delta': float(fiz_delta[i]),
                         'has_oi': True,
                     })
                     break
 
-        # OI-дивергенция
+        # OI-дивергенция (не требует подтверждения — только текущий бар)
         diverged = False
         if price_up and fiz_down and abs(fiz_delta[i]) > abs(fiz_net[i]) * 0.02:
             diverged = True
@@ -427,6 +430,8 @@ def detect_oi_traps(df: pd.DataFrame) -> list:
 def detect_oi_extreme(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD) -> list:
     """
     OI-экстремумы: |z-score FIZ_net| > порог + разворот цены.
+
+    Сигнал ставится на бар ПОДТВЕРЖДЕНИЯ (k), а не на триггер (i).
     """
     patterns = []
     if 'fiz_net' not in df.columns or 'fiz_zscore' not in df.columns:
@@ -455,7 +460,9 @@ def detect_oi_extreme(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHO
                 if closes[k] < closes[i] * 0.998:
                     patterns.append({
                         'type': 'OI_EXTREME', 'direction': 'BEAR',
-                        'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
+                        'time': pd.Timestamp(times[k]),
+                        'swing_idx': int(k),
+                        'trigger_time': pd.Timestamp(times[i]),
                         'fiz_net': float(fiz_net[i]),
                         'fiz_zscore': float(fiz_zscore[i]),
                         'has_oi': True,
@@ -466,7 +473,9 @@ def detect_oi_extreme(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHO
                 if closes[k] > closes[i] * 1.002:
                     patterns.append({
                         'type': 'OI_EXTREME', 'direction': 'BULL',
-                        'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
+                        'time': pd.Timestamp(times[k]),
+                        'swing_idx': int(k),
+                        'trigger_time': pd.Timestamp(times[i]),
                         'fiz_net': float(fiz_net[i]),
                         'fiz_zscore': float(fiz_zscore[i]),
                         'has_oi': True,
@@ -478,6 +487,8 @@ def detect_oi_extreme(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHO
 def detect_flow_extreme(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD) -> list:
     """
     Экстремальный поток толпы: |fiz_flow_zscore| > порог + разворот цены.
+
+    Сигнал ставится на бар ПОДТВЕРЖДЕНИЯ (k), а не на триггер (i).
 
     fiz_flow_zscore > +2  → толпа аномально много купила за 5 мин → разворот вниз
     fiz_flow_zscore < -2  → толпа аномально много продала за 5 мин → разворот вверх
@@ -511,7 +522,9 @@ def detect_flow_extreme(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRES
                 if closes[k] < closes[i] * 0.998:
                     patterns.append({
                         'type': 'FLOW_EXTREME', 'direction': 'BEAR',
-                        'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
+                        'time': pd.Timestamp(times[k]),
+                        'swing_idx': int(k),
+                        'trigger_time': pd.Timestamp(times[i]),
                         'fiz_net': float(fiz_net[i]),
                         'fiz_flow': float(fiz_flow[i]),
                         'fiz_flow_zscore': round(float(fiz_flow_z[i]), 2),
@@ -524,7 +537,9 @@ def detect_flow_extreme(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRES
                 if closes[k] > closes[i] * 1.002:
                     patterns.append({
                         'type': 'FLOW_EXTREME', 'direction': 'BULL',
-                        'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
+                        'time': pd.Timestamp(times[k]),
+                        'swing_idx': int(k),
+                        'trigger_time': pd.Timestamp(times[i]),
                         'fiz_net': float(fiz_net[i]),
                         'fiz_flow': float(fiz_flow[i]),
                         'fiz_flow_zscore': round(float(fiz_flow_z[i]), 2),
