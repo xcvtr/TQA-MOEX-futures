@@ -96,6 +96,8 @@ def save_oi_records(conn, ticker: str, records: list[dict]) -> int:
                 r["time"],
                 r["buy_orders"],
                 r["sell_orders"],
+                r["buy_accounts"],
+                r["sell_accounts"],
                 r["clgroup"],
             ))
 
@@ -103,11 +105,13 @@ def save_oi_records(conn, ticker: str, records: list[dict]) -> int:
         execute_values(
             cur,
             """INSERT INTO openinterest_moex
-               (symbol, time, buy_orders, sell_orders, clgroup)
+               (symbol, time, buy_orders, sell_orders, buy_accounts, sell_accounts, clgroup)
                VALUES %s
                ON CONFLICT (symbol, time, clgroup)
                DO UPDATE SET buy_orders = EXCLUDED.buy_orders,
-                             sell_orders = EXCLUDED.sell_orders""",
+                             sell_orders = EXCLUDED.sell_orders,
+                             buy_accounts = EXCLUDED.buy_accounts,
+                             sell_accounts = EXCLUDED.sell_accounts""",
             rows,
         )
         inserted = cur.rowcount
@@ -228,6 +232,8 @@ def fetch_oi_day(ticker: str, day: date, cookie: Optional[str] = None) -> Option
                 try:
                     buy_orders = int(row[7]) if row[7].strip() else 0
                     sell_orders = abs(int(row[8])) if row[8].strip() else 0
+                    buy_accounts = int(row[9]) if len(row) > 9 and row[9].strip() else 0
+                    sell_accounts = int(row[10]) if len(row) > 10 and row[10].strip() else 0
                 except (ValueError, IndexError):
                     continue
 
@@ -235,6 +241,8 @@ def fetch_oi_day(ticker: str, day: date, cookie: Optional[str] = None) -> Option
                     "time": dt,
                     "buy_orders": buy_orders,
                     "sell_orders": sell_orders,
+                    "buy_accounts": buy_accounts,
+                    "sell_accounts": sell_accounts,
                     "clgroup": 0 if clgroup_raw == "FIZ" else 1,
                 })
 

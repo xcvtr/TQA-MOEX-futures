@@ -79,7 +79,8 @@ def load_price_data(symbol: str, days: int) -> pd.DataFrame:
 def load_oi_data(symbol: str, days: int) -> pd.DataFrame:
     """
     Загрузить OI (FIZ и YUR) из openinterest_moex.
-    Возвращает таблицу с time, fiz_buy, fiz_sell, yur_buy, yur_sell.
+    Возвращает таблицу с time, fiz_buy, fiz_sell, yur_buy, yur_sell,
+    fiz_buy_acc, fiz_sell_acc, yur_buy_acc, yur_sell_acc.
     """
     conn = psycopg2.connect(
         host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
@@ -87,7 +88,7 @@ def load_oi_data(symbol: str, days: int) -> pd.DataFrame:
     )
     since = datetime.now(timezone.utc) - timedelta(days=days)
     df = pd.read_sql("""
-        SELECT time, clgroup, buy_orders, sell_orders
+        SELECT time, clgroup, buy_orders, sell_orders, buy_accounts, sell_accounts
         FROM openinterest_moex
         WHERE symbol = %s AND time >= %s
         ORDER BY time ASC
@@ -101,10 +102,11 @@ def load_oi_data(symbol: str, days: int) -> pd.DataFrame:
     df['side'] = df['clgroup'].map({0: 'fiz', 1: 'yur'})
     oi = df.pivot_table(
         index='time', columns='side',
-        values=['buy_orders', 'sell_orders'],
+        values=['buy_orders', 'sell_orders', 'buy_accounts', 'sell_accounts'],
         aggfunc='first'
     )
-    short = {'buy_orders': 'buy', 'sell_orders': 'sell'}
+    short = {'buy_orders': 'buy', 'sell_orders': 'sell',
+             'buy_accounts': 'buy_acc', 'sell_accounts': 'sell_acc'}
     oi.columns = [f'{side}_{short[s]}' for s, side in oi.columns]
     oi = oi.reset_index().sort_values('time')
     oi['time'] = oi['time'].dt.floor('5min')
@@ -125,7 +127,7 @@ def load_oi_daily(symbol: str, days: int) -> pd.DataFrame:
     )
     since = datetime.now(timezone.utc) - timedelta(days=days)
     df = pd.read_sql("""
-        SELECT time, clgroup, buy_orders, sell_orders
+        SELECT time, clgroup, buy_orders, sell_orders, buy_accounts, sell_accounts
         FROM openinterest_moex
         WHERE symbol = %s AND time >= %s
         ORDER BY time ASC
@@ -143,10 +145,11 @@ def load_oi_daily(symbol: str, days: int) -> pd.DataFrame:
     daily = df.groupby(['date', 'side']).last().reset_index()
     oi = daily.pivot_table(
         index='date', columns='side',
-        values=['buy_orders', 'sell_orders'],
+        values=['buy_orders', 'sell_orders', 'buy_accounts', 'sell_accounts'],
         aggfunc='first'
     )
-    short = {'buy_orders': 'buy', 'sell_orders': 'sell'}
+    short = {'buy_orders': 'buy', 'sell_orders': 'sell',
+             'buy_accounts': 'buy_acc', 'sell_accounts': 'sell_acc'}
     oi.columns = [f'{side}_{short[s]}' for s, side in oi.columns]
     oi = oi.reset_index()
     oi['time'] = pd.to_datetime(oi['date']).astype('datetime64[ns]')
@@ -266,11 +269,26 @@ def prepare_oi_daily(df_prices: pd.DataFrame, df_oi: pd.DataFrame, symbol: str) 
         df[f'{prefix}_net'] = df[f'{prefix}_buy'] - df[f'{prefix}_sell']
         df[f'{prefix}_net_delta'] = df[f'{prefix}_net'].diff()  # дневное изменение
 
+        # Средний размер позиции на участника
+        if f'{prefix}_buy_acc' in df.columns and f'{prefix}_sell_acc' in df.columns:
+            df[f'{prefix}_avg_long'] = (
+                df[f'{prefix}_buy'] / df[f'{prefix}_buy_acc'].replace(0, np.nan)
+            ).fillna(0)
+            df[f'{prefix}_avg_short'] = (
+                df[f'{prefix}_sell'] / df[f'{prefix}_sell_acc'].replace(0, np.nan)
+            ).fillna(0)
+
         # 20-дневное rolling z-score (осмысленно на D1 с ежедневным OI)
         series = df[f'{prefix}_net']
         mean = series.rolling(OI_DAILY_WINDOW, min_periods=10).mean()
         std = series.rolling(OI_DAILY_WINDOW, min_periods=10).std()
         df[f'{prefix}_zscore'] = ((series - mean) / std.replace(0, np.nan)).fillna(0)
+
+    # Ratio: средний размер YUR счёта / FIZ счёта
+    if 'yur_avg_long' in df.columns and 'fiz_avg_long' in df.columns:
+        df['yur_vs_fiz_ratio'] = (
+            df['yur_avg_long'] / df['fiz_avg_long'].replace(0, np.nan)
+        ).fillna(0)
 
     df['fiz_bias'] = np.sign(df['fiz_net'])
     return df
