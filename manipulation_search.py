@@ -527,15 +527,18 @@ def detect_oi_traps(df: pd.DataFrame) -> list:
 
         # OI-дивергенция (не требует подтверждения — только текущий бар)
         diverged = False
+        div_direction = 'NEUTRAL'
         if price_up and fiz_down and abs(fiz_delta[i]) > abs(fiz_net[i]) * 0.02:
             diverged = True
-            desc = 'Цена растёт, а толпа сокращает лонг — умные деньги выходят'
+            div_direction = 'BEAR'
+            desc = 'Цена растёт, а толпа сокращает лонг — медвежья дивергенция'
         elif price_down and fiz_up and abs(fiz_delta[i]) > abs(fiz_net[i]) * 0.02:
             diverged = True
-            desc = 'Цена падает, а толпа набирает лонг — ловушка'
+            div_direction = 'BULL'
+            desc = 'Цена падает, а толпа набирает лонг — бычья дивергенция'
         if diverged:
             patterns.append({
-                'type': 'OI_DIVERGENCE', 'direction': 'NEUTRAL',
+                'type': 'OI_DIVERGENCE', 'direction': div_direction,
                 'time': pd.Timestamp(times[i]), 'swing_idx': int(i),
                 'fiz_net': float(fiz_net[i]),
                 'fiz_delta': float(fiz_delta[i]),
