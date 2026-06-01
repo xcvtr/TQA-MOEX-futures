@@ -9,7 +9,7 @@ from pathlib import Path
 from manipulation_search import (
     load_price_data, load_oi_data, prepare_data,
     load_price_daily, load_oi_daily, prepare_oi_daily,
-    detect_all, resolve_symbol, ZSCORE_THRESHOLD
+    detect_all, resolve_symbol, ZSCORE_THRESHOLD, TRADE_COST
 )
 
 import numpy as np
@@ -115,7 +115,7 @@ def calc_equity(patterns, capital=10000):
         entry = p.get('entry_price', 0)
         # 1 lot Si: notional = entry_price * 1 (price in RUB per 1000 USD)
         pnl_pct = sign * fwd / 100.0
-        pnl_rub = entry * pnl_pct  # 1 lot
+        pnl_rub = entry * pnl_pct - TRADE_COST  # 1 lot - spread/commission
         capital += pnl_rub
         if isinstance(t, pd.Timestamp):
             t = t.isoformat()

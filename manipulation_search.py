@@ -43,13 +43,16 @@ warnings.filterwarnings('ignore')
 SWING_WINDOW = 10          # свечей влево/вправо для свинга
 BREAK_LOOKAHEAD = 8        # свечей для подтверждения пробоя
 VOLUME_WINDOW = 50         # окно средней волатильности
-VOLUME_THRESHOLD = 2.0     # порог объёмного климакса
+VOLUME_THRESHOLD = 3.5     # порог объёмного климакса (было 2.0 — слишком много шума)
 WICK_BODY_RATIO = 2.0      # фитиль / тело для стоп-ханта
 BREAK_EPSILON = 0.0005     # мин. пробой (0.05%)
 OI_WINDOW = 12             # окно OI скользящего среднего
 OI_CHANGE_PCT = 0.001      # мин. изменение OI (0.1%)
 ZSCORE_THRESHOLD = 2.0     # порог z-score
 OI_ROLLING_WINDOW = 576    # 2 дня по 288 свечей
+
+# ── Торговые издержки ─────────────────────────────────────────────────
+TRADE_COST = 20  # RUB на сделку (спред ~10-15 + комиссия ~2-5 за контракт Si)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -810,6 +813,7 @@ def detect_all_5m(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD) 
     # Forward return + ATR-фильтр
     patterns = add_forward_returns(patterns, df)
     atr = calc_atr(df)
+    atr_median = np.nanmedian(atr)  # медианный ATR за период
     filtered = []
     for p in patterns:
         if p['type'] in ('FLOW_EXTREME', 'FLOW_DIVERGENCE'):
@@ -820,6 +824,11 @@ def detect_all_5m(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD) 
             continue
         price = float(df.iloc[idx]['close'])
         atr_pct = atr[idx] / price * 100
+
+        # Режимный фильтр: рынок должен быть активнее медианы
+        if atr[idx] < atr_median * 0.6:
+            continue
+
         if p['type'] == 'FALSE_BREAK':
             r = abs(p.get('rejection_pct', 0))
             if r >= max(0.05, atr_pct * 0.3):
@@ -928,8 +937,29 @@ def detect_all(df: pd.DataFrame, zscore_threshold: float = ZSCORE_THRESHOLD,
     if use_oi and df_daily is not None and not df_daily.empty:
         patterns_d1 = detect_all_d1(df_daily, zscore_threshold)
 
-    merged = sorted(patterns_5m + patterns_d1, key=lambda x: x['time'])
-    return merged
+    # Merge and dedup: max 1 signal per bar, highest confidence wins
+    merged = patterns_5m + patterns_d1
+    merged.sort(key=lambda x: x['time'])
+    
+    # Confidence score for dedup
+    def _confidence(p):
+        score = 0
+        z = abs(p.get('fiz_zscore', 0) or p.get('fiz_flow_zscore', 0) or 0)
+        score += min(z, 5)  # z-score до 5
+        if z > 3: score += 0.5
+        if p['type'] in ('FLOW_DIVERGENCE', 'OI_TRAP', 'OI_EXTREME'):
+            score += 0.5  # confluence bonus
+        score += min(p.get('volume_ratio', 0) / 3.5, 0.5)  # volume bonus
+        return score
+
+    best_per_bar = {}
+    for p in merged:
+        bar_key = str(p['time'])
+        if bar_key not in best_per_bar or _confidence(p) > _confidence(best_per_bar[bar_key]):
+            best_per_bar[bar_key] = p
+
+    result = sorted(best_per_bar.values(), key=lambda x: x['time'])
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════
