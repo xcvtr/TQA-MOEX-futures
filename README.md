@@ -427,21 +427,25 @@ pip install requests psycopg2-binary pandas numpy matplotlib starlette uvicorn
 
 ## Быстрый старт (V8)
 
+**Требования:**
+- `ALOR_JWT` — JWT-токен Alor (в конфиге: `config.py` читает из переменной окружения)
+- `MOEX_LOGIN` / `MOEX_PASSWORD` — для полного доступа к OI (без них MOEX скрывает последние 14 дней)
+
 ```bash
-# Загрузить данные (если ещё нет)
+# 1. Загрузить 5m бары из Alor (нужен ALOR_JWT)
 python3 price_history_5m.py Si BR NG GD
 
-# Загрузить OI
+# 2. Загрузить OI из MOEX ISS
 python3 loader.py 90
 
-# Запустить детектор V8
+# 3. Запустить детектор V8
 python3 whale_detector.py          # Si (default)
 python3 whale_detector.py GD BR    # указать тикеры
 
-# Сгенерировать дашборд
+# 4. Сгенерировать дашборд
 python3 generate_equity_report.py
 
-# Открыть дашборд
+# 5. Открыть дашборд
 python3 -m http.server 5055
 # → http://localhost:5055/dashboard.html
 ```
