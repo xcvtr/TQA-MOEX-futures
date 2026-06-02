@@ -391,17 +391,37 @@ pip install requests psycopg2-binary pandas numpy matplotlib starlette uvicorn
 **Сервер:** `python3 -m http.server 5055` в корне проекта  
 **Ссылка:** http://localhost:5055/dashboard.html
 
-### Скрипты V8
+### Все скрипты анализа
 
 | Скрипт | Назначение |
 |--------|-----------|
-| `whale_detector.py` | Детектор V8 — D1 паттерны на OI + цена |
-| `generate_equity_report.py` | Генератор дашборда (читает БД → HTML) |
-| `dashboard.html` | Готовый дашборд (Canvas, без зависимостей) |
-| `check_5m_data.py` | Проверка качества 5m данных |
-| `check_oi_quality.py` | Проверка качества OI |
-| `compare_alor_vs_db.py` | Сверка Alor API vs БД |
-| `compare_alor_vs_moex.py` | Сверка Alor vs MOEX ISS |
+| **Детекторы** | |
+| `whale_detector.py` | V8: D1 паттерны OI + цена (77.8% WR на Si) |
+| `whale_patterns.py` | Библиотека паттернов (7 бычьих + 6 медвежьих) |
+| **Генерация отчётов** | |
+| `generate_equity_report.py` | Чтение БД → HTML дашборд |
+| `dashboard.html` | Готовый дашборд (Canvas 2D, 0 зависимостей) |
+| **Проверка качества данных** | |
+| `check_5m_data.py` | Проверка 5m баров (пропуски, аномалии V=0) |
+| `check_oi_quality.py` | Проверка OI (FIZ/YUR, пропуски) |
+| `check_oi_status.py` | Статус загрузки OI по тикерам |
+| `check_alor_endpoints.py` | Проверка доступности Alor API |
+| `check_contracts.py` | Проверка контрактов на MOEX |
+| **Сверка источников** | |
+| `compare_alor_vs_db.py` | Alor API vs локальная БД |
+| `compare_alor_vs_moex.py` | Alor vs MOEX ISS |
+| `compare_all_tickers.py` | Массовое сравнение всех тикеров |
+| `deep_dive_mismatches.py` | Анализ конкретных расхождений |
+| **Исследование** | |
+| `explore_alor_api.py` | Разведка API Alor |
+| `explore_oi_structure.py` | Структура OI данных |
+| **Верификация загрузки** | |
+| `verify_br.py` | Верификация BR |
+| `verify_reload.py` | Верификация перезагрузки |
+| `reload_eu_br.py` | Перезагрузка Eu/BR |
+| `fast_fill_oi_accounts.py` | Быстрое заполнение OI счетов |
+| `load_eod_oi.py` | Загрузка OI на конец дня |
+| `migrate_oi_accounts.py` | Миграция OI счетов |
 
 ---
 
