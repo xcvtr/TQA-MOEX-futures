@@ -98,10 +98,14 @@ function drawChart(c,d,o){
   for(var i=0;i<=5;i++){var vv=ymx-(i/5)*yr;cx.fillText(o.fmt?o.fmt(vv):vv.toFixed(2),pa.left-6,pa.top+(i/5)*ih+3)}
   cx.textAlign='center';
   for(var i=0;i<N;i+=Math.max(1,Math.floor((N-1)/7))){cx.fillText(dt[i].length>7?dt[i].slice(5):dt[i],xp(i),H-8)}
-  for(var i=0;i<N;i++){
-    var xx=xp(i),up=cl[i]>=op[i],co=up?'#3fb950':'#f85149',tp=up?cl[i]:op[i],bt=up?op[i]:cl[i];
-    cx.fillStyle=co;cx.fillRect(xx-cw/2,yp(tp),cw,Math.max(1,yp(bt)-yp(tp)));
-    cx.strokeStyle=co;cx.lineWidth=.8;cx.beginPath();cx.moveTo(xx,yp(hi[i]));cx.lineTo(xx,yp(lo[i]));cx.stroke()}
+  // Line chart (replace candles for trade clarity)
+  cx.strokeStyle='#58a6ff';cx.lineWidth=1.5;cx.beginPath();
+  for(var i=0;i<N;i++){var xx=xp(i),yy=yp(cl[i]);if(i===0)cx.moveTo(xx,yy);else cx.lineTo(xx,yy)}
+  cx.stroke();
+  // Fill below
+  var lastX=xp(N-1),lastY=yp(cl[N-1]);
+  cx.lineTo(lastX,pa.top+ih);cx.lineTo(xp(0),pa.top+ih);cx.closePath();
+  cx.fillStyle='rgba(88,166,255,0.06)';cx.fill();
   var sx=d.sx||[],sy=d.sy||[],sdir=d.sdir||[],sw=d.sw||[],ex=d.ex||[],ey=d.ey||[];
   for(var s=0;s<sx.length;s++){
     var ei=dt.indexOf(sx[s]),xi=dt.indexOf(ex[s]);if(ei<0||xi<0)continue;
