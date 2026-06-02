@@ -158,7 +158,7 @@ function renderAll(){
   var tbl=document.getElementById('sigtable');
   var htm='<tr><th>Date</th><th>Dir</th><th>Entry</th><th>Exit</th><th>PnL</th><th>GO'+GO_PCT+'%</th><th>Result</th></tr>';document.getElementById('filter-go').textContent=GO_PCT;
   for(var i=0;i<vw.sx.length;i++){
-    var pnl=((vw.ey[i]-vw.sy[i])/vw.sy[i]*100),lp=pnl*lev,dir=vw.sdir[i]||'LONG',c1=dir==='LONG'?'#3fb950':'#f85149',w=vw.sw[i];
+    var dir=vw.sdir[i]||'LONG',pnl=((dir==='LONG'?vw.ey[i]-vw.sy[i]:vw.sy[i]-vw.ey[i])/vw.sy[i]*100),lp=pnl*lev,c1=dir==='LONG'?'#3fb950':'#f85149',w=vw.sw[i];
     if(FILTER!=='all'&&(FILTER==='win')!==w)continue;
     var rc=' class="'+(w?'win':'loss')+'-row"';
     htm+='<tr'+rc+'><td>'+vw.sx[i]+'</td><td style="color:'+c1+'">'+dir+'</td><td class="num">'+fmt(vw.sy[i],CURRENT)+'</td><td class="num">'+fmt(vw.ey[i],CURRENT)+'</td><td class="num '+(pnl>=0?'win':'loss')+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</td><td class="num '+(lp>=0?'win':'loss')+'">'+(lp>=0?'+':'')+lp.toFixed(1)+'%</td><td class="'+(w?'win':'loss')+'">'+(w?'WIN':'LOSS')+'</td></tr>'}
