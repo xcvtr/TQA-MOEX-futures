@@ -152,7 +152,10 @@ def compute_features(data, tf, has_oi=True):
             d[f"ret_{fp}"] = (data[fi]['close']-d['close'])/d['close']*100
     return data
 
-def analyze(data, ms=3, dom=3.0, has_oi=True):
+def analyze(data, ms=3, dom=3.0, has_oi=True, h4_scale=None):
+    if h4_scale is not None:
+        return _analyze_h4(data, ms, dom, has_oi, h4_scale)
+    lp = {'short':3,'long':5}
     BULLISH = []
     BEARISH = []
     if has_oi:
@@ -195,6 +198,38 @@ def analyze(data, ms=3, dom=3.0, has_oi=True):
             sigs.append({"time":str(d["time"]), "dir":"SHORT", "ret_short":ret_s, "ret_long":ret_l, "hit":ret_s<0, "bull":bull, "bear":bear, "entry":d["close"]})
     return sigs
 
+def _analyze_h4(data, ms, dom, has_oi, scale):
+    vz = scale
+    BULLISH, BEARISH = [], []
+    if has_oi:
+        BULLISH = [
+            ("FIZ_DROP", lambda d: d.get("fiz_lnum_dn_streak",0)>=3),
+            ("YUR_LOAD", lambda d: d.get("yur_avg_up_streak",0)>=5),
+            ("FIZ_FLEE", lambda d: d.get("fiz_lnum_d_short",0)<-2000*vz),
+            ("FIZ_FLEE_ACCEL", lambda d: d.get("fiz_lnum_d_long",0)<-3000*vz and d.get("fiz_lnum_d_short",0)<d.get("fiz_lnum_d_long",0)*0.6),
+            ("FIZ_PANIC_ACCEL", lambda d: d.get("fiz_snum_d_long",0)>2000*vz and d.get("fiz_snum_d_short",0)>d.get("fiz_snum_d_long",0)*0.6),
+            ("FIZ_SHORT_SURGE", lambda d: d.get("fiz_short_d_long",0)>5000000*vz),
+            ("YUR_CALM_LOAD", lambda d: d.get("yur_avg_d_short",0)>0 and d.get("yur_avg_d_long",0)>0 and abs(d.get("fiz_lnum_d_short",0))<2000*vz),
+        ]
+        BEARISH = [
+            ("FIZ_EUPHORIA", lambda d: d.get("fiz_long_pct_up_streak",0)>=5),
+            ("FALLING_KNIFE", lambda d: d.get("price_d_long",0)<-1.0*vz and d.get("fiz_lnum_d_long",0)>2000*vz),
+            ("RALLY_FLEE", lambda d: d.get("price_d_long",0)>1.0*vz and d.get("fiz_lnum_d_long",0)<-2000*vz),
+            ("FIZ_OVERLOAD", lambda d: d.get("pct_fiz_lnum",50)>=95 and d.get("price_d_short",0)>0.5*vz),
+            ("SHORT_SQZ_EXHAUST", lambda d: d.get("price_d_long",0)>1.0*vz and d.get("fiz_snum_d_long",0)>1000*vz and d.get("pct_fiz_snum",50)>=90),
+        ]
+    else:
+        BULLISH = [("MOMENTUM", lambda d: d.get("price_d_long",0)>1.0 and d.get("price_d_short",0)>0.5),("BOUNCE", lambda d: d.get("price_d_long",0)<-2.0 and d.get("price_d_short",0)>0.3)]
+        BEARISH = [("DROPS", lambda d: d.get("price_d_long",0)<-1.0 and d.get("price_d_short",0)<-0.5),("TOP_BREAK", lambda d: d.get("price_d_long",0)>2.0 and d.get("price_d_short",0)<-0.3)]
+    sigs = []
+    for i,d in enumerate(data[W:], start=W):
+        bull=sum(1 for _,c in BULLISH if c(d)); bear=sum(1 for _,c in BEARISH if c(d))
+        if bull+bear<ms: continue
+        rs=d.get("ret_3",d.get("ret_6",0)); rl=d.get("ret_5",d.get("ret_10",0))
+        if bull>=bear*dom: sigs.append({"time":str(d["time"]),"dir":"LONG","ret_short":rs,"ret_long":rl,"hit":rs>0,"bull":bull,"bear":bear,"entry":d["close"]})
+        elif bear>=bull*dom: sigs.append({"time":str(d["time"]),"dir":"SHORT","ret_short":rs,"ret_long":rl,"hit":rs<0,"bull":bull,"bear":bear,"entry":d["close"]})
+    return sigs
+
 def run(sym, tf, days=700):
     print(f"  Load 5m...", end=" ", flush=True)
     df_p = load_data(sym, days)
@@ -227,7 +262,7 @@ def run(sym, tf, days=700):
     print(f"Features...", end=" ", flush=True)
     data = compute_features(data, tf, has_oi)
     print(f"Analyze...", end=" ", flush=True)
-    sigs = analyze(data, 3, 3.0, has_oi)
+    sigs = analyze(data, 3, 3.0, has_oi, h4_scale=0.3 if tf=="H4" else None)
     return data, sigs, has_oi
 
 def summ(sigs):

@@ -1,0 +1,38 @@
+{
+  "ACCUM+EXODUS": {
+    "signals": 20,
+    "hits": 5,
+    "wr": 25.0,
+    "avg_ret": -0.43
+  },
+  "EXODUS+PANIC": {
+    "signals": 8,
+    "hits": 4,
+    "wr": 50.0,
+    "avg_ret": 0.77
+  },
+  "CLIMAX+DUMP": {
+    "signals": 2,
+    "hits": 2,
+    "wr": 100.0,
+    "avg_ret": -3.16
+  },
+  "TRIPLE_BULL": {
+    "signals": 2,
+    "hits": 1,
+    "wr": 50.0,
+    "avg_ret": 0.16
+  },
+  "ACCUM+PANIC": {
+    "signals": 9,
+    "hits": 5,
+    "wr": 55.6,
+    "avg_ret": 0.27
+  },
+  "total": 41,
+  "hits": 17,
+  "winrate": 41.5,
+  "symbol": "Si",
+  "period": "2023-01-03..2026-05-18",
+  "days": 857
+}
