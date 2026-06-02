@@ -27,6 +27,11 @@ th{background:#1c2128;color:#8b949e;padding:5px 8px;text-align:left;border-botto
 td{padding:4px 8px;border-bottom:1px solid #21262d}tr:hover td{background:#1c2128}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 .price-up{color:#3fb950}.price-dn{color:#f85149}.win{color:#3fb950;font-weight:600}.loss{color:#f85149;font-weight:600}
+tr.win-row td{background:rgba(63,185,80,0.06)}tr.win-row:hover td{background:rgba(63,185,80,0.12)}
+tr.loss-row td{background:rgba(248,81,73,0.06)}tr.loss-row:hover td{background:rgba(248,81,73,0.12)}
+.filter-bar{display:flex;gap:4px;margin-bottom:6px}
+.filter-btn{background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:4px;padding:2px 10px;cursor:pointer;font-size:12px}
+.filter-btn.active{background:#1f6feb;color:#fff;border-color:#1f6feb}
 .scroll-wrap{max-height:300px;overflow-y:auto}
 </style></head><body>
 <h1>Whale V8 - Multi-Instrument Dashboard</h1>
@@ -59,7 +64,7 @@ td{padding:4px 8px;border-bottom:1px solid #21262d}tr:hover td{background:#1c212
 </div>
 <div class="card">
   <h2>Signals - <span id="sig-title">Si</span></h2>
-  <div class="scroll-wrap"><table id="sigtable"><tr><th>Date</th><th>Dir</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Lev</th><th>Result</th></tr></table></div>
+  <div class="filter-bar"><button class="filter-btn active" data-f="all" onclick="setFilter('all')">All</button><button class="filter-btn" data-f="win" onclick="setFilter('win')">WIN</button><button class="filter-btn" data-f="loss" onclick="setFilter('loss')">LOSS</button></div><div class="scroll-wrap"><table id="sigtable"><tr><th>Date</th><th>Dir</th><th>Entry</th><th>Exit</th><th>PnL</th><th>GO<span id="filter-go"></span>%</th><th>Result</th></tr></table></div>
 </div>
 <script>
 
@@ -97,17 +102,19 @@ function drawChart(c,d,o){
     var xx=xp(i),up=cl[i]>=op[i],co=up?'#3fb950':'#f85149',tp=up?cl[i]:op[i],bt=up?op[i]:cl[i];
     cx.fillStyle=co;cx.fillRect(xx-cw/2,yp(tp),cw,Math.max(1,yp(bt)-yp(tp)));
     cx.strokeStyle=co;cx.lineWidth=.8;cx.beginPath();cx.moveTo(xx,yp(hi[i]));cx.lineTo(xx,yp(lo[i]));cx.stroke()}
-  var sx=d.sx||[],sy=d.sy||[],sdir=d.sdir||[],ex=d.ex||[],ey=d.ey||[];
+  var sx=d.sx||[],sy=d.sy||[],sdir=d.sdir||[],sw=d.sw||[],ex=d.ex||[],ey=d.ey||[];
   for(var s=0;s<sx.length;s++){
     var ei=dt.indexOf(sx[s]),xi=dt.indexOf(ex[s]);if(ei<0||xi<0)continue;
-    var x1=xp(ei),y1=yp(sy[s]),x2=xp(xi),y2=yp(ey[s]),isL=sdir[s]==='LONG';
-    cx.strokeStyle=isL?'rgba(63,185,80,0.85)':'rgba(248,81,73,0.85)';cx.lineWidth=4;
-    cx.beginPath();cx.moveTo(x1,y1);cx.lineTo(x2,y2);cx.stroke();
-    cx.fillStyle=isL?'#3fb950':'#f85149';cx.beginPath();cx.arc(x2,y2,7,0,Math.PI*2);cx.fill()}
+    var x1=xp(ei),y1=yp(sy[s]),x2=xp(xi),y2=yp(ey[s]),isL=sdir[s]==='LONG',isW=sw[s];
+    cx.strokeStyle=isW?'rgba(63,185,80,0.85)':'rgba(248,81,73,0.6)';cx.lineWidth=4;
+    if(!isW){cx.setLineDash?cx.setLineDash([8,4]):0}
+    cx.beginPath();cx.moveTo(x1,y1);cx.lineTo(x2,y2);cx.stroke();cx.setLineDash?cx.setLineDash([]):0;
+    if(isW){cx.fillStyle='#3fb950';cx.beginPath();cx.arc(x2,y2,7,0,Math.PI*2);cx.fill()}
+    else{cx.strokeStyle='#f85149';cx.lineWidth=2.5;cx.beginPath();cx.moveTo(x2-6,y2-6);cx.lineTo(x2+6,y2+6);cx.moveTo(x2+6,y2-6);cx.lineTo(x2-6,y2+6);cx.stroke()}}
   for(var s=0;s<sx.length;s++){
     var ei=dt.indexOf(sx[s]);if(ei<0)continue;
-    var xx=xp(ei),yy=yp(sy[s]),sz=7,isL=sdir[s]==='LONG';
-    cx.fillStyle=isL?'#3fb950':'#f85149';cx.strokeStyle='#0d1117';cx.lineWidth=1.5;
+    var xx=xp(ei),yy=yp(sy[s]),sz=7,isL=sdir[s]==='LONG',isW=sw[s];
+    cx.fillStyle=isL?'#3fb950':'#f85149';cx.strokeStyle=isW?'#0d1117':'#f85149';cx.lineWidth=isW?1.5:2.5;
     if(isL){cx.beginPath();cx.moveTo(xx,yy-sz-3);cx.lineTo(xx-sz,yy+2);cx.lineTo(xx+sz,yy+2)}
     else{cx.beginPath();cx.moveTo(xx,yy+sz+3);cx.lineTo(xx-sz,yy-2);cx.lineTo(xx+sz,yy-2)}
     cx.closePath();cx.fill();cx.stroke()}
@@ -121,6 +128,8 @@ function drawVol(c,d){
   var cw=Math.max(1,Math.min(10,iw/N*0.6)),c2=d.c||[],op=d.o||[];
   for(var i=0;i<N;i++){cx.fillStyle=(c2[i]>=op[i]?'#3fb950':'#f85149');cx.globalAlpha=.35;cx.fillRect(xx(i)-cw/2,pa.top+ih-(v[i]/mv)*ih,cw,(v[i]/mv)*ih)}
   cx.globalAlpha=1}
+var FILTER='all';
+function setFilter(f){FILTER=f;document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.toggle('active',b.dataset.f===f)});renderAll()}
 function renderAll(){
   var el=document.getElementById('tabs');el.innerHTML='';
   for(var ti=0;ti<TICKERS.length;ti++){
@@ -147,10 +156,12 @@ function renderAll(){
   drawChart(document.getElementById('chart'),vw,{height:420,title:(NAMES[CURRENT]||CURRENT)+' ['+PERIOD+'] GO'+GO_PCT+'% x'+lev.toFixed(1),fmt:function(v){return fmt(v,CURRENT)}});
   drawVol(document.getElementById('vol_chart'),vw);
   var tbl=document.getElementById('sigtable');
-  var htm='<tr><th>Date</th><th>Dir</th><th>Entry</th><th>Exit</th><th>PnL</th><th>GO'+GO_PCT+'%</th><th>Result</th></tr>';
+  var htm='<tr><th>Date</th><th>Dir</th><th>Entry</th><th>Exit</th><th>PnL</th><th>GO'+GO_PCT+'%</th><th>Result</th></tr>';document.getElementById('filter-go').textContent=GO_PCT;
   for(var i=0;i<vw.sx.length;i++){
-    var pnl=((vw.ey[i]-vw.sy[i])/vw.sy[i]*100),lp=pnl*lev,dir=vw.sdir[i]||'LONG',c1=dir==='LONG'?'#3fb950':'#f85149';
-    htm+='<tr><td>'+vw.sx[i]+'</td><td style="color:'+c1+'">'+dir+'</td><td class="num">'+fmt(vw.sy[i],CURRENT)+'</td><td class="num">'+fmt(vw.ey[i],CURRENT)+'</td><td class="num '+(pnl>=0?'win':'loss')+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</td><td class="num '+(lp>=0?'win':'loss')+'">'+(lp>=0?'+':'')+lp.toFixed(1)+'%</td><td class="'+(vw.sw[i]?'win':'loss')+'">'+(vw.sw[i]?'WIN':'LOSS')+'</td></tr>'}
+    var pnl=((vw.ey[i]-vw.sy[i])/vw.sy[i]*100),lp=pnl*lev,dir=vw.sdir[i]||'LONG',c1=dir==='LONG'?'#3fb950':'#f85149',w=vw.sw[i];
+    if(FILTER!=='all'&&(FILTER==='win')!==w)continue;
+    var rc=' class="'+(w?'win':'loss')+'-row"';
+    htm+='<tr'+rc+'><td>'+vw.sx[i]+'</td><td style="color:'+c1+'">'+dir+'</td><td class="num">'+fmt(vw.sy[i],CURRENT)+'</td><td class="num">'+fmt(vw.ey[i],CURRENT)+'</td><td class="num '+(pnl>=0?'win':'loss')+'">'+(pnl>=0?'+':'')+pnl.toFixed(2)+'%</td><td class="num '+(lp>=0?'win':'loss')+'">'+(lp>=0?'+':'')+lp.toFixed(1)+'%</td><td class="'+(w?'win':'loss')+'">'+(w?'WIN':'LOSS')+'</td></tr>'}
   tbl.innerHTML=htm;document.getElementById('sig-title').textContent=CURRENT+' GO'+GO_PCT+'%'}
 function selectTicker(sym){CURRENT=sym;var tabs=document.querySelectorAll('.tab');for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('active',tabs[i].dataset.sym===sym);renderAll()}
 document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.zb').forEach(function(b){b.addEventListener('click',function(e){setPeriod(e.currentTarget.dataset.d)})});document.querySelectorAll('.go-btn').forEach(function(b){b.addEventListener('click',function(e){setGO(parseInt(e.currentTarget.dataset.go))})});renderAll()});
