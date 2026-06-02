@@ -50,15 +50,28 @@ for sym in symbols:
     for c in real_candles:
         day_data.setdefault(c[0].date(), []).append((c[0], c[1]))
 
+    # Pre-fetch dominant contract per day
+    cur.execute("""
+        SELECT time::date as dt, contract, COUNT(*) as cnt
+        FROM moex_prices_5m
+        WHERE symbol = %s AND contract IS NOT NULL AND contract != ''
+        GROUP BY time::date, contract
+        ORDER BY dt, cnt DESC
+    """, (sym,))
+    day_contracts = {}
+    for r in cur.fetchall():
+        if r[0] not in day_contracts:
+            day_contracts[r[0]] = r[1]  # first = most common
+
     inserts = []
     for day in sorted(day_data.keys()):
         dc = day_data[day]
         prev_close = dc[0][1]
+        day_contract = day_contracts.get(day, '')
 
         for slot in gen_day_slots(day):
             if slot in existing_times:
                 # Update prev_close from this existing candle
-                # Find if this slot has a real candle
                 for t, cl in dc:
                     rt = t.replace(second=0, microsecond=0)
                     rt = rt - timedelta(minutes=rt.minute % 5)
@@ -67,7 +80,7 @@ for sym in symbols:
                         break
                 continue
 
-            inserts.append((sym, slot, prev_close, prev_close, prev_close, prev_close, 0, ''))
+            inserts.append((sym, slot, prev_close, prev_close, prev_close, prev_close, 0, day_contract))
 
     if inserts:
         print(f"  {sym}: {len(inserts)} flat candles")

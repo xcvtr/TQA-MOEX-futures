@@ -5,7 +5,7 @@ Bulk OI History Loader — загружает ВСЮ доступную исто
 Читает все поля: pos_long, pos_short, pos_long_num, pos_short_num.
 Пропускает уже загруженные даты (upsert).
 """
-import sys, os, csv, io, time
+import sys, os, csv, io, time, logging
 from datetime import datetime, timedelta, date
 from pathlib import Path
 
@@ -26,7 +26,7 @@ log = logging.getLogger("bulk_oi")
 # ── Настройки ──────────────────────────────────────────────────────────
 HISTORY_START = date(2021, 1, 1)
 BATCH_ROWS = 5000  # rows per INSERT
-MAX_RECORDS_PER_DAY = 100  # max records per ticker per day (safety)
+FETCH_MONTHS = True  # fetch 1 month per API call (much faster than 1 day)
 
 # ── Database ────────────────────────────────────────────────────────────
 
@@ -87,13 +87,13 @@ def save_batch(conn, records: list) -> int:
 
 # ── MOEX futoi fetch ───────────────────────────────────────────────────
 
-def fetch_day(ticker: str, day: date) -> list[dict]:
-    """Fetch one day of OI data for a ticker. Returns all rows with ALL columns."""
+def fetch_range(ticker: str, from_date: date, to_date: date) -> list[dict]:
+    """Fetch OI data for a date range. More efficient than day-by-day."""
     url = (
         f"https://iss.moex.com/iss/analyticalproducts/futoi/securities/"
         f"{ticker}.csv"
         f"?iss.meta=off&iss.only=futoi"
-        f"&from={day.isoformat()}&till={day.isoformat()}&latest=0"
+        f"&from={from_date.isoformat()}&till={to_date.isoformat()}&latest=0"
     )
 
     for attempt in range(RETRY_ATTEMPTS):
@@ -101,14 +101,15 @@ def fetch_day(ticker: str, day: date) -> list[dict]:
             resp = requests.get(
                 url,
                 headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"},
-                timeout=REQUEST_TIMEOUT,
+                timeout=REQUEST_TIMEOUT * 2,
             )
             if resp.status_code == 404:
                 return []
             if resp.status_code != 200:
-                log.warning("  HTTP %d for %s on %s (attempt %d/%d)", resp.status_code, ticker, day, attempt+1, RETRY_ATTEMPTS)
+                log.warning("  HTTP %d %s %s..%s (attempt %d/%d)",
+                            resp.status_code, ticker, from_date, to_date, attempt+1, RETRY_ATTEMPTS)
                 if attempt < RETRY_ATTEMPTS - 1:
-                    time.sleep(RETRY_DELAY)
+                    time.sleep(RETRY_DELAY * 2)
                 continue
 
             text = resp.text
@@ -154,9 +155,10 @@ def fetch_day(ticker: str, day: date) -> list[dict]:
             return records
 
         except requests.RequestException as e:
-            log.warning("  Network error for %s on %s: %s (attempt %d/%d)", ticker, day, e, attempt+1, RETRY_ATTEMPTS)
+            log.warning("  Network error %s %s..%s: %s (attempt %d/%d)",
+                        ticker, from_date, to_date, e, attempt+1, RETRY_ATTEMPTS)
             if attempt < RETRY_ATTEMPTS - 1:
-                time.sleep(RETRY_DELAY)
+                time.sleep(RETRY_DELAY * 2)
 
     return []
 
@@ -164,53 +166,62 @@ def fetch_day(ticker: str, day: date) -> list[dict]:
 # ── Main ────────────────────────────────────────────────────────────────
 
 def load_ticker_history(conn, ticker: str) -> tuple[int, int, int]:
-    """Load all available history for one ticker. Returns (days_checked, records_loaded, days_skipped)."""
+    """Load all available history for one ticker using monthly range fetches."""
     existing = get_existing_dates(conn, ticker)
     today = date.today()
 
-    checked = 0
     loaded = 0
-    skipped = 0
-    current = HISTORY_START
+    months_checked = 0
+    months_skipped = 0
+
+    # Generate months from HISTORY_START to today
+    current_year = HISTORY_START.year
+    current_month = HISTORY_START.month
     buffer = []
 
-    while current <= today:
-        # Skip weekends
-        if current.weekday() >= 5:
-            current += timedelta(days=1)
-            continue
+    while date(current_year, current_month, 1) <= today:
+        months_checked += 1
+        month_start = date(current_year, current_month, 1)
+        # End of month
+        if current_month == 12:
+            month_end = date(current_year + 1, 1, 1) - timedelta(days=1)
+        else:
+            month_end = date(current_year, current_month + 1, 1) - timedelta(days=1)
+        month_end = min(month_end, today)
 
-        # Check if this day is already fully loaded (both FIZ and YUR)
-        has_fiz = (current, 0) in existing
-        has_yur = (current, 1) in existing
-        if has_fiz and has_yur:
-            skipped += 1
-            current += timedelta(days=1)
-            continue
+        # Check if this month is COMPLETELY covered
+        month_days = [(month_start + timedelta(days=d))
+                      for d in range((month_end - month_start).days + 1)
+                      if (month_start + timedelta(days=d)).weekday() < 5]
+        all_covered = all((d, 0) in existing and (d, 1) in existing for d in month_days)
+        if all_covered and month_days:
+            months_skipped += 1
+        else:
+            records = fetch_range(ticker, month_start, month_end)
+            if records:
+                for r in records:
+                    buffer.append(r)
+                    # Mark days we just loaded
+                    existing.add((r['time'].date(), r['clgroup']))
+                if len(buffer) >= BATCH_ROWS:
+                    n = save_batch(conn, buffer)
+                    loaded += n
+                    buffer = []
+            # Polite delay between months
+            time.sleep(0.1)
 
-        records = fetch_day(ticker, current)
-        checked += 1
-
-        if records:
-            # Mark this date as done for future reference
-            for r in records:
-                buffer.append(r)
-            existing.add((current, 0))
-            existing.add((current, 1))
-
-            if len(buffer) >= BATCH_ROWS:
-                n = save_batch(conn, buffer)
-                loaded += n
-                buffer = []
-
-        current += timedelta(days=1)
+        # Next month
+        current_month += 1
+        if current_month > 12:
+            current_month = 1
+            current_year += 1
 
     # Flush remaining
     if buffer:
         n = save_batch(conn, buffer)
         loaded += n
 
-    return checked, loaded, skipped
+    return months_checked, loaded, months_skipped
 
 
 def main():
@@ -231,12 +242,12 @@ def main():
             total_checked += c
             total_loaded += l
             total_skipped += s
-            log.info(f"  {ticker}: checked={c}d, loaded={l} records, skipped={s}d (already had)")
+            log.info(f"  {ticker}: checked={c}mo, loaded={l} records, skipped={s}mo (already had)")
         except Exception as e:
             log.error(f"  {ticker} FAILED: {e}")
             conn.rollback()
-        # Polite delay
-        time.sleep(0.05)
+        # Polite delay between tickers
+        time.sleep(0.2)
 
     conn.close()
     log.info(f"\n{'='*60}")
@@ -246,7 +257,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import logging
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-    log = logging.getLogger("bulk_oi")
     main()

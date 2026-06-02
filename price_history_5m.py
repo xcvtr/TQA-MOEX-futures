@@ -33,6 +33,9 @@ BATCH_SIZE = 10000
 DATA_START = date(2023, 1, 1)
 QUARTER_MONTHS = [3, 6, 9, 12]  # March, June, September, December
 
+# Tickers with monthly expiry (e.g., Brent)
+MONTHLY_TICKERS = {"BR"}
+
 # Short ticker → ASSETCODE mapping
 TICKER_TO_ASSET = {
     "Si": "Si", "BR": "BR", "ED": "ED", "Eu": "Eu",
@@ -111,10 +114,12 @@ def get_current_contracts() -> dict[str, list]:
 
 
 def generate_historical_contracts(asset_code: str, earliest_listed: str,
-                                    existing_symbols: set[str] | None = None) -> list[dict]:
+                                    existing_symbols: set[str] | None = None,
+                                    monthly: bool = False) -> list[dict]:
     """
-    Generate historical quarterly contract names from DATA_START up to the earliest listed one.
+    Generate historical quarterly or monthly contract names from DATA_START up to the earliest listed one.
     Skips contracts that already exist in the current list.
+    monthly=True: use all 12 months (for Brent and other monthly futures).
     """
     if existing_symbols is None:
         existing_symbols = set()
@@ -131,15 +136,21 @@ def generate_historical_contracts(asset_code: str, earliest_listed: str,
     year = DATA_START.year
     month = DATA_START.month
 
+    if monthly:
+        # All 12 months (for BR Brent)
+        cycle = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    else:
+        cycle = QUARTER_MONTHS
+
     while year < earliest_dt.year or (year == earliest_dt.year and month < earliest_dt.month):
         qm = None
-        for m in QUARTER_MONTHS:
+        for m in cycle:
             if m > month:
                 qm = m
                 break
         if qm is None:
             year += 1
-            qm = QUARTER_MONTHS[0]
+            qm = cycle[0]
         month = qm
 
         exp_day = 15
@@ -261,9 +272,13 @@ def main():
         earliest = min((c["last_trade"] for c in clist), default=None)
         hist_contracts = []
         if earliest and DATA_START < datetime.strptime(earliest.split("T")[0], "%Y-%m-%d").date():
-            hist_contracts = generate_historical_contracts(asset, earliest, existing_symbols)
+            monthly = ticker in MONTHLY_TICKERS
+            hist_contracts = generate_historical_contracts(asset, earliest, existing_symbols, monthly=monthly)
 
-        all_c_list = sorted(hist_contracts + clist, key=lambda x: x.get("last_trade", ""))
+        # Sort contracts: highest OI first (most liquid = de facto front-month),
+        # then by expiry for historicals
+        all_c_list = sorted(hist_contracts + clist,
+                            key=lambda x: (-x.get("open_interest", 0), x.get("last_trade", "")))
 
         print(f"\n{ticker:10s} ({asset}): {len(all_c_list)} contracts "
               f"({len(hist_contracts)} historical, {len(clist)} current)")
@@ -312,7 +327,7 @@ def main():
             if row and row[0]:
                 last_ts = int(row[0].replace(tzinfo=timezone.utc).timestamp())
 
-        seen = {}  # (symbol, time) → record with highest volume
+        seen = {}  # (symbol, time) → record (front-month contract wins)
         ticker_total = 0
 
         for c in all_c_list:
@@ -358,7 +373,7 @@ def main():
                 vol = int(c["volume"]) if c.get("volume") else 0
                 rec = (ticker, key[1], c["open"], c["high"], c["low"], c["close"],
                        vol, secid)
-                if key not in seen or vol > seen[key][6]:
+                if key not in seen:
                     seen[key] = rec
                     n_new += 1
 
