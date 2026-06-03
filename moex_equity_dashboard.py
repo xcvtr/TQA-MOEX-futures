@@ -13,6 +13,23 @@ PORT = 5057
 # go_rub: initial margin in RUB for 1 contract.
 # lev: verified leverage (entry_price * ISS_lot / GO), may differ from simple price/GO
 GO_DATA = {
+    "CE": {"go_rub": 1187, "lev": 11.9},
+    "ME": {"go_rub": 3149, "lev": 5.8},
+    "CC": {"go_rub": 473, "lev": 6.4},
+    "W4": {"go_rub": 1758, "lev": 9.2},
+    "SP": {"go_rub": 1008, "lev": 2.0},
+    "PD": {"go_rub": 22173, "lev": 4.6},
+    "SS": {"go_rub": 205, "lev": 2.0},
+    "GK": {"go_rub": 234, "lev": 5.8},
+    "SR": {"go_rub": 5719, "lev": 5.8},
+    "IB": {"go_rub": 803, "lev": 3.5},
+    "GZ": {"go_rub": 2065, "lev": 5.7},
+    "NM": {"go_rub": 1405, "lev": 5.8},
+    "NG": {"go_rub": 6565, "lev": 3.5},
+    "RN": {"go_rub": 8180, "lev": 4.9},
+    "CH": {"go_rub": 538, "lev": 7.8},
+}
+O_DATA = {
     # Old verified champions (lev confirmed working)
     "CC": {"go_rub": 473, "lev": 6.4}, "PD": {"go_rub": 22173, "lev": 4.6},
     "SS": {"go_rub": 205, "lev": 2.0}, "GZ": {"go_rub": 2065, "lev": 5.7},
@@ -31,6 +48,27 @@ DEFAULT_LEV = 5.0
 # New champions: strongest performers (Real WR × PF × GO return) + new stock futures
 # GK=NorNickel, MG=Magnitogorsk, RN=Rosneft, AL=Alrosa, SP=SPBE, ME=MOEX
 CHAMPIONS = [
+    ("CE", "Copper"),  # NEW
+    ("ME", "MOEX"),  # NEW
+    ("CC", "Cocoa C"),  # NEW
+    ("W4", "Wheat"),  # NEW
+    ("SP", "SPBE"),  # NEW
+    ("PD", "Palladium"),  # NEW
+    ("SF", "SF"),  # NEW
+    ("SS", "Sugar"),  # NEW
+    ("GK", "NorNickel"),  # NEW
+    ("SR", "Sberbank"),  # NEW
+    ("IB", "I-Bonds"),  # NEW
+    ("GZ", "Gazprom"),  # NEW
+    ("UC", "UC"),  # NEW
+    ("NM", "NLMK"),  # NEW
+    ("MM", "MM"),  # NEW
+    ("IMOEXF", "IMOEXF"),  # NEW
+    ("NG", "Nat Gas"),  # NEW
+    ("RN", "Rosneft"),  # NEW
+    ("CH", "Cocoa"),  # NEW
+]
+HAMPIONS = [
     ("ME", "MOEX"), ("GK", "NorNickel"), ("CC", "Cocoa C"),
     ("PD", "Palladium"), ("SP", "SPBE"),   ("SS", "Sugar"),
     ("NM", "NLMK"),     ("GZ", "Gazprom"), ("NG", "Nat Gas"),
@@ -526,6 +564,14 @@ def load_all():
     results.sort(key=lambda x: x["wr"], reverse=True)
     return results
 
+def load_history():
+    import json
+    path = os.path.join(os.path.dirname(__file__), 'champions_history.json')
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    return {"versions": []}
+
 # ── HTML Template ──
 
 HTML = r"""<!DOCTYPE html>
@@ -551,6 +597,9 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
 .card .pnl{font-weight:bold}
 .card .pnl.pos{color:#3fb950}
 .card .pnl.neg{color:#f85149}
+.card .tag{display:inline-block;font-size:0.7em;padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle}
+.card .tag.new{background:#1a3a1a;color:#3fb950;border:1px solid #3fb950}
+.card .tag.out{background:#3a1a1a;color:#f85149;border:1px solid #f85149}
 #main-chart{width:100%;height:400px;background:#0d1117;border:1px solid #30363d;border-radius:6px;margin-bottom:10px}
 #eq-chart{width:100%;height:200px;background:#0d1117;border:1px solid #30363d;border-radius:6px;margin-bottom:10px}
 .stats-row{display:flex;gap:15px;flex-wrap:wrap;margin-bottom:15px;font-size:0.85em}
@@ -603,7 +652,7 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
 }
 </style></head><body>
 <h1>📊 MOEX Volume Climax — Equity Dashboard</h1>
-<p class="sub" id="sub-info">Loading data... <span class="edu-toggle" id="eduBtn" onclick="toggleEdu()">📖 О расчётах GO</span></p>
+<p class="sub" id="sub-info">Loading data... <span class="edu-toggle" id="eduBtn" onclick="toggleEdu()">📖 О расчётах GO</span> <span class="edu-toggle" id="histBtn" onclick="toggleHist()">📋 История</span></p>
 
 <div class="filter-bar">
   <label>🔥 Sort: </label>
@@ -688,9 +737,18 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
   </p>
 </div>
 
+<!-- ─── Champions History Panel ─── -->
+<div class="edu-panel" id="histPanel">
+  <h3>📋 История отборов чемпионов</h3>
+  <p style="color:#8b949e;font-size:0.85em">Последнее обновление: <span id="lastUpdate">—</span></p>
+  <div id="histContent" style="margin-top:10px"></div>
+</div>
+
 <script>
 // DATA will be injected here
 const DATA = __DATA__;
+const HISTORY = __HISTORY__;
+const LAST_UPDATE = '__LAST_UPDATE__';
 
 function fmtPnl(v){return v>0?'+'+v.toFixed(1):v.toFixed(1)}
 function wrClass(w){return w>=50?'high':w>=42?'mid':'low'}
@@ -701,6 +759,39 @@ function toggleEdu(){
   const b = document.getElementById('eduBtn');
   p.classList.toggle('open');
   b.textContent = p.classList.contains('open') ? '📕 Скрыть GO' : '📖 О расчётах GO';
+}
+
+function toggleHist(){
+  const p = document.getElementById('histPanel');
+  p.classList.toggle('open');
+}
+
+function getPrevChamps(){
+  if(!HISTORY || !HISTORY.versions || HISTORY.versions.length < 2) return new Set();
+  return new Set(HISTORY.versions[HISTORY.versions.length - 2].champions);
+}
+
+function renderHistory(){
+  if(!HISTORY || !HISTORY.versions || HISTORY.versions.length === 0) return;
+  document.getElementById('lastUpdate').textContent = LAST_UPDATE;
+  const div = document.getElementById('histContent');
+  const rows = HISTORY.versions.map((v, i) => {
+    const newSyms = v.new && v.new.length ? v.new.join(', ') : '—';
+    const outSyms = v.out && v.out.length ? v.out.join(', ') : '—';
+    return '<tr' + (i === HISTORY.versions.length-1 ? ' style="background:#161b22"' : '') + '>' +
+      '<td style="color:#8b949e">' + v.date + '</td>' +
+      '<td>' + v.champions.join(', ') + '</td>' +
+      '<td style="color:#3fb950">' + newSyms + '</td>' +
+      '<td style="color:#f85149">' + outSyms + '</td>' +
+      '<td>' + (v.changed ? (newSyms !== '—' ? '🔄' : '—') : '➖') + '</td></tr>';
+  }).join('');
+  div.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:0.8em">' +
+    '<tr><th style="color:#8b949e;padding:4px 8px;border:1px solid #30363d;text-align:center">Дата</th>' +
+    '<th style="color:#8b949e;padding:4px 8px;border:1px solid #30363d;text-align:center">Состав</th>' +
+    '<th style="color:#8b949e;padding:4px 8px;border:1px solid #30363d;text-align:center">➕Новые</th>' +
+    '<th style="color:#8b949e;padding:4px 8px;border:1px solid #30363d;text-align:center">➖Выбыли</th>' +
+    '<th style="color:#8b949e;padding:4px 8px;border:1px solid #30363d;text-align:center">Изменение</th></tr>' +
+    rows + '</table>';
 }
 
 let selected = null;
@@ -732,8 +823,10 @@ function renderGrid(all){
   grid.innerHTML = filtered.map(t=>{
     const sel = selected===t.symbol?' sel':'';
     const s = t.stats;
+    const isNew = getPrevChamps().size > 0 && !getPrevChamps().has(t.symbol);
+    const tag = isNew ? '<span class="tag new">★NEW</span>' : '';
     return `<div class="card${sel}" onclick="selectTicker('${t.symbol}')">
-      <h3><span class="sym">${t.symbol}</span> — ${t.name}</h3>
+      <h3><span class="sym">${t.symbol}</span> — ${t.name}${tag}</h3>
       <div class="stat">Signals: <b>${s.signals}</b> · R-WR: <b class="wr ${wrClass(s.real_wr)}">${s.real_wr}%</b> · T-WR: <b>${s.touch_wr}%</b> · C-WR: <b>${s.close_wr}%</b></div>
       <div class="stat">TP${s.tp_count}/SL${s.sl_count}/Exp${s.expiry_count} · PF ${s.real_pf} · DD ${s.real_max_dd}% · Σ ${fmtPnl(s.real_total_pnl)}%</div>
     </div>`;
@@ -1003,6 +1096,7 @@ function renderSummaryTable(all){
 
 // Init
 document.addEventListener('DOMContentLoaded', ()=>{
+  renderHistory();
   renderSummary(DATA);
   renderSummaryTable(DATA);
   renderGrid(DATA);
@@ -1013,6 +1107,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 class Handler(http.server.BaseHTTPRequestHandler):
     data = None
+    history = {"versions": []}
+    last_update = ""
     
     def do_GET(self):
         if self.path == '/':
@@ -1020,6 +1116,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.end_headers()
             html = HTML.replace('__DATA__', json.dumps(self.data, default=str))
+            html = html.replace('__HISTORY__', json.dumps(self.history, default=str))
+            html = html.replace('__LAST_UPDATE__', str(self.last_update))
             self.wfile.write(html.encode('utf-8'))
         elif self.path == '/api/data':
             self.send_response(200)
@@ -1044,6 +1142,9 @@ def main():
         print(f"  ... and {len(data)-10} more", flush=True)
     
     Handler.data = data
+    history = load_history()
+    Handler.history = history
+    Handler.last_update = history['versions'][-1]['date'] if history['versions'] else datetime.now().strftime('%Y-%m-%d %H:%M')
     
     server = http.server.ThreadingHTTPServer(('0.0.0.0', PORT), Handler, bind_and_activate=False)
     server.allow_reuse_address = True

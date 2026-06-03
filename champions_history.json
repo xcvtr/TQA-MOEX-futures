@@ -1,0 +1,51 @@
+{
+  "versions": [
+    {
+      "date": "2026-06-03 19:28",
+      "champions": [
+        "CE",
+        "ME",
+        "CC",
+        "W4",
+        "SP",
+        "PD",
+        "SF",
+        "SS",
+        "GK",
+        "SR",
+        "IB",
+        "GZ",
+        "UC",
+        "NM",
+        "MM",
+        "IMOEXF",
+        "NG",
+        "RN",
+        "CH"
+      ],
+      "new": [
+        "CC",
+        "CE",
+        "CH",
+        "GK",
+        "GZ",
+        "IB",
+        "IMOEXF",
+        "ME",
+        "MM",
+        "NG",
+        "NM",
+        "PD",
+        "RN",
+        "SF",
+        "SP",
+        "SR",
+        "SS",
+        "UC",
+        "W4"
+      ],
+      "out": [],
+      "changed": true
+    }
+  ]
+}
