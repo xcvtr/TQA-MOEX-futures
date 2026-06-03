@@ -10,17 +10,22 @@ DB = dict(host="10.0.0.60", port=5432, dbname="moex", user="postgres", password=
 PORT = 5057
 
 # ── Guarantee (GO) by ticker (from MOEX ISS front-month) ──
-# go_rub: initial margin in RUB for 1 contract. lev computed dynamically from Alor price.
+# go_rub: initial margin in RUB for 1 contract.
+# lev: verified leverage (entry_price * ISS_lot / GO), may differ from simple price/GO
 GO_DATA = {
-    # Commodity/currency futures (per ISS front-month GO)
-    "CC": {"go_rub": 473}, "PD": {"go_rub": 22173}, "SS": {"go_rub": 205},
-    "GZ": {"go_rub": 2065}, "NG": {"go_rub": 6565}, "GL": {"go_rub": 1220},
-    "SE": {"go_rub": 625},  "SN": {"go_rub": 8180}, "HY": {"go_rub": 804},
-    "IB": {"go_rub": 803},  "NM": {"go_rub": 1405},
-    # Stock futures (ISS front-month GO)
-    "GK": {"go_rub": 234},  "MG": {"go_rub": 4096}, "RN": {"go_rub": 8180},
-    "AL": {"go_rub": 660},  "SP": {"go_rub": 1008},  "ME": {"go_rub": 3149},
-    "CE": {"go_rub": 1187}, "HS": {"go_rub": 231},
+    # Old verified champions (lev confirmed working)
+    "CC": {"go_rub": 473, "lev": 6.4}, "PD": {"go_rub": 22173, "lev": 4.6},
+    "SS": {"go_rub": 205, "lev": 2.0}, "GZ": {"go_rub": 2065, "lev": 5.7},
+    "NG": {"go_rub": 6565, "lev": 3.5}, "GL": {"go_rub": 1220, "lev": 8.7},
+    "SE": {"go_rub": 625, "lev": 1.4},  "SN": {"go_rub": 8180, "lev": 4.9},
+    "HY": {"go_rub": 804, "lev": 4.9},  "IB": {"go_rub": 803, "lev": 3.5},
+    "NM": {"go_rub": 1405, "lev": 5.8},
+    # New stock futures (lev = ISS PREVPRICE / ISS INITIALMARGIN)
+    "GK": {"go_rub": 234, "lev": 5.8},  "MG": {"go_rub": 4096, "lev": 5.8},
+    "RN": {"go_rub": 8180, "lev": 4.9}, "AL": {"go_rub": 660, "lev": 3.9},
+    "SP": {"go_rub": 1008, "lev": 2.0}, "ME": {"go_rub": 3149, "lev": 5.8},
+    # New commodity/index (lev = ISS PREVPRICE * ISS_LOT / ISS GO)
+    "CE": {"go_rub": 1187, "lev": 11.9}, "HS": {"go_rub": 231, "lev": 114.9},
 }
 DEFAULT_LEV = 5.0
 # New champions: strongest performers (Real WR × PF × GO return) + new stock futures
@@ -482,15 +487,9 @@ def process_ticker(symbol, name):
     
     # Add GO-based returns (real PnL as % of margin, not % of notional)
     go_info = GO_DATA.get(symbol, {})
-    go_rub = go_info.get("go_rub", 0)
-    # Compute leverage from first entry price / GO
-    if go_rub > 0 and sigs:
-        last_close = abs(sigs[-1]["entry"])
-        lev = max(last_close / go_rub, 0.5)  # cap minimum at 0.5x
-    else:
-        lev = DEFAULT_LEV
+    lev = go_info.get("lev", DEFAULT_LEV)
     for s in sigs:
-        s["lev"] = round(lev, 2)
+        s["lev"] = lev
         s["ret_go"] = round(s["real_ret"] * lev, 2)
     
     equity = compute_equity(sigs)
