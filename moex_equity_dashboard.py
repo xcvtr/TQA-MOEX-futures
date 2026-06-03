@@ -22,8 +22,11 @@ CHAMPIONS = [
 ]
 
 H4_WINDOW = 20  # rolling median window
-TARGET_BARS = 2  # forward look (hold period in H4 bars after entry)
-ENTRY_SLIPPAGE = 0.001  # 0.1% slippage for limit order fill
+TARGET_BARS = 2  # max hold in H4 bars
+ENTRY_SLIPPAGE = 0.001  # 0.1% slippage on entry
+TP_PCT = 0.004          # 0.4% take-profit limit
+SL_PCT = 0.008          # 0.8% stop-loss
+TRAIL_ACTIVATE = 0.005  # 0.5% → trail stop to breakeven
 
 def get_conn():
     return psycopg2.connect(**DB)
@@ -87,157 +90,231 @@ def compute_h4_features(h4_bars):
     return data
 
 def find_signals(data):
-    """Volume Climax strategy signals.
+    """Volume Climax strategy — realistic exchange simulation.
     
-    Entry: next H4 bar open (+ slippage for realistic fill)
-    Exit: close-based (any close in holding window beyond target)
-    Secondary: touch-based (any high/low in holding window) — for comparison
+    Entry: next H4 bar open +0.1% slippage (market order at open)
+    TP:    limit order at 0.4% from entry
+    SL:    stop-loss at 0.8% 
+    Trail: after 0.5% in our favor → trail SL to breakeven +0.1%
+    Max hold: 2 H4 bars → exit at close if TP/SL not hit
     
-    TARGET_BARS = 2 means: signal at bar i, entry at i+1 open, 
-    hold through bars i+1..i+2, exit at close of bar i+2.
+    Also keeps touch/close metrics for comparison.
     """
     sigs = []
     for i, d in enumerate(data):
         if d["vol_ratio"] <= 2 or d["range_pct"] <= d.get("avg_range_pct", 0):
             continue
         
-        # Bullish: sell-climax (red bar, close near low)
         is_red = d["close"] < d["open"]
         is_bear_climax = is_red and d["close_pos"] <= 0.35
-        # Bearish: buy-climax (green bar, close near high)
         is_green = d["close"] > d["open"]
         is_bull_climax = is_green and d["close_pos"] >= 0.65
         
         if not is_bear_climax and not is_bull_climax:
             continue
         
-        # Need enough bars AFTER entry bar for the holding window
         if i + 1 + TARGET_BARS >= len(data):
             continue
         
-        # Entry at next bar's open with slippage
         entry_bar = data[i+1]
-        entry = entry_bar["open"] * (1 + ENTRY_SLIPPAGE)  # pessimistic fill
-        
-        # Holding window: bars i+1 .. i+TARGET_BARS
+        entry = entry_bar["open"] * (1 + ENTRY_SLIPPAGE)
         hold_bars = [data[i+1+k] for k in range(TARGET_BARS)]
         
+        # Legacy metrics for comparison
         if is_bear_climax:
-            # LONG: expect price to go UP
             best_close = max(f["close"] for f in hold_bars)
             best_touch = max(f["high"] for f in hold_bars)
-            
             close_win = best_close >= entry * 1.002
             touch_win = best_touch >= entry * 1.002
-            
             ret_close = (best_close - entry) / entry * 100 if close_win else (min(f["low"] for f in hold_bars) - entry) / entry * 100
             ret_touch = (best_touch - entry) / entry * 100
+        else:
+            worst_close = min(f["close"] for f in hold_bars)
+            worst_touch = min(f["low"] for f in hold_bars)
+            close_win = worst_close <= entry * 0.998
+            touch_win = worst_touch <= entry * 0.998
+            ret_close = (entry - worst_close) / entry * 100 if close_win else (entry - max(f["high"] for f in hold_bars)) / entry * 100
+            ret_touch = (entry - worst_touch) / entry * 100
+        
+        # ── Realistic execution model ──
+        if is_bear_climax:
+            tp = entry * (1 + TP_PCT)
+            sl = entry * (1 - SL_PCT)
+            trail_be = entry * 1.001  # breakeven stop
+            trailed = False
+            real_exit = None
+            real_reason = "timeout"
+            
+            # Simulate bar by bar
+            trail_sl = sl  # current protective stop
+            for bar in hold_bars:
+                # Check TP first
+                if bar["high"] >= tp:
+                    real_exit = tp
+                    real_reason = "tp"
+                    break
+                # Check SL
+                if bar["low"] <= trail_sl:
+                    real_exit = trail_sl
+                    real_reason = "sl"
+                    break
+                # Trail to breakeven if price moved enough
+                if not trailed and bar["high"] >= entry * (1 + TRAIL_ACTIVATE):
+                    trail_sl = trail_be
+                    trailed = True
+            
+            if real_exit is None:
+                # Exit at close of last bar
+                real_exit = hold_bars[-1]["close"]
+                real_reason = "expiry"
+            
+            real_ret = (real_exit - entry) / entry * 100
+            real_win = real_ret > 0
             
             sigs.append({
                 "time": str(d["time"].date()), "dir": "LONG",
-                "entry": entry, "entry_bar_time": str(entry_bar["time"].date()),
+                "entry": entry,
+                "tp": tp, "sl": sl,
+                "real_ret": round(real_ret, 2),
+                "real_win": real_win,
+                "real_reason": real_reason,
                 "close_win": close_win, "touch_win": touch_win,
                 "ret_close": round(ret_close, 2),
                 "ret_touch": round(ret_touch, 2),
                 "vol_ratio": round(d["vol_ratio"], 1),
-                "range_pct": round(d["range_pct"], 2),
-                "close_pos": round(d["close_pos"], 2),
             })
-        elif is_bull_climax:
-            # SHORT: expect price to go DOWN
-            worst_close = min(f["close"] for f in hold_bars)
-            worst_touch = min(f["low"] for f in hold_bars)
+        else:
+            tp = entry * (1 - TP_PCT)
+            sl = entry * (1 + SL_PCT)
+            trail_be = entry * 0.999
+            trailed = False
+            real_exit = None
+            real_reason = "timeout"
             
-            close_win = worst_close <= entry * 0.998
-            touch_win = worst_touch <= entry * 0.998
+            trail_sl = sl
+            for bar in hold_bars:
+                if bar["low"] <= tp:
+                    real_exit = tp
+                    real_reason = "tp"
+                    break
+                if bar["high"] >= trail_sl:
+                    real_exit = trail_sl
+                    real_reason = "sl"
+                    break
+                if not trailed and bar["low"] <= entry * (1 - TRAIL_ACTIVATE):
+                    trail_sl = trail_be
+                    trailed = True
             
-            ret_close = (entry - worst_close) / entry * 100 if close_win else (entry - max(f["high"] for f in hold_bars)) / entry * 100
-            ret_touch = (entry - worst_touch) / entry * 100
+            if real_exit is None:
+                real_exit = hold_bars[-1]["close"]
+                real_reason = "expiry"
+            
+            real_ret = (entry - real_exit) / entry * 100
+            real_win = real_ret > 0
             
             sigs.append({
                 "time": str(d["time"].date()), "dir": "SHORT",
-                "entry": entry, "entry_bar_time": str(entry_bar["time"].date()),
+                "entry": entry,
+                "tp": tp, "sl": sl,
+                "real_ret": round(real_ret, 2),
+                "real_win": real_win,
+                "real_reason": real_reason,
                 "close_win": close_win, "touch_win": touch_win,
                 "ret_close": round(ret_close, 2),
                 "ret_touch": round(ret_touch, 2),
                 "vol_ratio": round(d["vol_ratio"], 1),
-                "range_pct": round(d["range_pct"], 2),
-                "close_pos": round(d["close_pos"], 2),
             })
     return sigs
 
 def compute_equity(sigs):
-    """Compute cumulative equity curves from signals.
-    Returns both close-based (realistic) and touch-based (best-case) equity."""
+    """Compute cumulative equity curves: realistic (TP/SL), touch, close."""
     if not sigs:
-        return {"close": [], "touch": []}
-    cum_close = 0
-    cum_touch = 0
-    curve_close = []
+        return {"real": [], "touch": [], "close": []}
+    cum_real = cum_touch = cum_close = 0
+    curve_real = []
     curve_touch = []
+    curve_close = []
     for s in sigs:
-        ret_c = s["ret_close"] / 100.0
-        ret_t = s["ret_touch"] / 100.0
-        cum_close += ret_c
-        cum_touch += ret_t
-        curve_close.append({"date": s["time"], "equity": round(cum_close * 100, 2)})
+        cum_real += s["real_ret"] / 100.0
+        cum_touch += s["ret_touch"] / 100.0
+        cum_close += s["ret_close"] / 100.0
+        curve_real.append({"date": s["time"], "equity": round(cum_real * 100, 2)})
         curve_touch.append({"date": s["time"], "equity": round(cum_touch * 100, 2)})
-    return {"close": curve_close, "touch": curve_touch}
+        curve_close.append({"date": s["time"], "equity": round(cum_close * 100, 2)})
+    return {"real": curve_real, "touch": curve_touch, "close": curve_close}
 
 def compute_stats(sigs):
-    """Compute trading stats. Primary = close-based, secondary = touch-based."""
+    """Compute trading stats. Primary = realistic (TP/SL), secondary = touch/close."""
     if not sigs:
         return {"signals": 0}
     
-    # Close-based (realistic)
-    close_wins = sum(1 for s in sigs if s["close_win"])
+    n = len(sigs)
+    real_ret = [s["real_ret"] for s in sigs]
+    touch_ret = [s["ret_touch"] if s["dir"]=="LONG" else -s["ret_touch"] for s in sigs]
     close_pnls = [s["ret_close"] if s["dir"]=="LONG" else -s["ret_close"] for s in sigs]
-    close_losses = sum(1 for p in close_pnls if p < 0)
-    close_wr = close_wins / max(len(sigs), 1) * 100
+    
+    # Realistic (primary)
+    real_wins = sum(1 for s in sigs if s["real_win"])
+    real_total = sum(real_ret)
+    real_avg = np.mean(real_ret) if real_ret else 0
+    real_gp = sum(p for p in real_ret if p > 0)
+    real_gl = abs(sum(p for p in real_ret if p < 0))
+    real_pf = real_gp / max(real_gl, 0.001)
+    real_cum = np.cumsum(real_ret) if real_ret else [0]
+    real_peak = np.maximum.accumulate(real_cum)
+    real_dd = real_cum - real_peak
+    real_max_dd = min(real_dd) if len(real_dd) > 0 else 0
+    
+    # Touch (best case)
+    touch_wins = sum(1 for s in sigs if s["touch_win"])
+    touch_total = sum(touch_ret)
+    touch_cum = np.cumsum(touch_ret) if touch_ret else [0]
+    touch_peak = np.maximum.accumulate(touch_cum)
+    touch_dd = touch_cum - touch_peak
+    touch_max_dd = min(touch_dd) if len(touch_dd) > 0 else 0
+    
+    # Close (realistic exit but by close)
+    close_wins = sum(1 for s in sigs if s["close_win"])
     close_total = sum(close_pnls)
-    close_avg = np.mean(close_pnls) if close_pnls else 0
-    close_gp = sum(p for p in close_pnls if p > 0)
-    close_gl = abs(sum(p for p in close_pnls if p < 0))
-    close_pf = close_gp / max(close_gl, 0.001)
     close_cum = np.cumsum(close_pnls) if close_pnls else [0]
     close_peak = np.maximum.accumulate(close_cum)
     close_dd = close_cum - close_peak
     close_max_dd = min(close_dd) if len(close_dd) > 0 else 0
     
-    # Touch-based (best case)
-    touch_wins = sum(1 for s in sigs if s["touch_win"])
-    touch_pnls = [s["ret_touch"] if s["dir"]=="LONG" else -s["ret_touch"] for s in sigs]
-    touch_total = sum(touch_pnls)
-    touch_cum = np.cumsum(touch_pnls) if touch_pnls else [0]
-    touch_peak = np.maximum.accumulate(touch_cum)
-    touch_dd = touch_cum - touch_peak
-    touch_max_dd = min(touch_dd) if len(touch_dd) > 0 else 0
-    
-    # Direction breakdown (close-based)
+    # Direction breakdown (realistic)
     long_sigs = [s for s in sigs if s["dir"] == "LONG"]
     short_sigs = [s for s in sigs if s["dir"] == "SHORT"]
-    long_wr = sum(1 for s in long_sigs if s["close_win"]) / max(len(long_sigs), 1) * 100
-    short_wr = sum(1 for s in short_sigs if s["close_win"]) / max(len(short_sigs), 1) * 100
+    long_wr = sum(1 for s in long_sigs if s["real_win"]) / max(len(long_sigs), 1) * 100
+    short_wr = sum(1 for s in short_sigs if s["real_win"]) / max(len(short_sigs), 1) * 100
+    
+    # Exit reason breakdown
+    tp_cnt = sum(1 for s in sigs if s.get("real_reason") == "tp")
+    sl_cnt = sum(1 for s in sigs if s.get("real_reason") == "sl")
+    exp_cnt = sum(1 for s in sigs if s.get("real_reason") == "expiry")
     
     return {
-        "signals": len(sigs),
-        # Close-based (primary)
-        "close_wins": close_wins, "close_losses": close_losses,
-        "close_wr": round(close_wr, 1),
-        "close_total_pnl": round(close_total, 2),
-        "close_avg_ret": round(close_avg, 2),
-        "close_pf": round(close_pf, 2),
-        "close_max_dd": round(close_max_dd, 2),
-        # Touch-based (secondary)
-        "touch_wins": touch_wins, "touch_losses": len(sigs) - touch_wins,
-        "touch_wr": round(touch_wins / max(len(sigs), 1) * 100, 1),
+        "signals": n,
+        # Realistic (TP/SL model)
+        "real_wins": real_wins, "real_losses": n - real_wins,
+        "real_wr": round(real_wins / max(n, 1) * 100, 1),
+        "real_total_pnl": round(real_total, 2),
+        "real_avg_ret": round(real_avg, 2),
+        "real_pf": round(real_pf, 2),
+        "real_max_dd": round(real_max_dd, 2),
+        # Touch (secondary)
+        "touch_wr": round(touch_wins / max(n, 1) * 100, 1),
         "touch_total_pnl": round(touch_total, 2),
         "touch_max_dd": round(touch_max_dd, 2),
+        # Close (tertiary)
+        "close_wr": round(close_wins / max(n, 1) * 100, 1),
+        "close_total_pnl": round(close_total, 2),
+        "close_max_dd": round(close_max_dd, 2),
         # Direction
         "long_wr": round(long_wr, 1), "short_wr": round(short_wr, 1),
         "long_count": len(long_sigs), "short_count": len(short_sigs),
-        # All signals with moves for analysis
-        "all_ret_close": close_pnls,
+        # Exit reasons
+        "tp_count": tp_cnt, "sl_count": sl_cnt, "expiry_count": exp_cnt,
+        "all_real_ret": real_ret,
     }
 
 def generate_analysis(stats, sigs):
@@ -245,14 +322,16 @@ def generate_analysis(stats, sigs):
     if not sigs or stats["signals"] == 0:
         return {"verdict": "neutral", "short": "Недостаточно сигналов.", "detail": ""}
     
-    # Use close-based (realistic) stats as primary
-    wr = stats["close_wr"]
-    pf = stats["close_pf"]
-    dd = stats["close_max_dd"]
-    avg = stats["close_avg_ret"]
-    total = stats["close_total_pnl"]
+    wr = stats["real_wr"]
+    pf = stats["real_pf"]
+    dd = stats["real_max_dd"]
+    avg = stats["real_avg_ret"]
+    total = stats["real_total_pnl"]
     twr = stats["touch_wr"]
-    tp = stats["touch_total_pnl"]
+    cwr = stats["close_wr"]
+    tp_cnt = stats["tp_count"]
+    sl_cnt = stats["sl_count"]
+    exp_cnt = stats["expiry_count"]
     
     lw = stats["long_wr"]
     sw = stats["short_wr"]
@@ -260,118 +339,83 @@ def generate_analysis(stats, sigs):
     sc = stats["short_count"]
     n = stats["signals"]
     
-    # Verdict based on close-based WR
-    if wr >= 65:
+    if wr >= 55:
         verdict = "strong_buy"
-        verdict_label = "🟢 Рабочий сигнал"
-    elif wr >= 55:
+        verdict_label = "🟢 Рабочий"
+    elif wr >= 48:
         verdict = "buy"
         verdict_label = "🟡 Перспективный"
-    elif wr >= 45:
+    elif wr >= 42:
         verdict = "neutral"
         verdict_label = "⚪ Нейтральный"
     else:
         verdict = "sell"
         verdict_label = "🔴 Слабый"
     
-    # Short description
     short_parts = []
-    short_parts.append(f"Close WR {wr:.0f}% ({n} сигн.)")
+    short_parts.append(f"Real WR {wr:.0f}%")
+    short_parts.append(f"TP {tp_cnt}/{sl_cnt}/{exp_cnt}")
     short_parts.append(f"средняя {avg:+.1f}%")
-    if pf >= 1.5:
+    if pf >= 1.2:
         short_parts.append(f"PF {pf:.1f}")
-    if dd < -5:
-        short_parts.append(f"просадка {dd:.1f}%")
-    
-    degradation = twr - wr
-    if degradation >= 15:
-        short_parts.append(f"⚠️ touch+{degradation:.0f}pp")
+    if dd < -10:
+        short_parts.append(f"⚠️ DD {dd:.0f}%")
     
     short = f"{verdict_label} · {' · '.join(short_parts)}"
     
-    # Detail analysis
     lines = []
     
-    # Realism warning
-    degradation = twr - wr
-    if degradation >= 10:
-        lines.append(f"⚠️ Большой разрыв между touch ({twr:.0f}%) и close ({wr:.0f}%) — {degradation:.0f}pp. "
-                    f"Цена часто касается цели, но не закрывается выше/ниже. "
-                    f"Требуется лимитник или скользящий стоп.")
-    elif degradation >= 5:
-        lines.append(f"Умеренный разрыв touch vs close: {degradation:.0f}pp. "
-                    f"Часть сигналов требует точного исполнения.")
-    else:
-        lines.append(f"Touch и close дают похожий результат (разрыв {degradation:.0f}pp). "
-                    f"Сигналы устойчивы к проскальзыванию.")
+    # Model explanation
+    lines.append(f"📐 Модель: вход по open +0.1%, TP {TP_PCT*100:.1f}%, SL {SL_PCT*100:.1f}%, "
+                f"трейлинг после {TRAIL_ACTIVATE*100:.1f}%, макс {TARGET_BARS} бара")
+    
+    # Exit breakdown
+    tp_pct = tp_cnt / max(n, 1) * 100
+    sl_pct = sl_cnt / max(n, 1) * 100
+    exp_pct = exp_cnt / max(n, 1) * 100
+    lines.append(f"Выходы: TP {tp_cnt} ({tp_pct:.0f}%) · SL {sl_cnt} ({sl_pct:.0f}%) · по времени {exp_cnt} ({exp_pct:.0f}%)")
+    
+    # Comparisons
+    lines.append(f"Сравнение: Real {wr:.0f}% vs Touch {twr:.0f}% vs Close {cwr:.0f}%")
     
     # Long vs Short
-    if lc >= 5 and sc >= 5:
-        diff = lw - sw
-        if abs(diff) >= 15:
-            better = "лонги" if diff > 0 else "шорты"
-            lines.append(f"Асимметрия: {better} значительно сильнее (лонги {lw:.0f}% vs шорты {sw:.0f}%).")
-        elif abs(diff) >= 5:
-            better = "лонги" if diff > 0 else "шорты"
-            lines.append(f"Небольшое преимущество {better}: {lw:.0f}% vs {sw:.0f}%.")
-        else:
-            lines.append(f"Симметричная: лонги {lw:.0f}% ({lc}) и шорты {sw:.0f}% ({sc}).")
-    elif lc >= 5:
-        lines.append(f"Доминируют лонги ({lc} сигн., {lw:.0f}% WR).")
-    elif sc >= 5:
-        lines.append(f"Доминируют шорты ({sc} сигн., {sw:.0f}% WR).")
+    if lc >= 5 and sc >= 5 and abs(lw - sw) >= 8:
+        better = "лонги" if lw > sw else "шорты"
+        lines.append(f"Преимущество {better}: {lw:.0f}% vs {sw:.0f}%")
     
-    # Drawdown
-    if dd < -20:
-        lines.append(f"⚠️ Высокая просадка {dd:.1f}% — рискованно.")
-    elif dd < -5:
-        lines.append(f"Просадка {dd:.1f}% — умеренная.")
-    elif dd < 0:
-        lines.append(f"Минимальная просадка {dd:.1f}%.")
+    # PF / quality
+    if pf >= 1.3:
+        lines.append(f"PF {pf:.2f} — есть запас прибыли над убытками")
+    elif pf >= 1.0:
+        lines.append(f"PF {pf:.2f} — на грани безубытка")
     else:
-        lines.append(f"Нулевая просадка на close-based.")
+        lines.append(f"PF {pf:.2f} — убытки превышают прибыль")
     
-    # Profit factor
-    if pf >= 3:
-        lines.append(f"Хороший PF {pf:.1f}.")
-    elif pf >= 1.5:
-        lines.append(f"Приемлемый PF {pf:.1f}.")
-    elif pf >= 1:
-        lines.append(f"Пограничный PF {pf:.2f} — на грани случайности.")
+    if dd < -30:
+        lines.append(f"⚠️ Просадка {dd:.0f}% — нужен стоп-лосс жёстче")
+    elif dd < -10:
+        lines.append(f"Просадка {dd:.0f}% — терпимо с контролем риска")
     else:
-        lines.append(f"Слабый PF {pf:.2f}.")
+        lines.append(f"Просадка {dd:.0f}% — хорошо")
     
-    # Signal analysis
-    rets = stats.get("all_ret_close", [])
+    # Avg ret analysis
+    rets = stats.get("all_real_ret", [])
     if rets:
-        neg = sum(1 for r in rets if r < 0)
-        pos = sum(1 for r in rets if r > 0)
-        if neg > 0:
-            avg_loss = abs(np.mean([r for r in rets if r < 0]))
-            avg_win = np.mean([r for r in rets if r > 0]) if pos > 0 else 0
-            if avg_win > 0 and avg_loss > 0:
-                ratio = avg_win / avg_loss
-                lines.append(f"Соотношение avg win/loss: {ratio:.1f}x ({avg_win:+.1f}% / {avg_loss:+.1f}%).")
+        avg_win = np.mean([r for r in rets if r > 0]) if any(r > 0 for r in rets) else 0
+        avg_loss = abs(np.mean([r for r in rets if r < 0])) if any(r < 0 for r in rets) else 0
+        if avg_win > 0 and avg_loss > 0:
+            lines.append(f"Средняя прибыль {avg_win:+.2f}% / убыток {avg_loss:+.2f}% (ratio {avg_win/max(avg_loss,0.001):.1f})")
     
-    # PnL
-    if total > 100:
-        lines.append(f"Суммарно {total:+.0f}% ({n} сделок).")
-    elif total > 20:
-        lines.append(f"Суммарно {total:+.0f}%.")
+    if total > 0:
+        lines.append(f"Σ {total:+.0f}% за {n} сделок")
     
     # Recommendation
-    if wr >= 60 and pf >= 1.5 and dd > -15 and degradation < 15:
-        lines.append(f"\n💡 Рекомендация: кандидат для тестовой торговли. "
-                    f"Добавить стоп-лосс и контролировать просадку.")
-    elif wr >= 50 and pf >= 1.2:
-        lines.append(f"\n💡 Рекомендация: только с фильтром (тренд, OI). "
-                    f"Самостоятельно недостаточно стабилен.")
+    if wr >= 50 and pf >= 1.2 and dd > -20:
+        lines.append(f"\n💡 Кандидат для тестовой торговли. Контролировать риск.")
+    elif wr >= 45 and pf >= 1.0:
+        lines.append(f"\n💡 Можно пробовать с фильтром (тренд/OI). Требует калибровки.")
     else:
-        lines.append(f"\n💡 Рекомендация: тестовая торговля не рекомендуется. "
-                    f"Нужна калибровка стратегии под этот инструмент.")
-    
-    # Touch-based comparison note
-    lines.append(f"\n📎 Touch-based (best case): WR {twr:.0f}%, ΣPnL {tp:+.0f}%")
+        lines.append(f"\n💡 Не рекомендуется для самостоятельной торговли")
     
     return {
         "verdict": verdict,
@@ -409,10 +453,10 @@ def process_ticker(symbol, name):
         "equity": equity, "prices": prices,
         "analysis": analysis,
         # Summary for sorting/filtering
-        "wr": stats["close_wr"],
-        "total_pnl": stats["close_total_pnl"],
-        "profit_factor": stats["close_pf"],
-        "avg_ret": stats["close_avg_ret"],
+        "wr": stats["real_wr"],
+        "total_pnl": stats["real_total_pnl"],
+        "profit_factor": stats["real_pf"],
+        "avg_ret": stats["real_avg_ret"],
         "signals": stats["signals"],
     }
 
@@ -508,7 +552,7 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
     <option value="asc">Asc</option>
   </select>
   <label>🔍 Min WR: </label>
-  <input type="number" id="minWR" value="55" min="0" max="100" onchange="sortGrid()">
+  <input type="number" id="minWR" value="45" min="0" max="100" onchange="sortGrid()">
   <label>Min signals: </label>
   <input type="number" id="minSig" value="20" min="0" onchange="sortGrid()">
 </div>
@@ -533,7 +577,7 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
 const DATA = __DATA__;
 
 function fmtPnl(v){return v>0?'+'+v.toFixed(1):v.toFixed(1)}
-function wrClass(w){return w>=55?'high':w>=45?'mid':'low'}
+function wrClass(w){return w>=50?'high':w>=42?'mid':'low'}
 function pnlClass(v){return v>=0?'pos':'neg'}
 
 let selected = null;
@@ -542,12 +586,12 @@ let sortDir = 'desc';
 
 function renderSummary(all){
   const totalSig = all.reduce((s,t)=>s+t.stats.signals,0);
-  const totalW = all.reduce((s,t)=>s+t.stats.close_wins,0);
+  const totalW = all.reduce((s,t)=>s+t.stats.real_wins,0);
   const totalWR = totalSig>0?(totalW/totalSig*100).toFixed(1):'0';
-  const totalPnL = all.reduce((s,t)=>s+t.stats.close_total_pnl,0);
-  const wr55 = all.filter(t=>t.stats.close_wr>=55).length;
+  const totalPnL = all.reduce((s,t)=>s+t.stats.real_total_pnl,0);
+  const wr50 = all.filter(t=>t.stats.real_wr>=50).length;
   document.getElementById('sub-info').textContent =
-    `${all.length} tickers · ${totalSig} signals · ${totalWR}% close WR · ${fmtPnl(totalPnL)}% ΣPnL · ${wr55} wr≥55%`;
+    `${all.length} tickers · ${totalSig} signals · ${totalWR}% real WR · ${fmtPnl(totalPnL)}% ΣPnL · ${wr50} rw≥50%`;
 }
 
 function renderGrid(all){
@@ -567,8 +611,8 @@ function renderGrid(all){
     const s = t.stats;
     return `<div class="card${sel}" onclick="selectTicker('${t.symbol}')">
       <h3><span class="sym">${t.symbol}</span> — ${t.name}</h3>
-      <div class="stat">Signals: <b>${s.signals}</b> · C-WR: <b class="wr ${wrClass(s.close_wr)}">${s.close_wr}%</b> · T-WR: <b>${s.touch_wr}%</b> · ΣPnL: <b class="pnl ${pnlClass(s.close_total_pnl)}">${fmtPnl(s.close_total_pnl)}%</b></div>
-      <div class="stat">L: ${s.long_wr}%(${s.long_count}) · S: ${s.short_wr}%(${s.short_count}) · PF: ${s.close_pf} · DD: ${s.close_max_dd}%</div>
+      <div class="stat">Signals: <b>${s.signals}</b> · R-WR: <b class="wr ${wrClass(s.real_wr)}">${s.real_wr}%</b> · T-WR: <b>${s.touch_wr}%</b> · C-WR: <b>${s.close_wr}%</b></div>
+      <div class="stat">TP${s.tp_count}/SL${s.sl_count}/Exp${s.expiry_count} · PF ${s.real_pf} · DD ${s.real_max_dd}% · Σ ${fmtPnl(s.real_total_pnl)}%</div>
     </div>`;
   }).join('');
 }
@@ -594,15 +638,17 @@ function showDetail(sym){
   const s = t.stats;
   document.getElementById('detail-stats').innerHTML = [
     ['Signals', s.signals, ''],
-    ['C-Wins', s.close_wins, ''],
-    ['C-WR', s.close_wr+'%', wrClass(s.close_wr)],
-    ['T-WR', s.touch_wr+'%', wrClass(s.touch_wr)],
-    ['Avg Ret', fmtPnl(s.close_avg_ret)+'%', pnlClass(s.close_avg_ret)],
-    ['ΣPnL', fmtPnl(s.close_total_pnl)+'%', pnlClass(s.close_total_pnl)],
-    ['PF', s.close_pf, s.close_pf>=1.5?'pos':'neg'],
-    ['Max DD', s.close_max_dd+'%', 'neg'],
-    ['L-WR', s.long_wr+'%', wrClass(s.long_wr)],
-    ['S-WR', s.short_wr+'%', wrClass(s.short_wr)],
+    ['R-Wins', s.real_wins, ''],
+    ['R-WR', s.real_wr+'%', wrClass(s.real_wr)],
+    ['T-WR', s.touch_wr+'%', ''],
+    ['C-WR', s.close_wr+'%', ''],
+    ['Avg Ret', fmtPnl(s.real_avg_ret)+'%', pnlClass(s.real_avg_ret)],
+    ['ΣPnL', fmtPnl(s.real_total_pnl)+'%', pnlClass(s.real_total_pnl)],
+    ['PF', s.real_pf, s.real_pf>=1.2?'pos':'neg'],
+    ['DD', s.real_max_dd+'%', 'neg'],
+    ['TP', s.tp_count, s.tp_count>s.sl_count?'pos':'neg'],
+    ['SL', s.sl_count, 'neg'],
+    ['Exp', s.expiry_count, ''],
   ].map(x=>`<div class="stat-box"><div class="label">${x[0]}</div><div class="val ${x[2]}">${x[1]}</div></div>`).join('');
   
   // Analysis text
@@ -701,17 +747,19 @@ function drawEquityChart(t){
   const ctx=canvas.getContext('2d');
   const W=canvas.width,H=canvas.height,PAD={t:20,b:25,l:60,r:20};
   
-  const eqClose = t.equity.close||[];
+  const eqReal = t.equity.real||[];
   const eqTouch = t.equity.touch||[];
-  if(eqClose.length<2){ctx.fillStyle='#8b949e';ctx.font='12px Courier New';ctx.textAlign='center';ctx.fillText('No equity data',W/2,H/2);return}
+  const eqClose = t.equity.close||[];
+  if(eqReal.length<2){ctx.fillStyle='#8b949e';ctx.font='12px Courier New';ctx.textAlign='center';ctx.fillText('No equity data',W/2,H/2);return}
   
-  const valsClose = eqClose.map(e=>e.equity);
-  const valsTouch = eqTouch.map(e=>e.equity);
-  const allVals = [...valsClose, ...valsTouch, 0];
-  const maxV = Math.max(...allVals)*1.1;
-  const minV = Math.min(...allVals)*1.1;
+  const valsR = eqReal.map(e=>e.equity);
+  const valsT = eqTouch.map(e=>e.equity);
+  const valsC = eqClose.map(e=>e.equity);
+  const allV = [...valsR,...valsT,...valsC,0];
+  const maxV = Math.max(...allV)*1.1;
+  const minV = Math.min(...allV)*1.1;
   const rangeV = maxV-minV||1;
-  const xStep = (W-PAD.l-PAD.r)/Math.max(valsClose.length-1,1);
+  const xStep = (W-PAD.l-PAD.r)/Math.max(valsR.length-1,1);
   
   function x(i){return PAD.l+i*xStep}
   function y(v){return PAD.t+(1-(v-minV)/rangeV)*(H-PAD.t-PAD.b)}
@@ -721,57 +769,48 @@ function drawEquityChart(t){
   ctx.strokeStyle='#30363d';ctx.lineWidth=1;ctx.setLineDash([4,4]);
   ctx.beginPath();ctx.moveTo(PAD.l,zy);ctx.lineTo(W-PAD.r,zy);ctx.stroke();ctx.setLineDash([]);
   
-  // Touch-based (ghost, secondary)
-  if(valsTouch.length>=2){
-    ctx.strokeStyle='rgba(88,166,255,0.3)';ctx.lineWidth=1;
-    ctx.beginPath();
-    for(let i=0;i<valsTouch.length;i++){
-      i===0?ctx.moveTo(x(i),y(valsTouch[i])):ctx.lineTo(x(i),y(valsTouch[i]));
-    }
+  // Touch (ghost)
+  if(valsT.length>=2){
+    ctx.strokeStyle='rgba(88,166,255,0.2)';ctx.lineWidth=1;
+    ctx.beginPath();for(let i=0;i<valsT.length;i++){i===0?ctx.moveTo(x(i),y(valsT[i])):ctx.lineTo(x(i),y(valsT[i]));}
     ctx.stroke();
-    ctx.fillStyle='rgba(88,166,255,0.05)';
-    ctx.fillRect(W-PAD.r-60,PAD.t,55,16);
-    ctx.fillStyle='rgba(88,166,255,0.6)';ctx.font='9px Courier New';ctx.textAlign='right';
-    ctx.fillText('touch',W-PAD.r-5,PAD.t+11);
+  }
+  // Close (ghost)
+  if(valsC.length>=2){
+    ctx.strokeStyle='rgba(210,153,34,0.2)';ctx.lineWidth=1;
+    ctx.beginPath();for(let i=0;i<valsC.length;i++){i===0?ctx.moveTo(x(i),y(valsC[i])):ctx.lineTo(x(i),y(valsC[i]));}
+    ctx.stroke();
   }
   
-  // Close-based fill
-  const lastC = valsClose[valsClose.length-1];
+  // Realistic fill
+  const lastR = valsR[valsR.length-1];
   ctx.beginPath();
   ctx.moveTo(PAD.l,zy);
-  for(let i=0;i<valsClose.length;i++){
-    i===0?ctx.lineTo(x(i),y(valsClose[i])):ctx.lineTo(x(i),y(valsClose[i]));
-  }
-  ctx.lineTo(PAD.l+(valsClose.length-1)*xStep,zy);ctx.closePath();
+  for(let i=0;i<valsR.length;i++){i===0?ctx.lineTo(x(i),y(valsR[i])):ctx.lineTo(x(i),y(valsR[i]));}
+  ctx.lineTo(PAD.l+(valsR.length-1)*xStep,zy);ctx.closePath();
   const grad = ctx.createLinearGradient(0,PAD.t,0,H-PAD.b);
-  grad.addColorStop(0,lastC>=0?'rgba(63,185,80,0.25)':'rgba(248,81,73,0.25)');
-  grad.addColorStop(1,lastC>=0?'rgba(63,185,80,0.02)':'rgba(248,81,73,0.02)');
+  grad.addColorStop(0,lastR>=0?'rgba(63,185,80,0.25)':'rgba(248,81,73,0.25)');
+  grad.addColorStop(1,lastR>=0?'rgba(63,185,80,0.02)':'rgba(248,81,73,0.02)');
   ctx.fillStyle=grad;ctx.fill();
   
-  // Close-based line
-  ctx.strokeStyle=lastC>=0?'#3fb950':'#f85149';ctx.lineWidth=2;
-  ctx.beginPath();
-  for(let i=0;i<valsClose.length;i++){
-    i===0?ctx.moveTo(x(i),y(valsClose[i])):ctx.lineTo(x(i),y(valsClose[i]));
-  }
+  // Realistic line
+  ctx.strokeStyle=lastR>=0?'#3fb950':'#f85149';ctx.lineWidth=2;
+  ctx.beginPath();for(let i=0;i<valsR.length;i++){i===0?ctx.moveTo(x(i),y(valsR[i])):ctx.lineTo(x(i),y(valsR[i]));}
   ctx.stroke();
+  
+  // Legend
+  ctx.fillStyle='rgba(88,166,255,0.4)';ctx.font='9px Courier New';ctx.textAlign='left';
+  ctx.fillText('touch',W-PAD.r-120,PAD.t+10);
+  ctx.fillStyle='rgba(210,153,34,0.4)';ctx.fillText('close',W-PAD.r-120,PAD.t+22);
+  ctx.fillStyle=lastR>=0?'rgba(63,185,80,0.7)':'rgba(248,81,73,0.7)';ctx.fillText('real',W-PAD.r-120,PAD.t+34);
   
   // Y axis
   ctx.fillStyle='#8b949e';ctx.font='10px Courier New';ctx.textAlign='right';
-  for(let i=0;i<=3;i++){
-    const yy = PAD.t+(H-PAD.t-PAD.b)*i/3;
-    const v = maxV-(maxV-minV)*i/3;
-    ctx.fillText(v.toFixed(1)+'%',PAD.l-5,yy+3);
-  }
-  
+  for(let i=0;i<=3;i++){const yy=PAD.t+(H-PAD.t-PAD.b)*i/3;ctx.fillText((maxV-(maxV-minV)*i/3).toFixed(1)+'%',PAD.l-5,yy+3);}
   // Date labels
   ctx.textAlign='center';
-  const nLabels = Math.min(6, valsClose.length);
-  const lStep = Math.max(1,Math.floor(valsClose.length/nLabels));
-  for(let i=0;i<valsClose.length;i+=lStep){
-    const d = eqClose[i].date;
-    if(d)ctx.fillText(d.substring(5), x(i), H-3);
-  }
+  const lStep=Math.max(1,Math.floor(valsR.length/6));
+  for(let i=0;i<valsR.length;i+=lStep){const d=eqReal[i].date;if(d)ctx.fillText(d.substring(5),x(i),H-3);}
 }
 
 function renderTradeTable(t){
@@ -779,14 +818,13 @@ function renderTradeTable(t){
   const sigs = t.sigs;
   if(!sigs||!sigs.length){div.innerHTML='<p>No signals</p>';return}
   
-  let html = '<table class="sig-table"><tr><th>Date</th><th>Entry</th><th>Dir</th><th>Entry$</th><th>Ret%</th><th>T-Ret%</th><th>VolR</th></tr>';
+  let html = '<table class="sig-table"><tr><th>Date</th><th>Dir</th><th>Entry</th><th>R-Ret%</th><th>Exit</th><th>T-Ret%</th><th>C-Ret%</th></tr>';
   sigs.forEach(s=>{
-    const cls = s.close_win?'w':'l';
+    const cls = s.real_win?'w':'l';
     const arrow = s.dir==='LONG'?'▲':'▼';
-    const icon = s.close_win?'✅':'❌';
-    const tIcon = s.touch_win?'t':' ';
+    const reason = s.real_reason||'';
     const entryVal = typeof s.entry==='number'?s.entry.toFixed(s.entry>100?0:4):s.entry;
-    html += `<tr class="${cls}"><td>${s.time}</td><td>${s.entry_bar_time||''}</td><td>${arrow} ${s.dir}</td><td>${entryVal}</td><td>${s.ret_close.toFixed(2)}%</td><td>${s.ret_touch.toFixed(2)}%</td><td>${s.vol_ratio}</td></tr>`;
+    html += `<tr class="${cls}"><td>${s.time}</td><td>${arrow}</td><td>${entryVal}</td><td>${s.real_ret.toFixed(2)}%</td><td>${reason}</td><td>${(s.dir==='LONG'?'+':'')+s.ret_touch.toFixed(2)}%</td><td>${(s.dir==='LONG'?'+':'')+s.ret_close.toFixed(2)}%</td></tr>`;
   });
   html += '</table>';
   div.innerHTML = html;
@@ -795,8 +833,8 @@ function renderTradeTable(t){
 // Summary table
 function renderSummaryTable(all){
   const div = document.getElementById('summary-div');
-  const cols = ['sym','name','signals','close_wr','close_total_pnl','close_pf','close_max_dd','close_avg_ret','touch_wr','long_wr'];
-  const colLabels = ['Sym','Name','Sig','C-WR%','ΣPnL%','PF','DD%','Avg%','T-WR%','L-WR%'];
+  const cols = ['sym','name','signals','real_wr','real_total_pnl','real_pf','real_max_dd','real_avg_ret','touch_wr','close_wr'];
+  const colLabels = ['Sym','Name','Sig','R-WR%','ΣPnL%','PF','DD%','Avg%','T-WR%','C-WR%'];
   
   const render = (data)=>{
     let h = '<table class="summary-table"><tr>';
@@ -811,13 +849,13 @@ function renderSummaryTable(all){
         <td style="color:#58a6ff;font-weight:bold">${t.symbol}</td>
         <td style="color:#8b949e;font-size:0.85em">${t.name}</td>
         <td>${s.signals}</td>
-        <td class="wr ${wrClass(s.close_wr)}">${s.close_wr}%</td>
-        <td class="pnl ${pnlClass(s.close_total_pnl)}">${fmtPnl(s.close_total_pnl)}%</td>
-        <td>${s.close_pf}</td>
-        <td style="color:#f85149">${s.close_max_dd}%</td>
-        <td class="pnl ${pnlClass(s.close_avg_ret)}">${fmtPnl(s.close_avg_ret)}%</td>
+        <td class="wr ${wrClass(s.real_wr)}">${s.real_wr}%</td>
+        <td class="pnl ${pnlClass(s.real_total_pnl)}">${fmtPnl(s.real_total_pnl)}%</td>
+        <td>${s.real_pf}</td>
+        <td style="color:#f85149">${s.real_max_dd}%</td>
+        <td class="pnl ${pnlClass(s.real_avg_ret)}">${fmtPnl(s.real_avg_ret)}%</td>
         <td class="wr ${wrClass(s.touch_wr)}">${s.touch_wr}%</td>
-        <td>${s.long_wr}%</td>
+        <td class="wr ${wrClass(s.close_wr)}">${s.close_wr}%</td>
       </tr>`;
     });
     h += '</table>';
@@ -878,7 +916,7 @@ def main():
     print(f"Loaded {len(data)} tickers:", flush=True)
     for d in data[:10]:
         s = d['stats']
-        print(f"  {d['symbol']:4s} {s['signals']:4d} sig  C-WR {s['close_wr']:5.1f}%  T-WR {s['touch_wr']:5.1f}%  ΣPnL {s['close_total_pnl']:+.1f}%  PF {s['close_pf']:.2f}", flush=True)
+        print(f"  {d['symbol']:4s} {s['signals']:4d} sig  R-WR {s['real_wr']:5.1f}%  T-WR {s['touch_wr']:5.1f}%  C-WR {s['close_wr']:5.1f}%  ΣPnL {s['real_total_pnl']:+.1f}%  PF {s['real_pf']:.2f}  TP/SL/Exp {s['tp_count']}/{s['sl_count']}/{s['expiry_count']}", flush=True)
     if len(data) > 10:
         print(f"  ... and {len(data)-10} more", flush=True)
     
