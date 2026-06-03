@@ -9,7 +9,24 @@ import numpy as np
 DB = dict(host="10.0.0.60", port=5432, dbname="moex", user="postgres", password=os.environ.get("MOEX_DB_PASSWORD", "***"))
 PORT = 5057
 
-# --- Champion tickers from H4 ranking (WR >= 53%) ---
+# ── Guarantee (GO) by ticker (from MOEX ISS, IMOEXF etc not available) ──
+# go_rub: initial margin in RUB for 1 contract front-month
+# If 0 → default leverage 5x applied
+GO_DATA = {
+    "SS": {"go_rub": 205, "lev": 2.0}, "W4": {"go_rub": 1758, "lev": 9.2},
+    "VB": {"go_rub": 1363, "lev": 5.7}, "GD": {"go_rub": 26922, "lev": 12.1},
+    "SR": {"go_rub": 5719, "lev": 5.8}, "SV": {"go_rub": 11487, "lev": 4.8},
+    "GZ": {"go_rub": 2065, "lev": 5.7}, "PD": {"go_rub": 22173, "lev": 4.6},
+    "LK": {"go_rub": 10218, "lev": 4.9}, "GL": {"go_rub": 1220, "lev": 8.7},
+    "RI": {"go_rub": 24668, "lev": 6.6}, "NG": {"go_rub": 6565, "lev": 3.5},
+    "CC": {"go_rub": 473, "lev": 6.4}, "CH": {"go_rub": 538, "lev": 7.8},
+    "IB": {"go_rub": 803, "lev": 3.5}, "NM": {"go_rub": 1405, "lev": 5.8},
+    "SN": {"go_rub": 8180, "lev": 4.9}, "BR": {"go_rub": 1702, "lev": 3.8},
+    "NR": {"go_rub": 1536, "lev": 4.9}, "HY": {"go_rub": 804, "lev": 4.9},
+    "OJ": {"go_rub": 2019, "lev": 5.9}, "SE": {"go_rub": 625, "lev": 1.4},
+    "DX": {"go_rub": 0, "lev": 5.0}, "BM": {"go_rub": 0, "lev": 5.0},
+}
+DEFAULT_LEV = 5.0
 CHAMPIONS = [
     ("CH", "Cocoa"), ("W4", "Wheat"), ("OJ", "Orange Juice"),
     ("DX", "Dollar Index"), ("BM", "Butter"), ("BR", "Brent"),
@@ -227,21 +244,21 @@ def find_signals(data):
     return sigs
 
 def compute_equity(sigs):
-    """Compute cumulative equity curves: realistic (TP/SL), touch, close."""
+    """Compute cumulative equity curves: realistic (TP/SL), touch, close, GO-based."""
     if not sigs:
-        return {"real": [], "touch": [], "close": []}
-    cum_real = cum_touch = cum_close = 0
-    curve_real = []
-    curve_touch = []
-    curve_close = []
+        return {"real": [], "touch": [], "close": [], "go": []}
+    cum_real = cum_touch = cum_close = cum_go = 0
+    curve_real = curve_touch = curve_close = curve_go = []
     for s in sigs:
         cum_real += s["real_ret"] / 100.0
         cum_touch += s["ret_touch"] / 100.0
         cum_close += s["ret_close"] / 100.0
+        cum_go += s["ret_go"] / 100.0
         curve_real.append({"date": s["time"], "equity": round(cum_real * 100, 2)})
         curve_touch.append({"date": s["time"], "equity": round(cum_touch * 100, 2)})
         curve_close.append({"date": s["time"], "equity": round(cum_close * 100, 2)})
-    return {"real": curve_real, "touch": curve_touch, "close": curve_close}
+        curve_go.append({"date": s["time"], "equity": round(cum_go * 100, 2)})
+    return {"real": curve_real, "touch": curve_touch, "close": curve_close, "go": curve_go}
 
 def compute_stats(sigs):
     """Compute trading stats. Primary = realistic (TP/SL), secondary = touch/close."""
@@ -250,10 +267,11 @@ def compute_stats(sigs):
     
     n = len(sigs)
     real_ret = [s["real_ret"] for s in sigs]
+    go_ret = [s["ret_go"] for s in sigs]  # % of GO instead of notional
     touch_ret = [s["ret_touch"] if s["dir"]=="LONG" else -s["ret_touch"] for s in sigs]
     close_pnls = [s["ret_close"] if s["dir"]=="LONG" else -s["ret_close"] for s in sigs]
     
-    # Realistic (primary)
+    # Realistic (primary) — notional-based
     real_wins = sum(1 for s in sigs if s["real_win"])
     real_total = sum(real_ret)
     real_avg = np.mean(real_ret) if real_ret else 0
@@ -264,6 +282,17 @@ def compute_stats(sigs):
     real_peak = np.maximum.accumulate(real_cum)
     real_dd = real_cum - real_peak
     real_max_dd = min(real_dd) if len(real_dd) > 0 else 0
+    
+    # GO-based (with leverage)
+    go_total = sum(go_ret)
+    go_avg = np.mean(go_ret) if go_ret else 0
+    go_cum = np.cumsum(go_ret) if go_ret else [0]
+    go_peak = np.maximum.accumulate(go_cum)
+    go_dd = go_cum - go_peak
+    go_max_dd = min(go_dd) if len(go_dd) > 0 else 0
+    go_gp = sum(p for p in go_ret if p > 0)
+    go_gl = abs(sum(p for p in go_ret if p < 0))
+    go_pf = go_gp / max(go_gl, 0.001)
     
     # Touch (best case)
     touch_wins = sum(1 for s in sigs if s["touch_win"])
@@ -301,6 +330,11 @@ def compute_stats(sigs):
         "real_avg_ret": round(real_avg, 2),
         "real_pf": round(real_pf, 2),
         "real_max_dd": round(real_max_dd, 2),
+        # GO-based (with leverage)
+        "go_total_pnl": round(go_total, 2),
+        "go_avg_ret": round(go_avg, 2),
+        "go_pf": round(go_pf, 2),
+        "go_max_dd": round(go_max_dd, 2),
         # Touch (secondary)
         "touch_wr": round(touch_wins / max(n, 1) * 100, 1),
         "touch_total_pnl": round(touch_total, 2),
@@ -327,6 +361,10 @@ def generate_analysis(stats, sigs):
     dd = stats["real_max_dd"]
     avg = stats["real_avg_ret"]
     total = stats["real_total_pnl"]
+    go_total = stats["go_total_pnl"]
+    go_avg = stats["go_avg_ret"]
+    go_pf = stats["go_pf"]
+    go_dd = stats["go_max_dd"]
     twr = stats["touch_wr"]
     cwr = stats["close_wr"]
     tp_cnt = stats["tp_count"]
@@ -368,6 +406,13 @@ def generate_analysis(stats, sigs):
     # Model explanation
     lines.append(f"📐 Модель: вход по open +0.1%, TP {TP_PCT*100:.1f}%, SL {SL_PCT*100:.1f}%, "
                 f"трейлинг после {TRAIL_ACTIVATE*100:.1f}%, макс {TARGET_BARS} бара")
+    
+    # Leverage info
+    lev = sigs[0].get("lev", 5.0) if sigs else 5.0
+    if go_total != 0 and go_pf > 0:
+        lines.append(f"💰 С плечом {lev:.1f}x: GO Σ {go_total:+.0f}% · средняя {go_avg:+.1f}% · PF {go_pf:.2f} · DD {go_dd:.0f}%")
+    else:
+        lines.append(f"💰 Без плеча: Σ {total:+.0f}% ({avg:+.2f}%/сделку) · PF {pf:.2f}")
     
     # Exit breakdown
     tp_pct = tp_cnt / max(n, 1) * 100
@@ -438,6 +483,13 @@ def process_ticker(symbol, name):
     if not sigs:
         return None
     
+    # Add GO-based returns (real PnL as % of margin, not % of notional)
+    go_info = GO_DATA.get(symbol, {})
+    lev = go_info.get("lev", DEFAULT_LEV)
+    for s in sigs:
+        s["lev"] = lev
+        s["ret_go"] = round(s["real_ret"] * lev, 2)
+    
     equity = compute_equity(sigs)
     stats = compute_stats(sigs)
     
@@ -458,6 +510,7 @@ def process_ticker(symbol, name):
         "profit_factor": stats["real_pf"],
         "avg_ret": stats["real_avg_ret"],
         "signals": stats["signals"],
+        "lev": lev,
     }
 
 def load_all():
@@ -916,7 +969,7 @@ def main():
     print(f"Loaded {len(data)} tickers:", flush=True)
     for d in data[:10]:
         s = d['stats']
-        print(f"  {d['symbol']:4s} {s['signals']:4d} sig  R-WR {s['real_wr']:5.1f}%  T-WR {s['touch_wr']:5.1f}%  C-WR {s['close_wr']:5.1f}%  ΣPnL {s['real_total_pnl']:+.1f}%  PF {s['real_pf']:.2f}  TP/SL/Exp {s['tp_count']}/{s['sl_count']}/{s['expiry_count']}", flush=True)
+        print(f"  {d['symbol']:4s} {s['signals']:4d} sig  R-WR {s['real_wr']:5.1f}%  GO-PnL {s['go_total_pnl']:+7.1f}%  Not-PnL {s['real_total_pnl']:+7.1f}%  PF {s['real_pf']:.2f}  {d['lev']:.1f}x  TP/SL/Exp {s['tp_count']}/{s['sl_count']}/{s['expiry_count']}", flush=True)
     if len(data) > 10:
         print(f"  ... and {len(data)-10} more", flush=True)
     
