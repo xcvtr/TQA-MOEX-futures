@@ -581,6 +581,19 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
 .analysis-short{font-size:0.9em;font-weight:bold;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #30363d;white-space:pre-wrap}
 .analysis-detail{font-size:0.8em;color:#c9d1d9;line-height:1.6;white-space:pre-wrap}
 .analysis-detail .rec{color:#58a6ff;font-size:1.1em}
+.edu-toggle{display:inline-block;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:0.85em;margin-left:10px}
+.edu-toggle:hover{border-color:#58a6ff;color:#c9d1d9}
+.edu-panel{display:none;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:15px;margin:15px 0;font-size:0.85em;line-height:1.7}
+.edu-panel.open{display:block}
+.edu-panel h3{color:#58a6ff;font-size:1.1em;margin-bottom:10px}
+.edu-panel h4{color:#f0883e;font-size:0.95em;margin:12px 0 6px}
+.edu-panel p{color:#c9d1d9;margin-bottom:8px}
+.edu-panel code{background:#161b22;color:#58a6ff;padding:1px 5px;border-radius:3px;font-size:0.95em}
+.edu-panel .formula{background:#161b22;border:1px solid #30363d;border-radius:4px;padding:8px 12px;margin:8px 0;font-family:inherit;color:#f0883e}
+.edu-panel .example{background:#161b22;border-left:3px solid #3fb950;border-radius:4px;padding:8px 12px;margin:8px 0}
+.edu-panel table{width:100%;border-collapse:collapse;margin:8px 0}
+.edu-panel th{background:#161b22;color:#8b949e;padding:4px 8px;border:1px solid #30363d;text-align:center;font-size:0.85em}
+.edu-panel td{padding:3px 8px;border:1px solid #30363d;text-align:center;font-size:0.85em}
 @media(max-width:900px){
   .dash-grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
   .stats-row{gap:8px}
@@ -588,7 +601,7 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
 }
 </style></head><body>
 <h1>📊 MOEX Volume Climax — Equity Dashboard</h1>
-<p class="sub" id="sub-info">Loading data...</p>
+<p class="sub" id="sub-info">Loading data... <span class="edu-toggle" id="eduBtn" onclick="toggleEdu()">📖 О расчётах GO</span></p>
 
 <div class="filter-bar">
   <label>🔥 Sort: </label>
@@ -625,6 +638,54 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
   <div id="detail-table"></div>
 </div>
 
+<!-- ─── Educational panel: GO Equity Calculation ─── -->
+<div class="edu-panel" id="eduPanel">
+  <h3>📘 Как считаются доходности на ГО (гарантийное обеспечение)</h3>
+  
+  <h4>Проблема</h4>
+  <p>Фьючерсы на MOEX торгуются с плечом. Один контракт требует лишь часть полной стоимости — <strong>гарантийное обеспечение (ГО)</strong>. 
+  Доходность в % от цены контракта (notional) не отражает реальную эффективность капитала трейдера.</p>
+  
+  <h4>Формула</h4>
+  <div class="formula">ret_GO = ret_notional × leverage</div>
+  
+  <p>Где:</p>
+  <p>• <code>ret_notional</code> — процент изменения цены контракта (наша Real Return)</p>
+  <p>• <code>leverage</code> = стоимость контракта / ГО (кредитное плечо биржи)</p>
+  
+  <h4>Пример: CC (Cocoa C)</h4>
+  <div class="example">
+    <b>Параметры:</b> цена ~20 000 RUB, ГО = 473 RUB, плечо = 6.4x<br>
+    <b>Сигнал:</b> TP 0.4% от entry → notional return = +0.4%<br>
+    <b>На ГО:</b> 0.4% × 6.4 = <b>+2.6%</b> от вложенного капитала<br>
+    <b>При WR 76%:</b> 10 сделок → ~7.6× +2.6% и ~2.4× −5.1% (SL 0.8% × 6.4)
+  </div>
+
+  <h4>Откуда берутся цифры плеча</h4>
+  <p>ГО каждого фьючерса публикуется на <a href="https://www.moex.com/ru/contracts/forts/" style="color:#58a6ff" target="_blank">moex.com</a> в разделе FORTS. 
+  Мы используем <strong>initial margin</strong> ближайшего фьючерса на 1 контракт. 
+  Плечо считается как <code>цена_контракта / ГО</code> и меняется с ценой базового актива.</p>
+
+  <h4>Ключевые расхождения с notional-подходом</h4>
+  <table>
+    <tr><th>Метрика</th><th>Notional (обычный)</th><th>GO (с плечом)</th><th>Разница</th></tr>
+    <tr><td>Средняя сделка (CC)</td><td>+0.32%</td><td>+2.0%</td><td>× 6.4</td></tr>
+    <tr><td>ΣPnL (CC)</td><td>+48%</td><td>+305%</td><td>× 6.4</td></tr>
+    <tr><td>Просадка (CC)</td><td>−13.3%</td><td>−85%</td><td>× 6.4</td></tr>
+  </table>
+  <p>Просадка масштабируется <b>так же</b>, как и прибыль — плечо работает в обе стороны. 
+  Именно поэтому в дашборде отображаются оба показателя: notional (для сравнения моделей) и GO (для реальной оценки риска/прибыли).</p>
+  
+  <h4>Зачем это трейдеру</h4>
+  <p>• Реалистичная оценка <b>доходности на капитал</b> (ROI на ГО, а не на полную стоимость)<br>
+     • Понимание <b>реального риска</b>: просадка 10% notional = 50-80% на ГО при плече 5-8x<br>
+     • Сравнение инструментов: CC с WR 76% и плечом 6.4x даёт <b>+305%</b> на ГО vs NG с WR 70% и плечом 3.5x даёт +129%<br>
+     • Оценка drawdown-риска для расчёта капитала под стратегию</p>
+  <p style="margin-top:10px;color:#8b949e;font-size:0.8em;border-top:1px solid #30363d;padding-top:8px">
+  ⚠️ Все расчёты — для образовательных целей. Прошлые результаты не гарантируют будущую доходность.
+  </p>
+</div>
+
 <script>
 // DATA will be injected here
 const DATA = __DATA__;
@@ -632,6 +693,13 @@ const DATA = __DATA__;
 function fmtPnl(v){return v>0?'+'+v.toFixed(1):v.toFixed(1)}
 function wrClass(w){return w>=50?'high':w>=42?'mid':'low'}
 function pnlClass(v){return v>=0?'pos':'neg'}
+
+function toggleEdu(){
+  const p = document.getElementById('eduPanel');
+  const b = document.getElementById('eduBtn');
+  p.classList.toggle('open');
+  b.textContent = p.classList.contains('open') ? '📕 Скрыть GO' : '📖 О расчётах GO';
+}
 
 let selected = null;
 let sortCol = 'wr';
