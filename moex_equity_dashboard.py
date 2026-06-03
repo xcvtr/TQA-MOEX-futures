@@ -9,33 +9,30 @@ import numpy as np
 DB = dict(host="10.0.0.60", port=5432, dbname="moex", user="postgres", password=os.environ.get("MOEX_DB_PASSWORD", "***"))
 PORT = 5057
 
-# ── Guarantee (GO) by ticker (from MOEX ISS, IMOEXF etc not available) ──
-# go_rub: initial margin in RUB for 1 contract front-month
-# If 0 → default leverage 5x applied
+# ── Guarantee (GO) by ticker (from MOEX ISS front-month) ──
+# go_rub: initial margin in RUB for 1 contract. lev computed dynamically from Alor price.
 GO_DATA = {
-    "SS": {"go_rub": 205, "lev": 2.0}, "W4": {"go_rub": 1758, "lev": 9.2},
-    "VB": {"go_rub": 1363, "lev": 5.7}, "GD": {"go_rub": 26922, "lev": 12.1},
-    "SR": {"go_rub": 5719, "lev": 5.8}, "SV": {"go_rub": 11487, "lev": 4.8},
-    "GZ": {"go_rub": 2065, "lev": 5.7}, "PD": {"go_rub": 22173, "lev": 4.6},
-    "LK": {"go_rub": 10218, "lev": 4.9}, "GL": {"go_rub": 1220, "lev": 8.7},
-    "RI": {"go_rub": 24668, "lev": 6.6}, "NG": {"go_rub": 6565, "lev": 3.5},
-    "CC": {"go_rub": 473, "lev": 6.4}, "CH": {"go_rub": 538, "lev": 7.8},
-    "IB": {"go_rub": 803, "lev": 3.5}, "NM": {"go_rub": 1405, "lev": 5.8},
-    "SN": {"go_rub": 8180, "lev": 4.9}, "BR": {"go_rub": 1702, "lev": 3.8},
-    "NR": {"go_rub": 1536, "lev": 4.9}, "HY": {"go_rub": 804, "lev": 4.9},
-    "OJ": {"go_rub": 2019, "lev": 5.9}, "SE": {"go_rub": 625, "lev": 1.4},
-    "DX": {"go_rub": 0, "lev": 5.0}, "BM": {"go_rub": 0, "lev": 5.0},
+    # Commodity/currency futures (per ISS front-month GO)
+    "CC": {"go_rub": 473}, "PD": {"go_rub": 22173}, "SS": {"go_rub": 205},
+    "GZ": {"go_rub": 2065}, "NG": {"go_rub": 6565}, "GL": {"go_rub": 1220},
+    "SE": {"go_rub": 625},  "SN": {"go_rub": 8180}, "HY": {"go_rub": 804},
+    "IB": {"go_rub": 803},  "NM": {"go_rub": 1405},
+    # Stock futures (ISS front-month GO)
+    "GK": {"go_rub": 234},  "MG": {"go_rub": 4096}, "RN": {"go_rub": 8180},
+    "AL": {"go_rub": 660},  "SP": {"go_rub": 1008},  "ME": {"go_rub": 3149},
+    "CE": {"go_rub": 1187}, "HS": {"go_rub": 231},
 }
 DEFAULT_LEV = 5.0
+# New champions: strongest performers (Real WR × PF × GO return) + new stock futures
+# GK=NorNickel, MG=Magnitogorsk, RN=Rosneft, AL=Alrosa, SP=SPBE, ME=MOEX
 CHAMPIONS = [
-    ("CH", "Cocoa"), ("W4", "Wheat"), ("OJ", "Orange Juice"),
-    ("DX", "Dollar Index"), ("BM", "Butter"), ("BR", "Brent"),
-    ("NR", "Natural Rubber"), ("SV", "Silver"), ("SS", "Sugar"),
-    ("IB", "I-Bonds"), ("NG", "Natural Gas"), ("CC", "Cocoa C"),
-    ("SN", "Tin"), ("GZ", "Gold Z"), ("VB", "VTB"),
-    ("PD", "Palladium"), ("HY", "Hryvnia"), ("SE", "Soybean"),
-    ("LK", "Lukoil"), ("GD", "Gold"), ("RI", "RTS Index"),
-    ("GL", "Gold L"), ("SR", "Sberbank"), ("NM", "Norilsk"),
+    ("ME", "MOEX"), ("GK", "NorNickel"), ("CC", "Cocoa C"),
+    ("PD", "Palladium"), ("SP", "SPBE"),   ("SS", "Sugar"),
+    ("NM", "NLMK"),     ("GZ", "Gazprom"), ("NG", "Nat Gas"),
+    ("IB", "I-Bonds"),  ("GL", "Gold L"),  ("SE", "Soybean"),
+    ("AL", "Alrosa"),   ("MG", "MMK"),     ("RN", "Rosneft"),
+    ("CE", "Copper"),   ("HS", "Hang Seng"), ("HY", "Hryvnia"),
+    ("SN", "Tin"),
 ]
 
 H4_WINDOW = 20  # rolling median window
@@ -485,9 +482,15 @@ def process_ticker(symbol, name):
     
     # Add GO-based returns (real PnL as % of margin, not % of notional)
     go_info = GO_DATA.get(symbol, {})
-    lev = go_info.get("lev", DEFAULT_LEV)
+    go_rub = go_info.get("go_rub", 0)
+    # Compute leverage from first entry price / GO
+    if go_rub > 0 and sigs:
+        last_close = abs(sigs[-1]["entry"])
+        lev = max(last_close / go_rub, 0.5)  # cap minimum at 0.5x
+    else:
+        lev = DEFAULT_LEV
     for s in sigs:
-        s["lev"] = lev
+        s["lev"] = round(lev, 2)
         s["ret_go"] = round(s["real_ret"] * lev, 2)
     
     equity = compute_equity(sigs)
