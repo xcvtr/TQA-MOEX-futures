@@ -7,7 +7,7 @@ import psycopg2
 import numpy as np
 
 DB = dict(host="10.0.0.60", port=5432, dbname="moex", user="postgres", password=os.environ.get("MOEX_DB_PASSWORD", "***"))
-PORT = 5056
+PORT = 5057
 
 # --- Champion tickers from H4 ranking (WR >= 53%) ---
 CHAMPIONS = [
@@ -22,7 +22,8 @@ CHAMPIONS = [
 ]
 
 H4_WINDOW = 20  # rolling median window
-TARGET_BARS = 4  # forward look
+TARGET_BARS = 2  # forward look (hold period in H4 bars after entry)
+ENTRY_SLIPPAGE = 0.001  # 0.1% slippage for limit order fill
 
 def get_conn():
     return psycopg2.connect(**DB)
@@ -86,7 +87,15 @@ def compute_h4_features(h4_bars):
     return data
 
 def find_signals(data):
-    """Volume Climax strategy signals."""
+    """Volume Climax strategy signals.
+    
+    Entry: next H4 bar open (+ slippage for realistic fill)
+    Exit: close-based (any close in holding window beyond target)
+    Secondary: touch-based (any high/low in holding window) — for comparison
+    
+    TARGET_BARS = 2 means: signal at bar i, entry at i+1 open, 
+    hold through bars i+1..i+2, exit at close of bar i+2.
+    """
     sigs = []
     for i, d in enumerate(data):
         if d["vol_ratio"] <= 2 or d["range_pct"] <= d.get("avg_range_pct", 0):
@@ -102,35 +111,55 @@ def find_signals(data):
         if not is_bear_climax and not is_bull_climax:
             continue
         
-        # Forward check: best/worst of next TARGET_BARS
-        future = data[i+1:i+1+TARGET_BARS]
-        if len(future) < TARGET_BARS:
+        # Need enough bars AFTER entry bar for the holding window
+        if i + 1 + TARGET_BARS >= len(data):
             continue
         
+        # Entry at next bar's open with slippage
+        entry_bar = data[i+1]
+        entry = entry_bar["open"] * (1 + ENTRY_SLIPPAGE)  # pessimistic fill
+        
+        # Holding window: bars i+1 .. i+TARGET_BARS
+        hold_bars = [data[i+1+k] for k in range(TARGET_BARS)]
+        
         if is_bear_climax:
-            # Expect price to go UP
-            best_fwd = max(f["high"] for f in future)
-            entry = d["close"]
-            win = best_fwd >= entry * 1.002
-            ret_pct = (best_fwd - entry) / entry * 100
+            # LONG: expect price to go UP
+            best_close = max(f["close"] for f in hold_bars)
+            best_touch = max(f["high"] for f in hold_bars)
+            
+            close_win = best_close >= entry * 1.002
+            touch_win = best_touch >= entry * 1.002
+            
+            ret_close = (best_close - entry) / entry * 100 if close_win else (min(f["low"] for f in hold_bars) - entry) / entry * 100
+            ret_touch = (best_touch - entry) / entry * 100
+            
             sigs.append({
                 "time": str(d["time"].date()), "dir": "LONG",
-                "entry": entry, "target": best_fwd,
-                "ret_pct": round(ret_pct, 2), "win": win,
+                "entry": entry, "entry_bar_time": str(entry_bar["time"].date()),
+                "close_win": close_win, "touch_win": touch_win,
+                "ret_close": round(ret_close, 2),
+                "ret_touch": round(ret_touch, 2),
                 "vol_ratio": round(d["vol_ratio"], 1),
                 "range_pct": round(d["range_pct"], 2),
                 "close_pos": round(d["close_pos"], 2),
             })
         elif is_bull_climax:
-            # Expect price to go DOWN
-            worst_fwd = min(f["low"] for f in future)
-            entry = d["close"]
-            win = worst_fwd <= entry * 0.998
-            ret_pct = (worst_fwd - entry) / entry * 100
+            # SHORT: expect price to go DOWN
+            worst_close = min(f["close"] for f in hold_bars)
+            worst_touch = min(f["low"] for f in hold_bars)
+            
+            close_win = worst_close <= entry * 0.998
+            touch_win = worst_touch <= entry * 0.998
+            
+            ret_close = (entry - worst_close) / entry * 100 if close_win else (entry - max(f["high"] for f in hold_bars)) / entry * 100
+            ret_touch = (entry - worst_touch) / entry * 100
+            
             sigs.append({
                 "time": str(d["time"].date()), "dir": "SHORT",
-                "entry": entry, "target": worst_fwd,
-                "ret_pct": round(ret_pct, 2), "win": win,
+                "entry": entry, "entry_bar_time": str(entry_bar["time"].date()),
+                "close_win": close_win, "touch_win": touch_win,
+                "ret_close": round(ret_close, 2),
+                "ret_touch": round(ret_touch, 2),
                 "vol_ratio": round(d["vol_ratio"], 1),
                 "range_pct": round(d["range_pct"], 2),
                 "close_pos": round(d["close_pos"], 2),
@@ -138,64 +167,77 @@ def find_signals(data):
     return sigs
 
 def compute_equity(sigs):
-    """Compute cumulative equity curve from signals."""
+    """Compute cumulative equity curves from signals.
+    Returns both close-based (realistic) and touch-based (best-case) equity."""
     if not sigs:
-        return []
-    cum = 0
-    curve = []
+        return {"close": [], "touch": []}
+    cum_close = 0
+    cum_touch = 0
+    curve_close = []
+    curve_touch = []
     for s in sigs:
-        ret = s["ret_pct"] / 100.0
-        if s["dir"] == "LONG":
-            cum += ret
-        else:
-            cum += -ret  # short: positive ret_pct means price went down
-        curve.append({"date": s["time"], "equity": round(cum * 100, 2)})
-    return curve
+        ret_c = s["ret_close"] / 100.0
+        ret_t = s["ret_touch"] / 100.0
+        cum_close += ret_c
+        cum_touch += ret_t
+        curve_close.append({"date": s["time"], "equity": round(cum_close * 100, 2)})
+        curve_touch.append({"date": s["time"], "equity": round(cum_touch * 100, 2)})
+    return {"close": curve_close, "touch": curve_touch}
 
 def compute_stats(sigs):
-    """Compute trading stats."""
+    """Compute trading stats. Primary = close-based, secondary = touch-based."""
     if not sigs:
-        return {"signals": 0, "wins": 0, "wr": 0, "avg_ret": 0, "total_pnl": 0,
-                "profit_factor": 0, "max_drawdown": 0, "long_wr": 0, "short_wr": 0}
+        return {"signals": 0}
     
-    wins = sum(1 for s in sigs if s["win"])
-    losses = len(sigs) - wins
-    wr = wins / len(sigs) * 100
+    # Close-based (realistic)
+    close_wins = sum(1 for s in sigs if s["close_win"])
+    close_pnls = [s["ret_close"] if s["dir"]=="LONG" else -s["ret_close"] for s in sigs]
+    close_losses = sum(1 for p in close_pnls if p < 0)
+    close_wr = close_wins / max(len(sigs), 1) * 100
+    close_total = sum(close_pnls)
+    close_avg = np.mean(close_pnls) if close_pnls else 0
+    close_gp = sum(p for p in close_pnls if p > 0)
+    close_gl = abs(sum(p for p in close_pnls if p < 0))
+    close_pf = close_gp / max(close_gl, 0.001)
+    close_cum = np.cumsum(close_pnls) if close_pnls else [0]
+    close_peak = np.maximum.accumulate(close_cum)
+    close_dd = close_cum - close_peak
+    close_max_dd = min(close_dd) if len(close_dd) > 0 else 0
     
-    # PnL
-    pnls = []
-    for s in sigs:
-        pnl = s["ret_pct"] if s["dir"] == "LONG" else -s["ret_pct"]
-        pnls.append(pnl)
-    total_pnl = sum(pnls)
-    avg_ret = np.mean(pnls) if pnls else 0
+    # Touch-based (best case)
+    touch_wins = sum(1 for s in sigs if s["touch_win"])
+    touch_pnls = [s["ret_touch"] if s["dir"]=="LONG" else -s["ret_touch"] for s in sigs]
+    touch_total = sum(touch_pnls)
+    touch_cum = np.cumsum(touch_pnls) if touch_pnls else [0]
+    touch_peak = np.maximum.accumulate(touch_cum)
+    touch_dd = touch_cum - touch_peak
+    touch_max_dd = min(touch_dd) if len(touch_dd) > 0 else 0
     
-    gross_profit = sum(p for p in pnls if p > 0)
-    gross_loss = abs(sum(p for p in pnls if p < 0))
-    profit_factor = gross_profit / max(gross_loss, 0.001)
-    
-    # Drawdown
-    cum = np.cumsum(pnls) if pnls else [0]
-    peak = np.maximum.accumulate(cum) if len(cum) > 0 else [0]
-    dd = cum - peak
-    max_dd = min(dd) if len(dd) > 0 else 0
-    
-    # Long/short WR
+    # Direction breakdown (close-based)
     long_sigs = [s for s in sigs if s["dir"] == "LONG"]
     short_sigs = [s for s in sigs if s["dir"] == "SHORT"]
-    long_wr = sum(1 for s in long_sigs if s["win"]) / max(len(long_sigs), 1) * 100
-    short_wr = sum(1 for s in short_sigs if s["win"]) / max(len(short_sigs), 1) * 100
+    long_wr = sum(1 for s in long_sigs if s["close_win"]) / max(len(long_sigs), 1) * 100
+    short_wr = sum(1 for s in short_sigs if s["close_win"]) / max(len(short_sigs), 1) * 100
     
     return {
-        "signals": len(sigs), "wins": wins, "losses": losses,
-        "wr": round(wr, 1), "avg_ret": round(avg_ret, 2),
-        "total_pnl": round(total_pnl, 2),
-        "profit_factor": round(profit_factor, 2),
-        "max_drawdown": round(max_dd, 2),
-        "long_wr": round(long_wr, 1),
-        "short_wr": round(short_wr, 1),
-        "long_count": len(long_sigs),
-        "short_count": len(short_sigs),
+        "signals": len(sigs),
+        # Close-based (primary)
+        "close_wins": close_wins, "close_losses": close_losses,
+        "close_wr": round(close_wr, 1),
+        "close_total_pnl": round(close_total, 2),
+        "close_avg_ret": round(close_avg, 2),
+        "close_pf": round(close_pf, 2),
+        "close_max_dd": round(close_max_dd, 2),
+        # Touch-based (secondary)
+        "touch_wins": touch_wins, "touch_losses": len(sigs) - touch_wins,
+        "touch_wr": round(touch_wins / max(len(sigs), 1) * 100, 1),
+        "touch_total_pnl": round(touch_total, 2),
+        "touch_max_dd": round(touch_max_dd, 2),
+        # Direction
+        "long_wr": round(long_wr, 1), "short_wr": round(short_wr, 1),
+        "long_count": len(long_sigs), "short_count": len(short_sigs),
+        # All signals with moves for analysis
+        "all_ret_close": close_pnls,
     }
 
 def generate_analysis(stats, sigs):
@@ -203,25 +245,29 @@ def generate_analysis(stats, sigs):
     if not sigs or stats["signals"] == 0:
         return {"verdict": "neutral", "short": "Недостаточно сигналов.", "detail": ""}
     
-    wr = stats["wr"]
-    pf = stats["profit_factor"]
-    dd = stats["max_drawdown"]
-    avg = stats["avg_ret"]
-    total = stats["total_pnl"]
+    # Use close-based (realistic) stats as primary
+    wr = stats["close_wr"]
+    pf = stats["close_pf"]
+    dd = stats["close_max_dd"]
+    avg = stats["close_avg_ret"]
+    total = stats["close_total_pnl"]
+    twr = stats["touch_wr"]
+    tp = stats["touch_total_pnl"]
+    
     lw = stats["long_wr"]
     sw = stats["short_wr"]
     lc = stats["long_count"]
     sc = stats["short_count"]
     n = stats["signals"]
     
-    # Verdict
-    if wr >= 80:
+    # Verdict based on close-based WR
+    if wr >= 65:
         verdict = "strong_buy"
-        verdict_label = "🟢 Сильный сигнал"
-    elif wr >= 65:
+        verdict_label = "🟢 Рабочий сигнал"
+    elif wr >= 55:
         verdict = "buy"
-        verdict_label = "🟡 Позитивный"
-    elif wr >= 50:
+        verdict_label = "🟡 Перспективный"
+    elif wr >= 45:
         verdict = "neutral"
         verdict_label = "⚪ Нейтральный"
     else:
@@ -230,107 +276,102 @@ def generate_analysis(stats, sigs):
     
     # Short description
     short_parts = []
-    
-    if avg > 1.5:
-        short_parts.append(f"средняя доходность {avg:+.1f}% на сделку")
-    elif avg > 0.5:
-        short_parts.append(f"средняя доходность {avg:+.1f}%")
-    else:
-        short_parts.append(f"средняя доходность {avg:+.1f}%")
-    
-    short_parts.append(f"{wr:.0f}% побед ({n} сигналов)")
-    
-    if pf >= 3:
-        short_parts.append(f"PF {pf:.0f}")
-    elif pf >= 1.5:
+    short_parts.append(f"Close WR {wr:.0f}% ({n} сигн.)")
+    short_parts.append(f"средняя {avg:+.1f}%")
+    if pf >= 1.5:
         short_parts.append(f"PF {pf:.1f}")
-    
     if dd < -5:
         short_parts.append(f"просадка {dd:.1f}%")
+    
+    degradation = twr - wr
+    if degradation >= 15:
+        short_parts.append(f"⚠️ touch+{degradation:.0f}pp")
     
     short = f"{verdict_label} · {' · '.join(short_parts)}"
     
     # Detail analysis
     lines = []
     
+    # Realism warning
+    degradation = twr - wr
+    if degradation >= 10:
+        lines.append(f"⚠️ Большой разрыв между touch ({twr:.0f}%) и close ({wr:.0f}%) — {degradation:.0f}pp. "
+                    f"Цена часто касается цели, но не закрывается выше/ниже. "
+                    f"Требуется лимитник или скользящий стоп.")
+    elif degradation >= 5:
+        lines.append(f"Умеренный разрыв touch vs close: {degradation:.0f}pp. "
+                    f"Часть сигналов требует точного исполнения.")
+    else:
+        lines.append(f"Touch и close дают похожий результат (разрыв {degradation:.0f}pp). "
+                    f"Сигналы устойчивы к проскальзыванию.")
+    
     # Long vs Short
     if lc >= 5 and sc >= 5:
         diff = lw - sw
         if abs(diff) >= 15:
             better = "лонги" if diff > 0 else "шорты"
-            lines.append(f"Асимметрия: {better} значительно сильнее (лонги {lw:.0f}% vs шорты {sw:.0f}%). "
-                        f"Рекомендуется фильтровать сигналы в пользу {better}.")
+            lines.append(f"Асимметрия: {better} значительно сильнее (лонги {lw:.0f}% vs шорты {sw:.0f}%).")
         elif abs(diff) >= 5:
             better = "лонги" if diff > 0 else "шорты"
             lines.append(f"Небольшое преимущество {better}: {lw:.0f}% vs {sw:.0f}%.")
         else:
-            lines.append(f"Симметричная стратегия: лонги {lw:.0f}% ({lc} сигн.) и шорты {sw:.0f}% ({sc} сигн.) — примерно равны.")
+            lines.append(f"Симметричная: лонги {lw:.0f}% ({lc}) и шорты {sw:.0f}% ({sc}).")
     elif lc >= 5:
-        lines.append(f"Доминируют лонги ({lc} сигн., {lw:.0f}% WR). Шортов недостаточно для анализа ({sc}).")
+        lines.append(f"Доминируют лонги ({lc} сигн., {lw:.0f}% WR).")
     elif sc >= 5:
-        lines.append(f"Доминируют шорты ({sc} сигн., {sw:.0f}% WR). Лонгов недостаточно ({lc}).")
+        lines.append(f"Доминируют шорты ({sc} сигн., {sw:.0f}% WR).")
     
     # Drawdown
     if dd < -20:
-        lines.append(f"⚠️ Высокая просадка {dd:.1f}% — стратегия может быть рискованной. "
-                    f"Рекомендуется стоп-лосс или уменьшение размера позиции.")
+        lines.append(f"⚠️ Высокая просадка {dd:.1f}% — рискованно.")
     elif dd < -5:
-        lines.append(f"Просадка {dd:.1f}% — умеренная, контролируемая.")
+        lines.append(f"Просадка {dd:.1f}% — умеренная.")
+    elif dd < 0:
+        lines.append(f"Минимальная просадка {dd:.1f}%.")
     else:
-        lines.append(f"Минимальная просадка {dd:.1f}% — отличная стабильность.")
+        lines.append(f"Нулевая просадка на close-based.")
     
     # Profit factor
-    if pf >= 10:
-        lines.append(f"Исключительный PF {pf:.0f}: на каждый рубль убытка приходится {pf:.0f} прибыли. "
-                    f"Стратегия крайне устойчива.")
-    elif pf >= 3:
-        lines.append(f"Хороший PF {pf:.1f}: убыточные сделки не перевешивают прибыльные.")
+    if pf >= 3:
+        lines.append(f"Хороший PF {pf:.1f}.")
     elif pf >= 1.5:
-        lines.append(f"Приемлемый PF {pf:.1f} — работает, но запас прочности невелик.")
+        lines.append(f"Приемлемый PF {pf:.1f}.")
+    elif pf >= 1:
+        lines.append(f"Пограничный PF {pf:.2f} — на грани случайности.")
     else:
-        lines.append(f"Слабый PF {pf:.2f}: убытки почти равны прибыли. Нужна калибровка.")
+        lines.append(f"Слабый PF {pf:.2f}.")
     
-    # Signal density
-    period_days = 365 * 2  # approximate since 2024
-    sig_per_month = n / max(period_days / 30, 1)
-    if sig_per_month >= 15:
-        lines.append(f"Высокая частота сигналов (~{sig_per_month:.0f}/мес). Достаточно для активной торговли.")
-    elif sig_per_month >= 5:
-        lines.append(f"Умеренная частота (~{sig_per_month:.0f}/мес). ")
-    else:
-        lines.append(f"Низкая частота (~{sig_per_month:.0f}/мес). Требуется терпение.")
+    # Signal analysis
+    rets = stats.get("all_ret_close", [])
+    if rets:
+        neg = sum(1 for r in rets if r < 0)
+        pos = sum(1 for r in rets if r > 0)
+        if neg > 0:
+            avg_loss = abs(np.mean([r for r in rets if r < 0]))
+            avg_win = np.mean([r for r in rets if r > 0]) if pos > 0 else 0
+            if avg_win > 0 and avg_loss > 0:
+                ratio = avg_win / avg_loss
+                lines.append(f"Соотношение avg win/loss: {ratio:.1f}x ({avg_win:+.1f}% / {avg_loss:+.1f}%).")
     
-    # Total PnL
-    if total > 200:
-        lines.append(f"Суммарная доходность {total:+.0f}% — выдающийся результат на исторических данных.")
-    elif total > 50:
-        lines.append(f"Суммарная доходность {total:+.0f}% — хороший результат.")
-    
-    # Win rate quality
-    if wr >= 90:
-        lines.append(f"WR {wr:.0f}% — экстра-класс. Система практически не ошибается на этом таймфрейме.")
-    elif wr >= 75:
-        lines.append(f"WR {wr:.0f}% — отличный показатель. Стратегия уверенно предсказывает движение.")
-    elif wr >= 60:
-        lines.append(f"WR {wr:.0f}% — уверенный результат выше случайного.")
-    
-    # Signal direction imbalance
-    if lc > 0 and sc > 0:
-        ratio = max(lc, sc) / min(lc, sc) if min(lc, sc) > 0 else 0
-        if ratio >= 3:
-            dominant = "лонговые" if lc > sc else "короткие"
-            lines.append(f"Дисбаланс направлений: {dominant} сигналов в {ratio:.0f}x больше. "
-                        f"Проверь, нет ли систематического смещения в Volume Climax на этом инструменте.")
+    # PnL
+    if total > 100:
+        lines.append(f"Суммарно {total:+.0f}% ({n} сделок).")
+    elif total > 20:
+        lines.append(f"Суммарно {total:+.0f}%.")
     
     # Recommendation
-    if wr >= 75 and pf >= 2 and dd > -10:
-        lines.append(f"\n💡 Рекомендация: сильный кандидат для торговли. "
-                    f"Использовать Volume Climax как основной вход с фильтром по направлению.")
-    elif wr >= 60 and pf >= 1.5:
-        lines.append(f"\n💡 Рекомендация: можно торговать, но с осторожностью. "
-                    f"Добавить дополнительный фильтр (тренд, OI).")
+    if wr >= 60 and pf >= 1.5 and dd > -15 and degradation < 15:
+        lines.append(f"\n💡 Рекомендация: кандидат для тестовой торговли. "
+                    f"Добавить стоп-лосс и контролировать просадку.")
+    elif wr >= 50 and pf >= 1.2:
+        lines.append(f"\n💡 Рекомендация: только с фильтром (тренд, OI). "
+                    f"Самостоятельно недостаточно стабилен.")
     else:
-        lines.append(f"\n💡 Рекомендация: только в комбинации с другими сигналами. Самостоятельно недостаточно надёжен.")
+        lines.append(f"\n💡 Рекомендация: тестовая торговля не рекомендуется. "
+                    f"Нужна калибровка стратегии под этот инструмент.")
+    
+    # Touch-based comparison note
+    lines.append(f"\n📎 Touch-based (best case): WR {twr:.0f}%, ΣPnL {tp:+.0f}%")
     
     return {
         "verdict": verdict,
@@ -367,6 +408,12 @@ def process_ticker(symbol, name):
         "stats": stats, "sigs": sigs,
         "equity": equity, "prices": prices,
         "analysis": analysis,
+        # Summary for sorting/filtering
+        "wr": stats["close_wr"],
+        "total_pnl": stats["close_total_pnl"],
+        "profit_factor": stats["close_pf"],
+        "avg_ret": stats["close_avg_ret"],
+        "signals": stats["signals"],
     }
 
 def load_all():
@@ -376,8 +423,8 @@ def load_all():
         r = process_ticker(sym, name)
         if r and r["stats"]["signals"] >= 10:  # minimum signal threshold
             results.append(r)
-    # Sort by WR descending
-    results.sort(key=lambda x: x["stats"]["wr"], reverse=True)
+    # Sort by close WR descending
+    results.sort(key=lambda x: x["wr"], reverse=True)
     return results
 
 # ── HTML Template ──
@@ -461,7 +508,7 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
     <option value="asc">Asc</option>
   </select>
   <label>🔍 Min WR: </label>
-  <input type="number" id="minWR" value="50" min="0" max="100" onchange="sortGrid()">
+  <input type="number" id="minWR" value="55" min="0" max="100" onchange="sortGrid()">
   <label>Min signals: </label>
   <input type="number" id="minSig" value="20" min="0" onchange="sortGrid()">
 </div>
@@ -486,7 +533,7 @@ h2{color:#f0883e;font-size:1.1em;margin:15px 0 8px}
 const DATA = __DATA__;
 
 function fmtPnl(v){return v>0?'+'+v.toFixed(1):v.toFixed(1)}
-function wrClass(w){return w>=65?'high':w>=53?'mid':'low'}
+function wrClass(w){return w>=55?'high':w>=45?'mid':'low'}
 function pnlClass(v){return v>=0?'pos':'neg'}
 
 let selected = null;
@@ -495,32 +542,33 @@ let sortDir = 'desc';
 
 function renderSummary(all){
   const totalSig = all.reduce((s,t)=>s+t.stats.signals,0);
-  const totalW = all.reduce((s,t)=>s+t.stats.wins,0);
+  const totalW = all.reduce((s,t)=>s+t.stats.close_wins,0);
   const totalWR = totalSig>0?(totalW/totalSig*100).toFixed(1):'0';
-  const totalPnL = all.reduce((s,t)=>s+t.stats.total_pnl,0);
-  const wr50 = all.filter(t=>t.stats.wr>=50).length;
+  const totalPnL = all.reduce((s,t)=>s+t.stats.close_total_pnl,0);
+  const wr55 = all.filter(t=>t.stats.close_wr>=55).length;
   document.getElementById('sub-info').textContent =
-    `${all.length} tickers · ${totalSig} signals · ${totalWR}% WR · ${fmtPnl(totalPnL)}% ΣPnL · ${wr50} wr≥50%`;
+    `${all.length} tickers · ${totalSig} signals · ${totalWR}% close WR · ${fmtPnl(totalPnL)}% ΣPnL · ${wr55} wr≥55%`;
 }
 
 function renderGrid(all){
   const grid = document.getElementById('grid-div');
   const minWR = parseFloat(document.getElementById('minWR').value)||0;
   const minSig = parseInt(document.getElementById('minSig').value)||0;
-  const filtered = all.filter(t=>t.stats.wr>=minWR && t.stats.signals>=minSig);
+  const filtered = all.filter(t=>t.stats.close_wr>=minWR && t.stats.signals>=minSig);
   const sb = document.getElementById('sortBy').value;
   const sd = document.getElementById('sortDir').value;
   const rev = sd==='desc'?-1:1;
   filtered.sort((a,b)=>{
-    const va = a.stats[sb], vb = b.stats[sb];
+    const va = a[sb]||a.stats[sb]||0, vb = b[sb]||b.stats[sb]||0;
     return (va-vb)*rev;
   });
   grid.innerHTML = filtered.map(t=>{
     const sel = selected===t.symbol?' sel':'';
+    const s = t.stats;
     return `<div class="card${sel}" onclick="selectTicker('${t.symbol}')">
       <h3><span class="sym">${t.symbol}</span> — ${t.name}</h3>
-      <div class="stat">Signals: <b>${t.stats.signals}</b> · WR: <b class="wr ${wrClass(t.stats.wr)}">${t.stats.wr}%</b> · ΣPnL: <b class="pnl ${pnlClass(t.stats.total_pnl)}">${fmtPnl(t.stats.total_pnl)}%</b></div>
-      <div class="stat">L: ${t.stats.long_wr}%(${t.stats.long_count}) · S: ${t.stats.short_wr}%(${t.stats.short_count}) · PF: ${t.stats.profit_factor} · DD: ${t.stats.max_drawdown}%</div>
+      <div class="stat">Signals: <b>${s.signals}</b> · C-WR: <b class="wr ${wrClass(s.close_wr)}">${s.close_wr}%</b> · T-WR: <b>${s.touch_wr}%</b> · ΣPnL: <b class="pnl ${pnlClass(s.close_total_pnl)}">${fmtPnl(s.close_total_pnl)}%</b></div>
+      <div class="stat">L: ${s.long_wr}%(${s.long_count}) · S: ${s.short_wr}%(${s.short_count}) · PF: ${s.close_pf} · DD: ${s.close_max_dd}%</div>
     </div>`;
   }).join('');
 }
@@ -546,14 +594,15 @@ function showDetail(sym){
   const s = t.stats;
   document.getElementById('detail-stats').innerHTML = [
     ['Signals', s.signals, ''],
-    ['Wins', s.wins, ''],
-    ['WR', s.wr+'%', wrClass(s.wr)],
-    ['Avg Ret', fmtPnl(s.avg_ret)+'%', pnlClass(s.avg_ret)],
-    ['ΣPnL', fmtPnl(s.total_pnl)+'%', pnlClass(s.total_pnl)],
-    ['PF', s.profit_factor, s.profit_factor>=1.5?'pos':'neg'],
-    ['Max DD', s.max_drawdown+'%', 'neg'],
-    ['L WR', s.long_wr+'%', wrClass(s.long_wr)],
-    ['S WR', s.short_wr+'%', wrClass(s.short_wr)],
+    ['C-Wins', s.close_wins, ''],
+    ['C-WR', s.close_wr+'%', wrClass(s.close_wr)],
+    ['T-WR', s.touch_wr+'%', wrClass(s.touch_wr)],
+    ['Avg Ret', fmtPnl(s.close_avg_ret)+'%', pnlClass(s.close_avg_ret)],
+    ['ΣPnL', fmtPnl(s.close_total_pnl)+'%', pnlClass(s.close_total_pnl)],
+    ['PF', s.close_pf, s.close_pf>=1.5?'pos':'neg'],
+    ['Max DD', s.close_max_dd+'%', 'neg'],
+    ['L-WR', s.long_wr+'%', wrClass(s.long_wr)],
+    ['S-WR', s.short_wr+'%', wrClass(s.short_wr)],
   ].map(x=>`<div class="stat-box"><div class="label">${x[0]}</div><div class="val ${x[2]}">${x[1]}</div></div>`).join('');
   
   // Analysis text
@@ -652,14 +701,17 @@ function drawEquityChart(t){
   const ctx=canvas.getContext('2d');
   const W=canvas.width,H=canvas.height,PAD={t:20,b:25,l:60,r:20};
   
-  const eq = t.equity;
-  if(!eq||eq.length<2){ctx.fillStyle='#8b949e';ctx.font='12px Courier New';ctx.textAlign='center';ctx.fillText('No equity data',W/2,H/2);return}
+  const eqClose = t.equity.close||[];
+  const eqTouch = t.equity.touch||[];
+  if(eqClose.length<2){ctx.fillStyle='#8b949e';ctx.font='12px Courier New';ctx.textAlign='center';ctx.fillText('No equity data',W/2,H/2);return}
   
-  const vals = eq.map(e=>e.equity);
-  const maxV = Math.max(...vals,0)*1.1;
-  const minV = Math.min(...vals,0)*1.1;
+  const valsClose = eqClose.map(e=>e.equity);
+  const valsTouch = eqTouch.map(e=>e.equity);
+  const allVals = [...valsClose, ...valsTouch, 0];
+  const maxV = Math.max(...allVals)*1.1;
+  const minV = Math.min(...allVals)*1.1;
   const rangeV = maxV-minV||1;
-  const xStep = (W-PAD.l-PAD.r)/Math.max(vals.length-1,1);
+  const xStep = (W-PAD.l-PAD.r)/Math.max(valsClose.length-1,1);
   
   function x(i){return PAD.l+i*xStep}
   function y(v){return PAD.t+(1-(v-minV)/rangeV)*(H-PAD.t-PAD.b)}
@@ -669,24 +721,38 @@ function drawEquityChart(t){
   ctx.strokeStyle='#30363d';ctx.lineWidth=1;ctx.setLineDash([4,4]);
   ctx.beginPath();ctx.moveTo(PAD.l,zy);ctx.lineTo(W-PAD.r,zy);ctx.stroke();ctx.setLineDash([]);
   
-  // Fill
+  // Touch-based (ghost, secondary)
+  if(valsTouch.length>=2){
+    ctx.strokeStyle='rgba(88,166,255,0.3)';ctx.lineWidth=1;
+    ctx.beginPath();
+    for(let i=0;i<valsTouch.length;i++){
+      i===0?ctx.moveTo(x(i),y(valsTouch[i])):ctx.lineTo(x(i),y(valsTouch[i]));
+    }
+    ctx.stroke();
+    ctx.fillStyle='rgba(88,166,255,0.05)';
+    ctx.fillRect(W-PAD.r-60,PAD.t,55,16);
+    ctx.fillStyle='rgba(88,166,255,0.6)';ctx.font='9px Courier New';ctx.textAlign='right';
+    ctx.fillText('touch',W-PAD.r-5,PAD.t+11);
+  }
+  
+  // Close-based fill
+  const lastC = valsClose[valsClose.length-1];
   ctx.beginPath();
   ctx.moveTo(PAD.l,zy);
-  for(let i=0;i<vals.length;i++){
-    i===0?ctx.lineTo(x(i),y(vals[i])):ctx.lineTo(x(i),y(vals[i]));
+  for(let i=0;i<valsClose.length;i++){
+    i===0?ctx.lineTo(x(i),y(valsClose[i])):ctx.lineTo(x(i),y(valsClose[i]));
   }
-  ctx.lineTo(PAD.l+(vals.length-1)*xStep,zy);ctx.closePath();
+  ctx.lineTo(PAD.l+(valsClose.length-1)*xStep,zy);ctx.closePath();
   const grad = ctx.createLinearGradient(0,PAD.t,0,H-PAD.b);
-  const lastV = vals[vals.length-1];
-  grad.addColorStop(0,lastV>=0?'rgba(63,185,80,0.3)':'rgba(248,81,73,0.3)');
-  grad.addColorStop(1,lastV>=0?'rgba(63,185,80,0.02)':'rgba(248,81,73,0.02)');
+  grad.addColorStop(0,lastC>=0?'rgba(63,185,80,0.25)':'rgba(248,81,73,0.25)');
+  grad.addColorStop(1,lastC>=0?'rgba(63,185,80,0.02)':'rgba(248,81,73,0.02)');
   ctx.fillStyle=grad;ctx.fill();
   
-  // Line
-  ctx.strokeStyle=lastV>=0?'#3fb950':'#f85149';ctx.lineWidth=2;
+  // Close-based line
+  ctx.strokeStyle=lastC>=0?'#3fb950':'#f85149';ctx.lineWidth=2;
   ctx.beginPath();
-  for(let i=0;i<vals.length;i++){
-    i===0?ctx.moveTo(x(i),y(vals[i])):ctx.lineTo(x(i),y(vals[i]));
+  for(let i=0;i<valsClose.length;i++){
+    i===0?ctx.moveTo(x(i),y(valsClose[i])):ctx.lineTo(x(i),y(valsClose[i]));
   }
   ctx.stroke();
   
@@ -700,10 +766,10 @@ function drawEquityChart(t){
   
   // Date labels
   ctx.textAlign='center';
-  const nLabels = Math.min(6, vals.length);
-  const lStep = Math.max(1,Math.floor(vals.length/nLabels));
-  for(let i=0;i<vals.length;i+=lStep){
-    const d = eq[i].date;
+  const nLabels = Math.min(6, valsClose.length);
+  const lStep = Math.max(1,Math.floor(valsClose.length/nLabels));
+  for(let i=0;i<valsClose.length;i+=lStep){
+    const d = eqClose[i].date;
     if(d)ctx.fillText(d.substring(5), x(i), H-3);
   }
 }
@@ -713,12 +779,14 @@ function renderTradeTable(t){
   const sigs = t.sigs;
   if(!sigs||!sigs.length){div.innerHTML='<p>No signals</p>';return}
   
-  let html = '<table class="sig-table"><tr><th>Date</th><th>Dir</th><th>Entry</th><th>Ret%</th><th>VolR</th><th>Range%</th></tr>';
+  let html = '<table class="sig-table"><tr><th>Date</th><th>Entry</th><th>Dir</th><th>Entry$</th><th>Ret%</th><th>T-Ret%</th><th>VolR</th></tr>';
   sigs.forEach(s=>{
-    const cls = s.win?'w':'l';
+    const cls = s.close_win?'w':'l';
     const arrow = s.dir==='LONG'?'▲':'▼';
-    const icon = s.win?'✅':'❌';
-    html += `<tr class="${cls}"><td>${s.time}</td><td>${arrow} ${s.dir}</td><td>${s.entry.toFixed(s.entry>100?0:4)}</td><td>${(s.dir==='LONG'?'+':'')+s.ret_pct.toFixed(2)}%</td><td>${s.vol_ratio}</td><td>${s.range_pct}%</td></tr>`;
+    const icon = s.close_win?'✅':'❌';
+    const tIcon = s.touch_win?'t':' ';
+    const entryVal = typeof s.entry==='number'?s.entry.toFixed(s.entry>100?0:4):s.entry;
+    html += `<tr class="${cls}"><td>${s.time}</td><td>${s.entry_bar_time||''}</td><td>${arrow} ${s.dir}</td><td>${entryVal}</td><td>${s.ret_close.toFixed(2)}%</td><td>${s.ret_touch.toFixed(2)}%</td><td>${s.vol_ratio}</td></tr>`;
   });
   html += '</table>';
   div.innerHTML = html;
@@ -727,8 +795,8 @@ function renderTradeTable(t){
 // Summary table
 function renderSummaryTable(all){
   const div = document.getElementById('summary-div');
-  const cols = ['sym','name','signals','wr','total_pnl','profit_factor','max_drawdown','avg_ret','long_wr','short_wr'];
-  const colLabels = ['Sym','Name','Sig','WR%','ΣPnL%','PF','DD%','Avg%','L%','S%'];
+  const cols = ['sym','name','signals','close_wr','close_total_pnl','close_pf','close_max_dd','close_avg_ret','touch_wr','long_wr'];
+  const colLabels = ['Sym','Name','Sig','C-WR%','ΣPnL%','PF','DD%','Avg%','T-WR%','L-WR%'];
   
   const render = (data)=>{
     let h = '<table class="summary-table"><tr>';
@@ -743,13 +811,13 @@ function renderSummaryTable(all){
         <td style="color:#58a6ff;font-weight:bold">${t.symbol}</td>
         <td style="color:#8b949e;font-size:0.85em">${t.name}</td>
         <td>${s.signals}</td>
-        <td class="wr ${wrClass(s.wr)}">${s.wr}%</td>
-        <td class="pnl ${pnlClass(s.total_pnl)}">${fmtPnl(s.total_pnl)}%</td>
-        <td>${s.profit_factor}</td>
-        <td style="color:#f85149">${s.max_drawdown}%</td>
-        <td class="pnl ${pnlClass(s.avg_ret)}">${fmtPnl(s.avg_ret)}%</td>
+        <td class="wr ${wrClass(s.close_wr)}">${s.close_wr}%</td>
+        <td class="pnl ${pnlClass(s.close_total_pnl)}">${fmtPnl(s.close_total_pnl)}%</td>
+        <td>${s.close_pf}</td>
+        <td style="color:#f85149">${s.close_max_dd}%</td>
+        <td class="pnl ${pnlClass(s.close_avg_ret)}">${fmtPnl(s.close_avg_ret)}%</td>
+        <td class="wr ${wrClass(s.touch_wr)}">${s.touch_wr}%</td>
         <td>${s.long_wr}%</td>
-        <td>${s.short_wr}%</td>
       </tr>`;
     });
     h += '</table>';
@@ -760,7 +828,11 @@ function renderSummaryTable(all){
     if(sortCol===col)sortDir=sortDir==='desc'?'asc':'desc';
     else{sortCol=col;sortDir='desc'}
     const rev = sortDir==='desc'?-1:1;
-    const sorted = [...DATA].sort((a,b)=>((a.stats[col]||0)-(b.stats[col]||0))*rev);
+    const sorted = [...DATA].sort((a,b)=>{
+      const va = a.stats[col]!==undefined?a.stats[col]:a[col]||0;
+      const vb = b.stats[col]!==undefined?b.stats[col]:b[col]||0;
+      return (va-vb)*rev;
+    });
     render(sorted);
     if(selected)showDetail(selected);
   };
@@ -806,14 +878,16 @@ def main():
     print(f"Loaded {len(data)} tickers:", flush=True)
     for d in data[:10]:
         s = d['stats']
-        print(f"  {d['symbol']:4s} {s['signals']:4d} sig  WR {s['wr']:5.1f}%  ΣPnL {s['total_pnl']:+.1f}%  PF {s['profit_factor']:.2f}", flush=True)
+        print(f"  {d['symbol']:4s} {s['signals']:4d} sig  C-WR {s['close_wr']:5.1f}%  T-WR {s['touch_wr']:5.1f}%  ΣPnL {s['close_total_pnl']:+.1f}%  PF {s['close_pf']:.2f}", flush=True)
     if len(data) > 10:
         print(f"  ... and {len(data)-10} more", flush=True)
     
     Handler.data = data
     
-    server = http.server.ThreadingHTTPServer(('0.0.0.0', PORT), Handler)
+    server = http.server.ThreadingHTTPServer(('0.0.0.0', PORT), Handler, bind_and_activate=False)
     server.allow_reuse_address = True
+    server.server_bind()
+    server.server_activate()
     print(f"\nDashboard: http://10.0.0.60:{PORT}/", flush=True)
     print(f"           http://localhost:{PORT}/", flush=True)
     server.serve_forever()
