@@ -28,7 +28,7 @@ DEFAULT_CONFIG: StrategyConfig = {
 
 
 SCAN_SYMBOLS = [
-    'HS', 'KC', 'DX', 'HY',
+    'HS', 'KC', 'DX', 'HY', 'BM',
 ]
 
 DB_CREDENTIALS = {
@@ -92,6 +92,19 @@ TICKERS: dict = {
         'go': 3000,
         'strategy': 'yur_dom',
         'yur_dom_ratio': 1.5,
+        'adx_filter': True,
+        'adx_threshold': 20,
+    },
+    'BM': {
+        'label': 'BM (фьючерс)',
+        'enabled': True,
+        'vol_thresh': 2.0,
+        'div_thresh': 1.5,
+        'horizon': 3,
+        'minstep': 1,
+        'tick_rub': 1.0,
+        'go': 5000,
+        'strategy': 'vol_surge',
         'adx_filter': True,
         'adx_threshold': 20,
     },
