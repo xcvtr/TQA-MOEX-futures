@@ -68,13 +68,17 @@ OI_ONLY_TICKERS = {"CR", "MN", "MY", "RB", "RL"}
 
 # Tickers with extremely low liquidity (<60 real candles/day on front-month)
 # Loading them produces mostly noise — excluded from 5m table
-LOW_LIQUIDITY_TICKERS = {"CH", "VI", "AU", "FF", "W4", "HS", "NR", "DX"}
+LOW_LIQUIDITY_TICKERS = {"CH", "VI", "AU", "FF"}
 
 # Core liquid tickers (≥178 real candles/day) — default full load
+# Includes all KEEP tickers from Volume Surge + Divergence scan
 HIGH_LIQUIDITY_TICKERS = {
     "CNYRUBF", "CC", "Si", "BR", "NG", "IMOEXF", "BM", "VB",
     "SV", "NA", "USDRUBF", "MC", "GD",
     "GLDRUBF", "SR", "SS", "GZ", "GL",
+    # KEEP tickers (Volume Surge + Divergence)
+    "AF", "AL", "CE", "DX", "HS", "HY", "MG", "NM", "NR",
+    "OJ", "PD", "SE", "SF", "SN", "SP", "TN", "TT", "W4", "YD",
 }
 
 

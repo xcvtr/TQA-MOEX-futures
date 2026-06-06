@@ -1,0 +1,41 @@
+============================================================
+  GK — PHASE 2 ANALYSIS
+============================================================
+
+Total configurations tested: 350
+
+── LONG (fiz_short_yur_long) ──
+  Best params:  vol_z ≥ 2.5, |div_z| ≥ 0.5, horizon = 240m
+  Signals:      2616
+  Win Rate:     47.7%
+  Profit Factor:0.83
+  Avg Return:   -0.086%
+  Max Drawdown: 349.161%
+  Sessions:
+    morning     : n= 736 wr= 47.8% avg= -0.402%
+    afternoon   : n= 784 wr= 50.0% avg= +0.051%
+    evening     : n= 268 wr= 51.1% avg= +0.208%
+  Top-5 months by signal count:
+    2025-04: 91 signals
+    2025-09: 84 signals
+    2023-08: 83 signals
+    2023-03: 79 signals
+    2025-07: 78 signals
+
+── SHORT (fiz_long_yur_short) ──
+  Best params:  vol_z ≥ 2.25, |div_z| ≥ 0.5, horizon = 240m
+  Signals:      3176
+  Win Rate:     49.0%
+  Profit Factor:1.05
+  Avg Return:   +0.020%
+  Max Drawdown: 124.810%
+  Sessions:
+    morning     : n= 965 wr= 48.4% avg= -0.003%
+    afternoon   : n= 991 wr= 52.3% avg= +0.081%
+    evening     : n= 274 wr= 47.1% avg= +0.079%
+  Top-5 months by signal count:
+    2024-10: 100 signals
+    2023-07: 98 signals
+    2026-01: 97 signals
+    2026-04: 96 signals
+    2025-04: 93 signals

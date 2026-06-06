@@ -1,0 +1,41 @@
+============================================================
+  NM — PHASE 2 ANALYSIS
+============================================================
+
+Total configurations tested: 350
+
+── LONG (fiz_short_yur_long) ──
+  Best params:  vol_z ≥ 2.75, |div_z| ≥ 1.0, horizon = 60m
+  Signals:      1343
+  Win Rate:     53.5%
+  Profit Factor:1.21
+  Avg Return:   +0.051%
+  Max Drawdown: 23.393%
+  Sessions:
+    morning     : n= 398 wr= 52.3% avg= +0.028%
+    afternoon   : n= 446 wr= 51.8% avg= +0.059%
+    evening     : n= 135 wr= 65.2% avg= +0.117%
+  Top-5 months by signal count:
+    2023-07: 50 signals
+    2025-02: 50 signals
+    2024-10: 45 signals
+    2025-12: 44 signals
+    2024-09: 43 signals
+
+── SHORT (fiz_long_yur_short) ──
+  Best params:  vol_z ≥ 3.0, |div_z| ≥ 1.5, horizon = 240m
+  Signals:      914
+  Win Rate:     50.7%
+  Profit Factor:1.13
+  Avg Return:   +0.058%
+  Max Drawdown: 38.177%
+  Sessions:
+    morning     : n= 353 wr= 49.3% avg= +0.072%
+    afternoon   : n= 284 wr= 57.0% avg= +0.108%
+    evening     : n=  58 wr= 50.0% avg= +0.283%
+  Top-5 months by signal count:
+    2023-08: 34 signals
+    2024-11: 34 signals
+    2025-06: 34 signals
+    2026-03: 32 signals
+    2026-04: 32 signals

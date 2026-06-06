@@ -1,0 +1,41 @@
+============================================================
+  CE — PHASE 2 ANALYSIS
+============================================================
+
+Total configurations tested: 350
+
+── LONG (fiz_short_yur_long) ──
+  Best params:  vol_z ≥ 2.5, |div_z| ≥ 1.5, horizon = 240m
+  Signals:      205
+  Win Rate:     56.1%
+  Profit Factor:1.34
+  Avg Return:   +0.096%
+  Max Drawdown: 14.455%
+  Sessions:
+    morning     : n=  38 wr= 65.8% avg= +0.227%
+    afternoon   : n=  58 wr= 48.3% avg= -0.021%
+    evening     : n=  35 wr= 51.4% avg= -0.016%
+  Top-5 months by signal count:
+    2026-04: 43 signals
+    2025-10: 27 signals
+    2026-02: 26 signals
+    2026-01: 25 signals
+    2026-03: 20 signals
+
+── SHORT (fiz_long_yur_short) ──
+  Best params:  vol_z ≥ 1.75, |div_z| ≥ 1.25, horizon = 240m
+  Signals:      519
+  Win Rate:     48.6%
+  Profit Factor:0.78
+  Avg Return:   -0.096%
+  Max Drawdown: 73.814%
+  Sessions:
+    morning     : n= 141 wr= 58.2% avg= +0.059%
+    afternoon   : n= 166 wr= 44.6% avg= -0.143%
+    evening     : n=  66 wr= 40.9% avg= -0.301%
+  Top-5 months by signal count:
+    2025-12: 97 signals
+    2026-01: 85 signals
+    2026-02: 65 signals
+    2026-03: 56 signals
+    2025-10: 46 signals

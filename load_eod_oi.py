@@ -18,8 +18,9 @@ from psycopg2.extras import execute_values
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger("eod_oi")
 
-# Delete all existing data for a ticker and reload from scratch
-DELETE_EXISTING = True
+# Incremental mode: by default only load missing data
+# Set to True for initial full reload
+DELETE_EXISTING = False
 
 def get_db():
     return psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
@@ -97,15 +98,27 @@ def bulk_upsert(conn, rows: list[tuple]) -> int:
     return n
 
 def load_ticker(conn, ticker: str):
-    """Load ALL OI data for one ticker from 2021-01-01 to today."""
+    """Load OI data for one ticker.
+
+    DELETE_EXISTING=True: full reload from 2021-01-01.
+    DELETE_EXISTING=False (default): incremental — continue from last loaded date.
+    """
     if DELETE_EXISTING:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM openinterest_moex WHERE symbol = %s", (ticker,))
             deleted = cur.rowcount
         conn.commit()
         log.info(f"  Deleted {deleted} existing rows")
-
-    start = date(2021, 1, 1)
+        start = date(2021, 1, 1)
+    else:
+        # Find last date in DB
+        with conn.cursor() as cur:
+            cur.execute("SELECT MAX(time)::date FROM openinterest_moex WHERE symbol = %s", (ticker,))
+            r = cur.fetchone()
+            last_in_db = r[0] if r and r[0] else date(2021, 1, 1)
+        # Go back 2 days to catch any partial-day data
+        start = last_in_db - timedelta(days=2)
+        log.info(f"  Last in DB: {last_in_db}, resuming from {start}")
     today = date.today()
     total = 0
 
