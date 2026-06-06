@@ -52,6 +52,27 @@ def main() -> str:
 
     signals = scan_all(configs)
 
+    # Apply ADX regime filter for tickers that have it enabled
+    from trading_bot.filters import calc_adx, add_regime_filter
+    from trading_bot.scanner import load_data
+    
+    adx_filtered_signals = []
+    for sig in signals:
+        tk = sig['ticker']
+        cfg = TICKERS.get(tk, {})
+        if cfg.get('adx_filter', False):
+            # Need to load data to compute ADX
+            rows = load_data(tk, days=30)
+            close = [r[5] for r in rows]
+            adx = calc_adx(close, 14)
+            # ADX at signal index
+            idx = sig.get('idx', -1)
+            if idx < len(adx) and adx[idx] > cfg.get('adx_threshold', 20):
+                adx_filtered_signals.append(sig)
+        else:
+            adx_filtered_signals.append(sig)
+    signals = adx_filtered_signals
+
     # Filter: only signals from last 30 minutes (recent, not historical)
     from datetime import timedelta
     cutoff = now - timedelta(minutes=30)

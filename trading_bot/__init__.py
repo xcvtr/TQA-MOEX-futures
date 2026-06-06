@@ -54,6 +54,8 @@ TICKERS: dict = {
         'tick_rub': 1.0,
         'go': 5000,
         'strategy': 'vol_surge',
+        'adx_filter': True,
+        'adx_threshold': 20,
     },
     'KC': {
         'label': 'KC (кофе)',
@@ -66,6 +68,7 @@ TICKERS: dict = {
         'tick_rub': 80.0,
         'go': 2500,
         'strategy': 'vol_surge',
+        'adx_filter': False,  # ADX kills KC signals
     },
     'DX': {
         'label': 'DX (фьючерс)',
@@ -77,6 +80,7 @@ TICKERS: dict = {
         'tick_rub': 1.0,
         'go': 3000,
         'strategy': 'vol_surge',
+        'adx_filter': False,  # Too few signals with ADX
     },
     'HY': {
         'label': 'HY (акции)',
@@ -88,5 +92,7 @@ TICKERS: dict = {
         'go': 3000,
         'strategy': 'yur_dom',
         'yur_dom_ratio': 1.5,
+        'adx_filter': True,
+        'adx_threshold': 20,
     },
 }

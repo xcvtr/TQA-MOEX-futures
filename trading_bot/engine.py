@@ -65,6 +65,7 @@ Signal = Dict[str, object]
         'vol_z':      float,  # z-score объёма в момент сигнала
         'yur_z':      float,  # z-score активности юрлиц
         'fiz_z':      float,  # z-score активности физлиц
+        'idx':        int,    # индекс сигнала в исходном массиве rows
     }
 """
 
@@ -183,6 +184,7 @@ def detect_signals(
             'vol_z':      round(vol_z[i], 4),
             'yur_z':      round(yur_z[i], 4),
             'fiz_z':      round(fiz_z[i], 4),
+            'idx':        i,
         })
 
     return signals
