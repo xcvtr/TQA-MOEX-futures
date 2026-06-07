@@ -48,6 +48,23 @@ REVERSION_TICKERS: dict = {
     'AF': {'enabled': True, 'go': 7000, 'tick_rub': 0.74, 'minstep': 1, 'label': 'AF (Africa)'},
 }
 
+# ─── Order Blocks (ICT Smart Money) ─────────────────────────────────────────
+DEFAULT_OB_CONFIG = {
+    'body_mul': 1.5,
+    'range_mul': 1.2,
+    'horizon': 4,
+    'lookback': 20,
+    'min_history': 50,
+    'max_lookback_bars': 5,
+}
+
+OB_TICKERS: dict = {
+    'SBERF': {'enabled': True, 'go': 6620, 'tick_rub': 1.0, 'minstep': 1, 'label': 'SBERF (Сбер OB)'},
+    'BR': {'enabled': True, 'go': 17228, 'tick_rub': 7.43, 'minstep': 1, 'label': 'BR (Brent OB)'},
+    'NM': {'enabled': True, 'go': 40000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'NM (фьючерс OB)'},
+    'AF': {'enabled': True, 'go': 7000, 'tick_rub': 0.74, 'minstep': 1, 'label': 'AF (Africa OB)'},
+}
+
 DB_CREDENTIALS = {
     'host': '10.0.0.60',
     'port': 5432,

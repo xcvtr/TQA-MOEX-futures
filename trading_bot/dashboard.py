@@ -37,12 +37,15 @@ def read_trades() -> list[dict]:
 
 VS_TICKERS = {'HS', 'KC', 'DX', 'HY'}
 REV_TICKERS = {'NM', 'BR', 'SBERF', 'AF'}
+OB_TICKERS = {'SBERF', 'BR', 'NM', 'AF'}
 
 def _strategy_for_symbol(symbol: str) -> str:
     if symbol in VS_TICKERS:
         return 'VS'
     if symbol in REV_TICKERS:
         return 'Reversion'
+    if symbol in OB_TICKERS:
+        return 'OB'
     return 'Other'
 
 def _calc_stats(trades: list[dict]) -> dict:
@@ -91,10 +94,12 @@ def get_portfolio_stats() -> dict[str, Any]:
     # Разделяем по стратегиям
     vs_trades = [t for t in trades if _strategy_for_symbol(t.get('symbol', '')) == 'VS']
     rev_trades = [t for t in trades if _strategy_for_symbol(t.get('symbol', '')) == 'Reversion']
+    ob_trades = [t for t in trades if _strategy_for_symbol(t.get('symbol', '')) == 'OB']
 
     total_stats = _calc_stats(trades)
     vs_stats = _calc_stats(vs_trades)
     rev_stats = _calc_stats(rev_trades)
+    ob_stats = _calc_stats(ob_trades)
 
     return {
         'total_trades': total_stats['trades'],
@@ -105,6 +110,7 @@ def get_portfolio_stats() -> dict[str, Any]:
         'open_positions': open_pos,
         'vs': vs_stats,
         'reversion': rev_stats,
+        'order_block': ob_stats,
     }
 
 
@@ -183,6 +189,7 @@ def render_html(stats: dict) -> str:
 
     vs_stats = stats.get('vs', {'trades': 0, 'win_rate': 0.0, 'profit_factor': 0.0})
     rev_stats = stats.get('reversion', {'trades': 0, 'win_rate': 0.0, 'profit_factor': 0.0})
+    ob_stats = stats.get('order_block', {'trades': 0, 'win_rate': 0.0, 'profit_factor': 0.0})
 
     # ── Сборка HTML ──────────────────────────────────────────────
     html = f"""<!DOCTYPE html>
@@ -315,6 +322,11 @@ def render_html(stats: dict) -> str:
     <h3>🟢 Mean Reversion</h3>
     <div class="value white">{rev_stats['trades']}</div>
     <div style="font-size:12px;color:#8b949e;margin-top:4px;">WR {rev_stats['win_rate']}% · PF {rev_stats['profit_factor']}</div>
+  </div>
+  <div class="card">
+    <h3>🟣 Order Block (ICT)</h3>
+    <div class="value white">{ob_stats['trades']}</div>
+    <div style="font-size:12px;color:#8b949e;margin-top:4px;">WR {ob_stats['win_rate']}% · PF {ob_stats['profit_factor']}</div>
   </div>
 </div>
 
