@@ -25,13 +25,17 @@ def _zs(vals: List[float], w: int = 20) -> List[float]:
 
 
 def _rolling_median(arr: List[float], w: int = 50) -> List[float]:
-    """Rolling median over last w values, NO look-ahead."""
+    """Rolling median over PREVIOUS w values, NO look-ahead. Excludes current value."""
     out: List[float] = [0.0] * len(arr)
     for i in range(len(arr)):
-        if i < w:
-            win = arr[:i + 1]
+        if i == 0:
+            win = [arr[0]]
+        elif i < w:
+            win = arr[:i]
         else:
-            win = arr[i - w + 1:i + 1]
+            win = arr[i - w:i]
+        if not win:
+            win = [arr[0]]
         sorted_win = sorted(win)
         mid = len(sorted_win) // 2
         if len(sorted_win) % 2 == 0:

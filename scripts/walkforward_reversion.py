@@ -27,14 +27,16 @@ def zs(vals, w=20):
 
 
 def rolling_median(arr, w=50):
-    """Rolling median over last w values, NO look-ahead."""
+    """Rolling median over PREVIOUS w values, NO look-ahead. Excludes current bar."""
     out = np.zeros(len(arr))
     for i in range(len(arr)):
-        if i < w:
-            win = arr[:i + 1]
+        if i == 0:
+            win = arr[:1]
+        elif i < w:
+            win = arr[:i]
         else:
-            win = arr[i - w + 1:i + 1]
-        out[i] = float(np.median(win))
+            win = arr[i - w:i]
+        out[i] = float(np.median(win)) if len(win) > 0 else 0.0
     return out
 
 

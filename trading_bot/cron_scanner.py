@@ -73,26 +73,27 @@ def main() -> str:
     # 4. Merge all signals
     signals.extend(rev_signals)
 
-    # 5. Apply ADX regime filter for tickers that have it enabled
-    from trading_bot.filters import calc_adx, add_regime_filter
-    from trading_bot.scanner import load_data
-    
-    adx_filtered_signals = []
-    for sig in signals:
-        tk = sig['ticker']
-        cfg = TICKERS.get(tk, {})
-        if cfg.get('adx_filter', False):
-            # Need to load data to compute ADX
-            rows = load_data(tk, days=30)
-            close = [r[5] for r in rows]
-            adx = calc_adx(close, 14)
-            # ADX at signal index
-            idx = sig.get('idx', -1)
-            if idx < len(adx) and adx[idx] > cfg.get('adx_threshold', 20):
+    # 5. Apply ADX regime filter — skip if filters module doesn't exist
+    try:
+        from trading_bot.filters import calc_adx
+        adx_filtered_signals = []
+        for sig in signals:
+            tk = sig['ticker']
+            cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, {}))
+            if cfg.get('adx_filter', False):
+                rows = load_data(tk, days=30)
+                if rows and len(rows) > 20:
+                    close = [float(r[5]) for r in rows]
+                    adx = calc_adx(close, 14)
+                    # Use last ADX as proxy (no idx available for VS signals)
+                    adx_val = adx[-1] if adx else 0
+                    if adx_val > cfg.get('adx_threshold', 20):
+                        adx_filtered_signals.append(sig)
+            else:
                 adx_filtered_signals.append(sig)
-        else:
-            adx_filtered_signals.append(sig)
-    signals = adx_filtered_signals
+        signals = adx_filtered_signals
+    except ImportError:
+        pass  # filters module not installed — skip ADX filtering
 
     # Filter: only signals from last 30 minutes (recent, not historical)
     from datetime import timedelta
