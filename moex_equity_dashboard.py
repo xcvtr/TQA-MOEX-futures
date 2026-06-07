@@ -16,6 +16,23 @@ GO_DATA = {
     "CE": {"go_rub": 1187, "lev": 11.9},
     "ME": {"go_rub": 3149, "lev": 5.8},
     "CC": {"go_rub": 473, "lev": 6.4},
+    "SP": {"go_rub": 1008, "lev": 2.0},
+    "PD": {"go_rub": 22173, "lev": 4.6},
+    "SS": {"go_rub": 205, "lev": 2.0},
+    "GK": {"go_rub": 234, "lev": 5.8},
+    "SR": {"go_rub": 5719, "lev": 5.8},
+    "IB": {"go_rub": 803, "lev": 3.5},
+    "GZ": {"go_rub": 2065, "lev": 5.7},
+    "W4": {"go_rub": 1758, "lev": 9.2},
+    "NM": {"go_rub": 1405, "lev": 5.8},
+    "HY": {"go_rub": 804, "lev": 4.9},
+    "RN": {"go_rub": 8180, "lev": 4.9},
+    "NG": {"go_rub": 6565, "lev": 3.5},
+}
+O_DATA = {
+    "CE": {"go_rub": 1187, "lev": 11.9},
+    "ME": {"go_rub": 3149, "lev": 5.8},
+    "CC": {"go_rub": 473, "lev": 6.4},
     "W4": {"go_rub": 1758, "lev": 9.2},
     "SP": {"go_rub": 1008, "lev": 2.0},
     "PD": {"go_rub": 22173, "lev": 4.6},
@@ -48,6 +65,27 @@ DEFAULT_LEV = 5.0
 # New champions: strongest performers (Real WR × PF × GO return) + new stock futures
 # GK=NorNickel, MG=Magnitogorsk, RN=Rosneft, AL=Alrosa, SP=SPBE, ME=MOEX
 CHAMPIONS = [
+    ("CE", "Copper"),
+    ("ME", "MOEX"),
+    ("CC", "Cocoa C"),
+    ("SP", "SPBE"),
+    ("PD", "Palladium"),
+    ("SF", "SF"),
+    ("SS", "Sugar"),
+    ("GK", "NorNickel"),
+    ("SR", "Sberbank"),
+    ("UC", "UC"),
+    ("IB", "I-Bonds"),
+    ("GZ", "Gazprom"),
+    ("W4", "Wheat"),
+    ("MM", "MM"),
+    ("IMOEXF", "IMOEXF"),
+    ("NM", "NLMK"),
+    ("HY", "Hryvnia"),  # NEW
+    ("RN", "Rosneft"),
+    ("NG", "Nat Gas"),
+]
+HAMPIONS = [
     ("CE", "Copper"),  # NEW
     ("ME", "MOEX"),  # NEW
     ("CC", "Cocoa C"),  # NEW

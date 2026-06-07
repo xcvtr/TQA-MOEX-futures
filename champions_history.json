@@ -46,6 +46,37 @@
       ],
       "out": [],
       "changed": true
+    },
+    {
+      "date": "2026-06-07 08:02",
+      "champions": [
+        "CE",
+        "ME",
+        "CC",
+        "SP",
+        "PD",
+        "SF",
+        "SS",
+        "GK",
+        "SR",
+        "UC",
+        "IB",
+        "GZ",
+        "W4",
+        "MM",
+        "IMOEXF",
+        "NM",
+        "HY",
+        "RN",
+        "NG"
+      ],
+      "new": [
+        "HY"
+      ],
+      "out": [
+        "CH"
+      ],
+      "changed": true
     }
   ]
 }

@@ -35,6 +35,39 @@ def read_trades() -> list[dict]:
     return trades
 
 
+VS_TICKERS = {'HS', 'KC', 'DX', 'HY'}
+REV_TICKERS = {'NM', 'BR', 'SBERF', 'AF'}
+
+def _strategy_for_symbol(symbol: str) -> str:
+    if symbol in VS_TICKERS:
+        return 'VS'
+    if symbol in REV_TICKERS:
+        return 'Reversion'
+    return 'Other'
+
+def _calc_stats(trades: list[dict]) -> dict:
+    """Посчитать статистику по списку сделок."""
+    total = len(trades)
+    if total == 0:
+        return {'trades': 0, 'win_rate': 0.0, 'profit_factor': 0.0, 'pnl': 0.0, 'equity': []}
+
+    pnls = [float(t.get('pnl_rub', 0)) for t in trades]
+    total_pnl = round(sum(pnls), 2)
+    wins = sum(1 for p in pnls if p > 0)
+    wr = round(wins / total * 100, 1) if total else 0.0
+    gross_profit = sum(p for p in pnls if p > 0)
+    gross_loss = abs(sum(p for p in pnls if p < 0))
+    pf = round(gross_profit / gross_loss, 2) if gross_loss > 0 else (gross_profit if gross_profit > 0 else 0.0)
+
+    equity = []
+    cum = 0.0
+    for p in pnls:
+        cum = round(cum + p, 2)
+        equity.append(cum)
+
+    return {'trades': total, 'win_rate': wr, 'profit_factor': pf, 'pnl': total_pnl, 'pnls': pnls, 'equity': equity}
+
+
 def get_portfolio_stats() -> dict[str, Any]:
     """
     Посчитать статистику портфеля.
@@ -48,50 +81,30 @@ def get_portfolio_stats() -> dict[str, Any]:
         total_pnl_rub    — суммарный PnL в рублях
         equity_curve     — список cumulative PnL
         open_positions   — список открытых позиций из tracker.load_positions
+        vs               — статистика по Volume Surge сделкам
+        reversion        — статистика по Reversion сделкам
     """
     trades = read_trades()
     positions = load_positions()
     open_pos = [p for p in positions if p.get('status') == 'open']
 
-    total_trades = len(trades)
-    if total_trades == 0:
-        return {
-            'total_trades': 0,
-            'win_rate': 0.0,
-            'profit_factor': 0.0,
-            'total_pnl_rub': 0.0,
-            'equity_curve': [],
-            'open_positions': open_pos,
-        }
+    # Разделяем по стратегиям
+    vs_trades = [t for t in trades if _strategy_for_symbol(t.get('symbol', '')) == 'VS']
+    rev_trades = [t for t in trades if _strategy_for_symbol(t.get('symbol', '')) == 'Reversion']
 
-    pnls = [float(t.get('pnl_rub', 0)) for t in trades]
-    total_pnl = round(sum(pnls), 2)
-
-    winning_pnls = [p for p in pnls if p > 0]
-    losing_pnls = [p for p in pnls if p < 0]
-    wins = len(winning_pnls)
-    win_rate = round(wins / total_trades * 100, 1) if total_trades else 0.0
-
-    gross_profit = sum(winning_pnls)
-    gross_loss = abs(sum(losing_pnls))
-    profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else (
-        gross_profit if gross_profit > 0 else 0.0
-    )
-
-    # Equity curve — накопленная сумма PnL
-    equity_curve = []
-    cum = 0.0
-    for p in pnls:
-        cum = round(cum + p, 2)
-        equity_curve.append(cum)
+    total_stats = _calc_stats(trades)
+    vs_stats = _calc_stats(vs_trades)
+    rev_stats = _calc_stats(rev_trades)
 
     return {
-        'total_trades': total_trades,
-        'win_rate': win_rate,
-        'profit_factor': profit_factor,
-        'total_pnl_rub': total_pnl,
-        'equity_curve': equity_curve,
+        'total_trades': total_stats['trades'],
+        'win_rate': total_stats['win_rate'],
+        'profit_factor': total_stats['profit_factor'],
+        'total_pnl_rub': total_stats['pnl'],
+        'equity_curve': total_stats['equity'],
         'open_positions': open_pos,
+        'vs': vs_stats,
+        'reversion': rev_stats,
     }
 
 
@@ -167,6 +180,9 @@ def render_html(stats: dict) -> str:
 
     svg = _equity_svg(ec)
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    vs_stats = stats.get('vs', {'trades': 0, 'win_rate': 0.0, 'profit_factor': 0.0})
+    rev_stats = stats.get('reversion', {'trades': 0, 'win_rate': 0.0, 'profit_factor': 0.0})
 
     # ── Сборка HTML ──────────────────────────────────────────────
     html = f"""<!DOCTYPE html>
@@ -287,6 +303,21 @@ def render_html(stats: dict) -> str:
   </div>
 </div>
 
+<!-- Panels by strategy -->
+<h2>По стратегиям</h2>
+<div class="grid">
+  <div class="card">
+    <h3>🔵 Volume Surge</h3>
+    <div class="value white">{vs_stats['trades']}</div>
+    <div style="font-size:12px;color:#8b949e;margin-top:4px;">WR {vs_stats['win_rate']}% · PF {vs_stats['profit_factor']}</div>
+  </div>
+  <div class="card">
+    <h3>🟢 Mean Reversion</h3>
+    <div class="value white">{rev_stats['trades']}</div>
+    <div style="font-size:12px;color:#8b949e;margin-top:4px;">WR {rev_stats['win_rate']}% · PF {rev_stats['profit_factor']}</div>
+  </div>
+</div>
+
 <div class="svg-wrap">
   <h3>Equity Curve</h3>
   {svg}
@@ -318,19 +349,21 @@ def render_html(stats: dict) -> str:
     html += """
 <h2>Последние 20 сделок</h2>
 """
-
     if last_trades:
         html += """<table>
-  <tr><th>Time</th><th>Symbol</th><th>Direction</th><th>Entry</th><th>Exit</th><th>PnL</th></tr>
+  <tr><th>Time</th><th>Symbol</th><th>Strategy</th><th>Direction</th><th>Entry</th><th>Exit</th><th>PnL</th></tr>
 """
         for t in reversed(last_trades):
             pnl = float(t.get('pnl_rub', 0))
             pnl_cls = 'pnl-pos' if pnl >= 0 else 'pnl-neg'
             direction = t.get('direction', '?')
             dir_cls = f"dir-{direction}"
+            sym = t.get('symbol', '?')
+            strat = _strategy_for_symbol(sym)
             html += f"""  <tr>
     <td>{t.get('time', '?')}</td>
-    <td>{t.get('symbol', '?')}</td>
+    <td>{sym}</td>
+    <td style="font-size:11px;color:#8b949e;">{strat}</td>
     <td class="{dir_cls}">{direction}</td>
     <td>{t.get('entry', '?')}</td>
     <td>{t.get('exit', '?')}</td>
