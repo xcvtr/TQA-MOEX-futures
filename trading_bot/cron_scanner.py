@@ -10,11 +10,12 @@ Usage:
 import sys, os, json
 from datetime import datetime
 
-from . import SCAN_SYMBOLS, DEFAULT_CONFIG, TICKERS, DB_CREDENTIALS
+from . import SCAN_SYMBOLS, DEFAULT_CONFIG, TICKERS, DB_CREDENTIALS, REVERSION_TICKERS, DEFAULT_REVERSION_CONFIG
 from .engine import detect_signals
 from .scanner import load_data, scan_all, format_signal
 from .tracker import load_positions, check_exits, open_position, get_stats
 from .alerts import send_alert, format_signal_alert, format_position_update, format_stats
+from .reversion_engine import detect_mean_reversion_signals, load_price_data
 
 
 def healthcheck() -> dict:
@@ -43,7 +44,7 @@ def main() -> str:
     positions = load_positions()
     alerts.append(f"[{now:%H:%M}] Открыто: {sum(1 for p in positions if p['status']=='open')}")
 
-    # 2. Build configs and scan
+    # 2. Build configs and scan (Volume Surge)
     configs = {}
     for sym in SCAN_SYMBOLS:
         cfg = TICKERS.get(sym, {})
@@ -51,8 +52,28 @@ def main() -> str:
             configs[sym] = {**DEFAULT_CONFIG, **cfg}
 
     signals = scan_all(configs)
+    vs_count = len(signals)
 
-    # Apply ADX regime filter for tickers that have it enabled
+    # 3. Reversion scanning
+    rev_signals = []
+    for sym, cfg in REVERSION_TICKERS.items():
+        if not cfg.get('enabled', True):
+            continue
+        rev_cfg = {**DEFAULT_REVERSION_CONFIG, **cfg}
+        try:
+            price_rows = load_price_data(sym, days=30)
+            if price_rows and len(price_rows) >= 50:
+                sigs = detect_mean_reversion_signals(sym, price_rows, rev_cfg)
+                rev_signals.extend(sigs)
+        except Exception as e:
+            alerts.append(f"[WARN] Reversion scan {sym} error: {e}")
+
+    rev_count = len(rev_signals)
+
+    # 4. Merge all signals
+    signals.extend(rev_signals)
+
+    # 5. Apply ADX regime filter for tickers that have it enabled
     from trading_bot.filters import calc_adx, add_regime_filter
     from trading_bot.scanner import load_data
     
@@ -78,7 +99,7 @@ def main() -> str:
     cutoff = now - timedelta(minutes=30)
     signals = [s for s in signals if s.get('time', '')[:16] >= cutoff.strftime('%Y-%m-%dT%H:%M')]
 
-    # 3. Check exits (horizon/stop)
+    # 6. Check exits (horizon/stop)
     # Convert signals to format tracker expects
     signal_dicts = []
     for sig in signals:
@@ -107,7 +128,7 @@ def main() -> str:
         if tk in active_symbols:
             continue
         # Check if we already have a signal for this ticker
-        cfg = TICKERS.get(tk, {})
+        cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, {}))
         label = cfg.get('label', tk)
         go = cfg.get('go', 5000)
         horizon = cfg.get('horizon', 12)
@@ -127,10 +148,10 @@ def main() -> str:
         except Exception as e:
             alerts.append(f"⚠ Open {tk} error: {e}")
 
-    # 5. Status line
+    # 9. Status line
     sig_count = len(signals)
     open_count = sum(1 for p in load_positions() if p['status'] == 'open')
-    status = f"[SCAN] Сигналов: {sig_count} | Открыто: {open_count} | Новых: {opened}"
+    status = f"[SCAN] VS: {vs_count} sig | Reversion: {rev_count} sig | Open: {open_count} | Новых: {opened}"
     alerts.append(status)
     print("\n".join(alerts))
     

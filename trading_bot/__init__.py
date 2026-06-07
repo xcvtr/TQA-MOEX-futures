@@ -31,6 +31,23 @@ SCAN_SYMBOLS = [
     'HS', 'KC', 'DX', 'HY', 'BM',
 ]
 
+# ─── Mean Reversion After Volatility Exhaustion ──────────────────────────────
+DEFAULT_REVERSION_CONFIG = {
+    'mid_low': 0.3,
+    'mid_high': 0.7,
+    'horizon': 12,
+    'vol_thresh': 1.5,
+    'range_mul': 1.5,
+    'lookback_bars': 3,
+}
+
+REVERSION_TICKERS: dict = {
+    'NM': {'enabled': True, 'go': 40000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'NM (фьючерс)'},
+    'BR': {'enabled': True, 'go': 17228, 'tick_rub': 7.43, 'minstep': 1, 'label': 'BR (Brent)'},
+    'SBERF': {'enabled': True, 'go': 6620, 'tick_rub': 1.0, 'minstep': 1, 'label': 'SBERF (Сбер)'},
+    'AF': {'enabled': True, 'go': 7000, 'tick_rub': 0.74, 'minstep': 1, 'label': 'AF (Africa)'},
+}
+
 DB_CREDENTIALS = {
     'host': '10.0.0.60',
     'port': 5432,
