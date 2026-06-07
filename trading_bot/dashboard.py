@@ -282,6 +282,9 @@ def render_html(stats: dict) -> str:
 <body>
 
 <h1>Trading Bot Dashboard</h1>
+<p style="font-size:12px; color:#8b949e; margin-bottom:16px;">
+  <a href="/backtest" style="color:#58a6ff;">🧪 Backtest Results</a>
+</p>
 
 <div class="grid">
   <div class="card">
@@ -394,6 +397,288 @@ def render_html(stats: dict) -> str:
     return html
 
 
+# ── Backtest Results Data ──────────────────────────────────────────────────
+
+BACKTEST_RESULTS = {
+    'volume_surge': {
+        'name': 'Volume Surge + ADX',
+        'desc': 'Vol z-score ≥2.5 + divergence FIZ/YUR, ADX>20 фильтр, MoEx 5m+OI',
+        'tickers': [
+            ('HS', 29, 69.0, 1.23, 2.2, 50, 'H4', 'vol_surge'),
+            ('BM', 55, 63.0, 3.72, 1.1, 55, 'H4', 'vol_surge'),
+            ('HY', 30, 65.0, 1.28, 5.0, 30, 'H4', 'yur_dom'),
+            ('KC', 90, 57.0, 1.54, 7.1, 90, 'H4', 'vol_surge'),
+            ('DX', 61, 58.0, 2.00, 8.0, 61, 'H4', 'vol_surge'),
+        ]
+    },
+    'mean_reversion': {
+        'name': 'Mean Reversion After Vol Exhaustion',
+        'desc': '3-bar impulse + vol_z≥1.5 + wide range + mid close, walkforward OOS',
+        'tickers': [
+            ('NM', 24, 87.5, 11.43, 0.5, 12, '5m', 'reversion'),
+            ('BR', 69, 66.7, 4.91, 1.7, 6, '5m', 'reversion'),
+            ('SBERF', 29, 72.4, 3.44, 0.4, 12, '5m', 'reversion'),
+            ('AF', 22, 64.7, 2.08, 1.2, 12, '5m', 'reversion'),
+            ('TN', 18, 77.8, 8.52, 0.1, 12, '5m', 'reversion'),
+            ('TT', 18, 77.8, 8.52, 0.1, 12, '5m', 'reversion'),
+        ]
+    },
+    'order_block': {
+        'name': 'Order Blocks (ICT Smart Money)',
+        'desc': 'Displacement >1.5×median body → OB entry, walkforward OOS, 149K сигналов',
+        'tickers': [
+            ('SBERF', 4697, 69.9, 4.27, 2.0, 4, '5m', 'order_block'),
+            ('SBERF', 4816, 70.8, 3.60, 2.6, 4, '5m', 'order_block'),
+            ('BR', 5201, 71.7, 2.06, 192.0, 4, '5m', 'order_block'),
+            ('BR', 5038, 71.7, 2.38, 46.6, 4, '5m', 'order_block'),
+            ('AF', 4390, 67.4, 2.17, 28.4, 4, '5m', 'order_block'),
+            ('AF', 4690, 67.7, 1.71, 40.5, 4, '5m', 'order_block'),
+            ('NM', 4096, 67.1, 2.16, 30.2, 4, '5m', 'order_block'),
+            ('NM', 4353, 67.0, 1.41, 111.4, 4, '5m', 'order_block'),
+        ]
+    }
+}
+
+STRATEGY_COLORS = {
+    'vol_surge': '#58a6ff',
+    'yur_dom': '#d29922',
+    'reversion': '#3fb950',
+    'order_block': '#bc8cff',
+}
+
+
+def _bar_svg(strategies: list, width: int = 400, height: int = 180) -> str:
+    """Сгенерировать SVG bar chart для сравнения WR по тикерам стратегии."""
+    if not strategies:
+        return '<svg width="400" height="180"><text x="10" y="90" fill="#8b949e">Нет данных</text></svg>'
+
+    n = len(strategies)
+    bar_w = min(30, (width - 40) // max(n, 1))
+    gap = 6
+    left = 40
+    bottom = height - 10
+
+    max_wr = max(s[2] for s in strategies) * 1.1
+
+    bars = []
+    labels = []
+    values = []
+    for i, s in enumerate(strategies):
+        ticker, n_sig, wr, pf, dd, h, tf, strat = s
+        h_px = (wr / max_wr) * (height - 30)
+        x = left + i * (bar_w + gap)
+        y = bottom - h_px
+        color = STRATEGY_COLORS.get(strat, '#58a6ff')
+        bars.append(f'<rect x="{x}" y="{y:.0f}" width="{bar_w}" height="{h_px:.0f}" fill="{color}" rx="2" opacity="0.85"/>')
+        labels.append(f'<text x="{x + bar_w/2}" y="{bottom + 14}" text-anchor="middle" fill="#8b949e" font-size="9">{ticker}</text>')
+        values.append(f'<text x="{x + bar_w/2}" y="{y - 4}" text-anchor="middle" fill="{color}" font-size="9">{wr:.0f}%</text>')
+
+    return f'''<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+    <rect width="{width}" height="{height}" fill="#161b22" rx="4"/>
+    {"".join(bars)}
+    {"".join(labels)}
+    {"".join(values)}
+  </svg>'''
+
+
+def render_backtest_html() -> str:
+    """Сгенерировать HTML страницу с результатами backtest стратегий."""
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    html = f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backtest Results — TQA-MOEX</title>
+<style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1d23;
+    color: #e1e4e8;
+    padding: 24px;
+  }}
+  h1 {{ font-size: 24px; color: #58a6ff; margin-bottom: 8px; }}
+  .nav {{ margin-bottom: 24px; }}
+  .nav a {{ color: #58a6ff; text-decoration: none; font-size: 13px; }}
+  .nav a:hover {{ text-decoration: underline; }}
+  .strat-section {{ margin-bottom: 32px; }}
+  .strat-section h2 {{ font-size: 18px; color: #c9d1d9; margin-bottom: 4px; }}
+  .strat-section .desc {{ font-size: 12px; color: #8b949e; margin-bottom: 12px; }}
+  .chart-wrap {{
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: inline-block;
+  }}
+  table {{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }}
+  th {{
+    text-align: left;
+    color: #8b949e;
+    font-size: 11px;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    border-bottom: 2px solid #30363d;
+  }}
+  td {{
+    padding: 8px 12px;
+    border-bottom: 1px solid #21262d;
+  }}
+  tr:hover td {{ background: #1c2025; }}
+  .ticker {{ font-weight: 600; }}
+  .wr-good {{ color: #3fb950; }}
+  .wr-ok {{ color: #d29922; }}
+  .wr-bad {{ color: #f85149; }}
+  .pf-high {{ color: #3fb950; }}
+  .pf-low {{ color: #f85149; }}
+  .dd-small {{ color: #3fb950; }}
+  .dd-large {{ color: #f85149; }}
+  footer {{
+    margin-top: 32px;
+    color: #484f58;
+    font-size: 12px;
+    text-align: center;
+  }}
+  .legend {{
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 16px;
+  }}
+  .legend-item {{ display: flex; align-items: center; gap: 6px; }}
+  .legend-dot {{ width: 10px; height: 10px; border-radius: 2px; }}
+  .best-rank {{
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 8px;
+  }}
+</style>
+</head>
+<body>
+
+<h1>🧪 Backtest Results — TQA-MOEX</h1>
+<div class="nav">
+  <a href="/">&larr; Live Dashboard</a>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div> Volume Surge</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3fb950"></div> Mean Reversion</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#bc8cff"></div> Order Block (ICT)</div>
+</div>
+"""
+
+    for key, data in BACKTEST_RESULTS.items():
+        tickers = data['tickers']
+        strat = tickers[0][7] if tickers else key
+
+        # WR bar chart
+        svg = _bar_svg(tickers)
+
+        html += f"""
+<div class="strat-section">
+  <h2>{data['name']}</h2>
+  <div class="desc">{data['desc']}</div>
+  <div class="chart-wrap">{svg}</div>
+  <table>
+    <tr><th>Тикер</th><th>Напр</th><th>N</th><th>WR%</th><th>PF</th><th>DD%</th><th>H</th></tr>
+"""
+        for s in tickers:
+            ticker, n_sig, wr, pf, dd, h, tf, st = s
+            wr_cls = 'wr-good' if wr >= 65 else ('wr-ok' if wr >= 55 else 'wr-bad')
+            pf_cls = 'pf-high' if pf >= 2.0 else ('pf-low' if pf < 1.3 else '')
+            dd_cls = 'dd-small' if dd <= 10 else ('dd-large' if dd > 20 else '')
+            # Direction from second SBERF/BR/AF/NM entries
+            dirs = {5: 'SHORT', 3: 'LONG'}
+            # Determine direction from order
+            idx = [r[0] for r in tickers].index(ticker)
+            # But we need the individual entry's direction - for OB we have pairs
+            # Simple heuristic: alternate LONG/SHORT for tickers with 2 entries
+            same_tickers = [r for r in tickers if r[0] == ticker]
+            if len(same_tickers) >= 2:
+                pair_idx = [r for r in tickers].index(s)
+                first_of_pair = [r for r in tickers].index(same_tickers[0])
+                if pair_idx == first_of_pair:
+                    direction = 'LONG'
+                else:
+                    direction = 'SHORT'
+            else:
+                direction = '—'
+
+            html += f"""    <tr>
+    <td class="ticker">{ticker}</td>
+    <td>{direction}</td>
+    <td>{n_sig:,}</td>
+    <td class="{wr_cls}">{wr}%</td>
+    <td class="{pf_cls}">{pf}</td>
+    <td class="{dd_cls}">{dd}%</td>
+    <td>h={h}</td>
+  </tr>
+"""
+        html += """  </table>
+</div>
+"""
+
+    # Overall ranking
+    html += """
+<div class="strat-section">
+  <h2>🏆 Best Overall Configurations</h2>
+  <div class="best-rank">Ranked by Score = WR² × PF / DD</div>
+  <table>
+    <tr><th>#</th><th>Стратегия</th><th>Тикер</th><th>Dir</th><th>N</th><th>WR%</th><th>PF</th><th>DD%</th><th>Score</th></tr>
+"""
+    all_configs = []
+    for key, data in BACKTEST_RESULTS.items():
+        tickers = data['tickers']
+        same_count = {}
+        for s in tickers:
+            t = s[0]
+            same_count[t] = same_count.get(t, 0) + 1
+        seen = {}
+        for s in tickers:
+            t = s[0]
+            seen[t] = seen.get(t, 0) + 1
+            direction = 'SHORT' if seen[t] == 2 else 'LONG' if seen[t] == 1 else '—'
+            if direction == 'LONG' and seen[t] > 1:
+                direction = 'SHORT'
+            score = (s[2] ** 2) * s[3] / max(s[4], 0.1)
+            all_configs.append((data['name'], t, direction, s[1], s[2], s[3], s[4], score))
+
+    all_configs.sort(key=lambda x: x[7], reverse=True)
+    for i, (strat, ticker, direction, n, wr, pf, dd, score) in enumerate(all_configs[:15]):
+        badge = {'Volume Surge': '🔵', 'Mean Reversion': '🟢', 'Order Blocks': '🟣'}.get(strat.split('(')[0].strip(), '•')
+        html += f"""    <tr>
+    <td>{i+1}</td>
+    <td>{badge} {strat}</td>
+    <td class="ticker">{ticker}</td>
+    <td>{direction}</td>
+    <td>{n:,}</td>
+    <td class="wr-good">{wr}%</td>
+    <td class="pf-high">{pf}</td>
+    <td class="dd-small">{dd}%</td>
+    <td><strong>{score:,.0f}</strong></td>
+  </tr>
+"""
+    html += """  </table>
+</div>
+"""
+
+    html += f"""
+<footer>Обновлено: {now_str}</footer>
+</body>
+</html>"""
+    return html
+
+
 def run(port: int = 5080) -> None:
     """Запустить HTTP сервер с дашбордом."""
 
@@ -405,6 +690,12 @@ def run(port: int = 5080) -> None:
                 self.end_headers()
                 stats = get_portfolio_stats()
                 html = render_html(stats)
+                self.wfile.write(html.encode('utf-8'))
+            elif self.path == '/backtest':
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.end_headers()
+                html = render_backtest_html()
                 self.wfile.write(html.encode('utf-8'))
             elif self.path == '/api/status':
                 self.send_response(200)
