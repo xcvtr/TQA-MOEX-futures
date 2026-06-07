@@ -8,9 +8,9 @@ import csv
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from . import CAPITAL, MARGIN_USAGE, TICKERS, REVERSION_TICKERS
+from . import CAPITAL, MARGIN_USAGE, TICKERS, REVERSION_TICKERS, OB_TICKERS
 
-ALL_TICKERS = {**TICKERS, **REVERSION_TICKERS}
+ALL_TICKERS = {**TICKERS, **REVERSION_TICKERS, **OB_TICKERS}
 
 POSITIONS_FILE = os.path.join(os.path.dirname(__file__), 'positions.json')
 TRADES_LOG = os.path.join(os.path.dirname(__file__), 'trades.csv')
@@ -261,7 +261,6 @@ def check_exits(active_signals: list[dict]) -> list[dict]:
     list[dict]
         Список закрытых позиций (каждая с PnL).
     """
-    max_loss = -5.0  # % стоп-лосс по умолчанию
     closed: list[dict] = []
 
     positions = load_positions()
@@ -298,6 +297,7 @@ def check_exits(active_signals: list[dict]) -> list[dict]:
                 pnl_pct_est = _pnl_pct(
                     pos['direction'], pos['entry_price'], cur_price
                 )
+                max_loss = _ticker_config(pos['symbol']).get('max_loss', -5.0)
                 if pnl_pct_est <= max_loss:
                     should_close = True
                     reason = 'stop'

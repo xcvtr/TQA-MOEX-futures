@@ -48,6 +48,19 @@ def _strategy_for_symbol(symbol: str) -> str:
         return 'OB'
     return 'Other'
 
+def _rolling_winrate(trades: list[dict], window: int = 50) -> list[dict]:
+    """Calculate rolling WR over sliding window. Returns list of {n, wr, cum_pnl} snapshots."""
+    pnls = [float(t.get('pnl_rub', 0)) for t in trades]
+    snapshots = []
+    for i in range(window, len(pnls)+1):
+        chunk = pnls[i-window:i]
+        wins = sum(1 for p in chunk if p > 0)
+        wr = round(wins / window * 100, 1)
+        cum = round(sum(pnls[:i]), 0)
+        snapshots.append({'n': i, 'wr': wr, 'cum_pnl': cum})
+    return snapshots
+
+
 def _calc_stats(trades: list[dict]) -> dict:
     """Посчитать статистику по списку сделок."""
     total = len(trades)
@@ -101,6 +114,7 @@ def get_portfolio_stats() -> dict[str, Any]:
     rev_stats = _calc_stats(rev_trades)
     ob_stats = _calc_stats(ob_trades)
 
+    rolling = _rolling_winrate(trades)
     return {
         'total_trades': total_stats['trades'],
         'win_rate': total_stats['win_rate'],
@@ -111,6 +125,7 @@ def get_portfolio_stats() -> dict[str, Any]:
         'vs': vs_stats,
         'reversion': rev_stats,
         'order_block': ob_stats,
+        'rolling_wr': rolling,
     }
 
 
@@ -333,6 +348,47 @@ def render_html(stats: dict) -> str:
   </div>
 </div>
 
+<!-- Rolling WR -->
+<h2>Rolling WR (последние 50 сделок)</h2>
+<div class="svg-wrap" style="overflow-x:auto;white-space:nowrap">
+"""
+
+    rolling = stats.get('rolling_wr', [])
+    if rolling:
+        last10 = rolling[-10:]
+        roll_warn = '⚠️ ' if last10[-1]['wr'] < 40 else ''
+        # Sparkline as mini SVG
+        vals = [s['wr'] for s in rolling]
+        mn, mx = min(vals), max(vals)
+        rng = mx - mn if mx != mn else 1
+        n = len(vals)
+        sw, sh = max(n * 3, 200), 60
+        pts = []
+        for i, v in enumerate(vals):
+            x = i / max(n - 1, 1) * sw
+            y = sh - ((v - mn) / rng * (sh - 10)) - 5
+            pts.append(f"{x:.1f},{y:.1f}")
+        roll_color = '#f85149' if last10[-1]['wr'] < 40 else '#3fb950'
+        roll_svg = f'<svg width="{sw}" height="{sh}" viewBox="0 0 {sw} {sh}"><rect width="{sw}" height="{sh}" fill="#21262d" rx="2"/><polyline points="{" ".join(pts)}" stroke="{roll_color}" fill="none" stroke-width="1.5"/><text x="4" y="10" fill="#8b949e" font-size="9">{mn:.0f}%</text><text x="{sw-4}" y="{sh-4}" text-anchor="end" fill="#8b949e" font-size="9">{mx:.0f}%</text></svg>'
+
+        html += f'<p style="font-size:12px;color:#8b949e;margin-bottom:8px">{roll_warn}Последние 10: {", ".join(f"{s["wr"]}%" for s in last10)}</p>'
+        html += f'<div style="margin-bottom:8px">{roll_svg}</div>'
+        html += f"""<table>
+  <tr><th>#</th><th>WR %</th><th>Cum PnL</th></tr>
+"""
+        for s in reversed(last10):
+            wr_cls = 'pnl-pos' if s['wr'] >= 50 else 'pnl-neg'
+            html += f"""  <tr>
+    <td>{s['n']}</td>
+    <td class="{wr_cls}">{s['wr']}%</td>
+    <td class="{'pnl-pos' if s['cum_pnl'] >= 0 else 'pnl-neg'}">{s['cum_pnl']:+,.0f}</td>
+  </tr>
+"""
+        html += '</table>'
+    else:
+        html += '<p style="color:#484f58;">Недостаточно данных (нужно ≥50 сделок)</p>'
+
+    html += """
 <div class="svg-wrap">
   <h3>Equity Curve</h3>
   {svg}

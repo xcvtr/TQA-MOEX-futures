@@ -30,23 +30,6 @@ GO_DATA = {
     "NG": {"go_rub": 6565, "lev": 3.5},
 }
 O_DATA = {
-    "CE": {"go_rub": 1187, "lev": 11.9},
-    "ME": {"go_rub": 3149, "lev": 5.8},
-    "CC": {"go_rub": 473, "lev": 6.4},
-    "W4": {"go_rub": 1758, "lev": 9.2},
-    "SP": {"go_rub": 1008, "lev": 2.0},
-    "PD": {"go_rub": 22173, "lev": 4.6},
-    "SS": {"go_rub": 205, "lev": 2.0},
-    "GK": {"go_rub": 234, "lev": 5.8},
-    "SR": {"go_rub": 5719, "lev": 5.8},
-    "IB": {"go_rub": 803, "lev": 3.5},
-    "GZ": {"go_rub": 2065, "lev": 5.7},
-    "NM": {"go_rub": 1405, "lev": 5.8},
-    "NG": {"go_rub": 6565, "lev": 3.5},
-    "RN": {"go_rub": 8180, "lev": 4.9},
-    "CH": {"go_rub": 538, "lev": 7.8},
-}
-O_DATA = {
     # Old verified champions (lev confirmed working)
     "CC": {"go_rub": 473, "lev": 6.4}, "PD": {"go_rub": 22173, "lev": 4.6},
     "SS": {"go_rub": 205, "lev": 2.0}, "GZ": {"go_rub": 2065, "lev": 5.7},
@@ -85,37 +68,6 @@ CHAMPIONS = [
     ("RN", "Rosneft"),
     ("NG", "Nat Gas"),
 ]
-HAMPIONS = [
-    ("CE", "Copper"),  # NEW
-    ("ME", "MOEX"),  # NEW
-    ("CC", "Cocoa C"),  # NEW
-    ("W4", "Wheat"),  # NEW
-    ("SP", "SPBE"),  # NEW
-    ("PD", "Palladium"),  # NEW
-    ("SF", "SF"),  # NEW
-    ("SS", "Sugar"),  # NEW
-    ("GK", "NorNickel"),  # NEW
-    ("SR", "Sberbank"),  # NEW
-    ("IB", "I-Bonds"),  # NEW
-    ("GZ", "Gazprom"),  # NEW
-    ("UC", "UC"),  # NEW
-    ("NM", "NLMK"),  # NEW
-    ("MM", "MM"),  # NEW
-    ("IMOEXF", "IMOEXF"),  # NEW
-    ("NG", "Nat Gas"),  # NEW
-    ("RN", "Rosneft"),  # NEW
-    ("CH", "Cocoa"),  # NEW
-]
-HAMPIONS = [
-    ("ME", "MOEX"), ("GK", "NorNickel"), ("CC", "Cocoa C"),
-    ("PD", "Palladium"), ("SP", "SPBE"),   ("SS", "Sugar"),
-    ("NM", "NLMK"),     ("GZ", "Gazprom"), ("NG", "Nat Gas"),
-    ("IB", "I-Bonds"),  ("GL", "Gold L"),  ("SE", "Soybean"),
-    ("AL", "Alrosa"),   ("MG", "MMK"),     ("RN", "Rosneft"),
-    ("CE", "Copper"),   ("HS", "Hang Seng"), ("HY", "Hryvnia"),
-    ("SN", "Tin"),
-]
-
 H4_WINDOW = 20  # rolling median window
 TARGET_BARS = 2  # max hold in H4 bars
 ENTRY_SLIPPAGE = 0.001  # 0.1% slippage on entry
@@ -546,6 +498,17 @@ def generate_analysis(stats, sigs):
         "detail": "\n".join(lines),
     }
 
+def _decimate(data, max_points=1000):
+    """Keep first, last, and every Nth point to reduce data size."""
+    if not data or len(data) <= max_points:
+        return data
+    step = max(1, len(data) // max_points)
+    result = [data[i] for i in range(0, len(data), step)]
+    if result[-1] is not data[-1]:
+        result.append(data[-1])
+    return result
+
+
 def process_ticker(symbol, name):
     """Full pipeline for one ticker."""
     rows = load_bars(symbol)
@@ -571,10 +534,14 @@ def process_ticker(symbol, name):
     equity = compute_equity(sigs)
     stats = compute_stats(sigs)
     
-    # Price series for chart
+    # Price series for chart (decimated)
     prices = [{"time": str(f["time"].date()), "close": f["close"],
                "open": f["open"], "high": f["high"], "low": f["low"]}
               for f in features]
+    prices = _decimate(prices)
+    # Decimate equity curves
+    for k in list(equity.keys()):
+        equity[k] = _decimate(equity[k])
     
     analysis = generate_analysis(stats, sigs)
     return {

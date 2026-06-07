@@ -94,12 +94,24 @@ def main() -> str:
     # 5. Apply ADX regime filter — skip if filters module doesn't exist
     try:
         from trading_bot.filters import calc_adx
+        from trading_bot.scanner import load_data
+        adx_data_cache = {}
+        # Pre-load for all tickers that might be checked
+        all_adx_tickers = set()
+        for sig in signals:
+            tk = sig['ticker']
+            cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, OB_TICKERS.get(tk, {})))
+            if cfg.get('adx_filter', False):
+                all_adx_tickers.add(tk)
+        for tk in all_adx_tickers:
+            adx_data_cache[tk] = load_data(tk, days=30)
+
         adx_filtered_signals = []
         for sig in signals:
             tk = sig['ticker']
             cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, OB_TICKERS.get(tk, {})))
             if cfg.get('adx_filter', False):
-                rows = load_data(tk, days=30)
+                rows = adx_data_cache.get(tk, [])
                 if rows and len(rows) > 20:
                     close = [float(r[5]) for r in rows]
                     adx = calc_adx(close, 14)

@@ -42,10 +42,8 @@ DEFAULT_REVERSION_CONFIG = {
 }
 
 REVERSION_TICKERS: dict = {
-    'NM': {'enabled': True, 'go': 40000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'NM (фьючерс)'},
-    'BR': {'enabled': True, 'go': 17228, 'tick_rub': 7.43, 'minstep': 1, 'label': 'BR (Brent)'},
-    'SBERF': {'enabled': True, 'go': 6620, 'tick_rub': 1.0, 'minstep': 1, 'label': 'SBERF (Сбер)'},
-    'AF': {'enabled': True, 'go': 7000, 'tick_rub': 0.74, 'minstep': 1, 'label': 'AF (Africa)'},
+    'NM': {'enabled': True, 'go': 1405, 'tick_rub': 1.0, 'minstep': 1, 'label': 'NM (фьючерс Reversion)', 'max_loss': -5.0},
+    'AF': {'enabled': True, 'go': 7000, 'tick_rub': 0.74, 'minstep': 1, 'label': 'AF (Africa Reversion)', 'max_loss': -5.0},
 }
 
 # ─── Order Blocks (ICT Smart Money) ─────────────────────────────────────────
@@ -59,10 +57,8 @@ DEFAULT_OB_CONFIG = {
 }
 
 OB_TICKERS: dict = {
-    'SBERF': {'enabled': True, 'go': 6620, 'tick_rub': 1.0, 'minstep': 1, 'label': 'SBERF (Сбер OB)'},
-    'BR': {'enabled': True, 'go': 17228, 'tick_rub': 7.43, 'minstep': 1, 'label': 'BR (Brent OB)'},
-    'NM': {'enabled': True, 'go': 40000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'NM (фьючерс OB)'},
-    'AF': {'enabled': True, 'go': 7000, 'tick_rub': 0.74, 'minstep': 1, 'label': 'AF (Africa OB)'},
+    'SBERF': {'enabled': True, 'go': 6620, 'tick_rub': 1.0, 'minstep': 1, 'label': 'SBERF (Сбер OB)', 'max_loss': -5.0},
+    'BR': {'enabled': True, 'go': 17228, 'tick_rub': 7.43, 'minstep': 1, 'label': 'BR (Brent OB)', 'max_loss': -5.0},
 }
 
 DB_CREDENTIALS = {
@@ -90,6 +86,7 @@ TICKERS: dict = {
         'strategy': 'vol_surge',
         'adx_filter': True,
         'adx_threshold': 20,
+        'max_loss': -5.0,
     },
     'KC': {
         'label': 'KC (кофе)',
@@ -103,6 +100,7 @@ TICKERS: dict = {
         'go': 2500,
         'strategy': 'vol_surge',
         'adx_filter': False,  # ADX kills KC signals
+        'max_loss': -5.0,
     },
     'DX': {
         'label': 'DX (фьючерс)',
@@ -115,6 +113,7 @@ TICKERS: dict = {
         'go': 3000,
         'strategy': 'vol_surge',
         'adx_filter': False,  # Too few signals with ADX
+        'max_loss': -5.0,
     },
     'HY': {
         'label': 'HY (акции)',
@@ -128,6 +127,7 @@ TICKERS: dict = {
         'yur_dom_ratio': 1.5,
         'adx_filter': True,
         'adx_threshold': 20,
+        'max_loss': -5.0,
     },
     'BM': {
         'label': 'BM (фьючерс)',
@@ -141,5 +141,6 @@ TICKERS: dict = {
         'strategy': 'vol_surge',
         'adx_filter': True,
         'adx_threshold': 20,
+        'max_loss': -5.0,
     },
 }
