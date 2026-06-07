@@ -7,7 +7,7 @@ Compares signal count vs unidirectional version.
 import psycopg2, sys, math
 from collections import defaultdict
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 TICKERS = ['HS', 'W4', 'DX', 'NR', 'KC']
 VOL_Z_THRESHOLDS = [1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]
 DIV_Z_THRESHOLDS = [0.5, 0.75, 1.0, 1.25, 1.5]

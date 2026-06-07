@@ -3,7 +3,7 @@
 import psycopg2, sys
 import numpy as np
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 TICKERS = ['AF', 'BR', 'GD', 'NG', 'VB', 'PD', 'GAZPF']
 THRESHOLDS = [1.5, 2.0, 2.5, 3.0]
 EXITS = [3, 6, 12, 24, 48]

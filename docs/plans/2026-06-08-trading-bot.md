@@ -40,8 +40,8 @@ trading_bot/
 
 ## База данных
 
-PostgreSQL на 10.0.0.60:
+PostgreSQL на 10.0.0.64:
 - moex_prices_5m_oi: symbol, time, fiz_buy, fiz_sell, yur_buy, yur_sell, total_oi
 - moex_prices_5m: symbol, time, open, high, low, close, volume
 
-DB: host=10.0.0.60, port=5432, dbname=moex, user=postgres, password=postgres
+DB: host=10.0.0.64, port=5432, dbname=moex, user=postgres, password=postgres

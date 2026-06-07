@@ -11,7 +11,7 @@ import requests
 import psycopg2
 import psycopg2.extras  # for execute_values
 
-DB_HOST = '10.0.0.60'
+DB_HOST = '10.0.0.64'
 DB_NAME = 'forex'
 DB_USER = 'postgres'
 DB_PASS = 'postgres'

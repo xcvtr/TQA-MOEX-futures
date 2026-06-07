@@ -8,7 +8,7 @@ import psycopg2
 
 warnings.filterwarnings('ignore')
 
-DB = dict(host="10.0.0.60", port=5432, dbname="forex", user="postgres", password="postgres")
+DB = dict(host="10.0.0.64", port=5432, dbname="forex", user="postgres", password="postgres")
 OUTDIR = Path("/home/user/.hermes/cache/screenshots/tqa/equity_cluster/2025")
 SYMBOLS = ['audjpy','audusd','euraud','eurgbp','eurjpy','eurusd',
            'gbpjpy','gbpusd','nzdusd','usdcad','usdchf','usdjpy','xauusd']

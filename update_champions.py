@@ -6,7 +6,7 @@ Auto-отбор чемпионов: сканирует все 59+ тикеров
 import os, sys, json, re, time, psycopg2, numpy as np
 from datetime import datetime, timedelta
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password=os.environ.get('MOEX_DB_PASSWORD', '***'))
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password=os.environ.get('MOEX_DB_PASSWORD', '***'))
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), 'champions_history.json')
 DASHBOARD_FILE = os.path.join(os.path.dirname(__file__), 'moex_equity_dashboard.py')
 TOP_N = 19

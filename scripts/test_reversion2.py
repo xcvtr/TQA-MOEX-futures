@@ -3,7 +3,7 @@
 import psycopg2, numpy as np
 from datetime import datetime, timedelta
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 TICKERS = ['HS','KC','DX','HY','BM','AF','MC','CC']
 
 def zs(vals, w=20):

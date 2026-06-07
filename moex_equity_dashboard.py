@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import psycopg2
 import numpy as np
 
-DB = dict(host="10.0.0.60", port=5432, dbname="moex", user="postgres", password=os.environ.get("MOEX_DB_PASSWORD", "***"))
+DB = dict(host="10.0.0.64", port=5432, dbname="moex", user="postgres", password=os.environ.get("MOEX_DB_PASSWORD", "***"))
 PORT = 5057
 
 # ── Guarantee (GO) by ticker (from MOEX ISS front-month) ──

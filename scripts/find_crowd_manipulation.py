@@ -41,7 +41,7 @@ warnings.filterwarnings('ignore')
 # ──────────────────────────────────────────────────────────────────────
 #  Конфигурация
 # ──────────────────────────────────────────────────────────────────────
-DB_HOST = os.getenv("MOEX_DB_HOST", "10.0.0.60")
+DB_HOST = os.getenv("MOEX_DB_HOST", "10.0.0.64")
 DB_PORT = int(os.getenv("MOEX_DB_PORT", "5432"))
 DB_NAME = os.getenv("MOEX_DB_NAME", "moex")
 DB_USER = os.getenv("MOEX_DB_USER", "postgres")

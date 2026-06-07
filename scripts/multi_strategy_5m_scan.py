@@ -14,7 +14,7 @@ import psycopg2, sys, math
 from collections import defaultdict
 import numpy as np
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 
 # Best candidates from asymmetry scan
 CANDIDATES = ['SN','UC','HY','AL','LK','RN','MX',  # YUR-dominant

@@ -3,7 +3,7 @@
 import psycopg2, numpy as np
 from datetime import datetime, timedelta
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='***')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='***')
 
 TICKERS = ['ME','GK','CC','SP','SS','CE','AL','NM','NG','GZ','MG','RN','HS','SN','HY','GL',
            'BR','RI','Si']  # + the ones user asked about

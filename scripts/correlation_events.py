@@ -16,7 +16,7 @@ import numpy as np
 
 warnings.filterwarnings("ignore")
 
-DB = dict(host="10.0.0.60", port=5432, dbname="forex", user="postgres", password="postgres")
+DB = dict(host="10.0.0.64", port=5432, dbname="forex", user="postgres", password="postgres")
 
 SYM_COUNTRY = {
     "audjpy": ("AU", "JP"), "audusd": ("AU", "US"), "euraud": ("EU", "AU"),

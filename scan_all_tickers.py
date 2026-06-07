@@ -5,7 +5,7 @@ import psycopg2
 import numpy as np
 from datetime import datetime, timedelta
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='***')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='***')
 H4_WINDOW = 20
 TARGET_BARS = 2
 ENTRY_SLIPPAGE = 0.001

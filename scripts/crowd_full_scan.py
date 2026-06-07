@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import numpy as np
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 MIN_DAYS = 100
 MIN_SIGNALS = 10
 Z_THRESHOLDS = [0.5, 1.0, 1.5, 2.0]

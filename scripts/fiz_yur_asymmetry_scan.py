@@ -5,7 +5,7 @@ import psycopg2, json, sys
 from datetime import datetime
 import numpy as np
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 
 # All tickers with 5m OI data
 TICKERS = [

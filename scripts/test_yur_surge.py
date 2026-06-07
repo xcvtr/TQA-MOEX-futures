@@ -3,7 +3,7 @@
 import psycopg2, sys, math
 from collections import defaultdict
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 
 def zscore_past(values, window=20):
     result = [0.0] * len(values)

@@ -3,7 +3,7 @@
 import psycopg2, numpy as np, sys
 from datetime import datetime, timedelta
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 TICKERS = ['HS','KC','DX','HY','BM','AF','MC','CC']
 SINCE = (datetime.now()-timedelta(days=365)).strftime('%Y-%m-%d')
 

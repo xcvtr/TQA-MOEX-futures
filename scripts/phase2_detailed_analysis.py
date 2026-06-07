@@ -7,7 +7,7 @@ import psycopg2, sys, os, csv, math
 from collections import defaultdict
 
 # ── Config ──────────────────────────────────────────────────────────────────
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 
 KEEP_TICKERS = ['GL','AF','CC','CE','DX','HS','HY','MC','MG','NG','NM','NR',
                 'OJ','PD','SE','SF','SN','SP','SS','TN','TT','W4','YD','AL']

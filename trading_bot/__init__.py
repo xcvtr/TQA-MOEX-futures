@@ -66,7 +66,7 @@ OB_TICKERS: dict = {
 }
 
 DB_CREDENTIALS = {
-    'host': '10.0.0.60',
+    'host': '10.0.0.64',
     'port': 5432,
     'dbname': 'moex',
     'user': 'postgres',

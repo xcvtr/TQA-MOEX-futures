@@ -17,7 +17,7 @@ from collections import defaultdict
 
 warnings.filterwarnings('ignore')
 
-DB_HOST = '10.0.0.60'
+DB_HOST = '10.0.0.64'
 DB_NAME = 'forex'
 DB_USER = 'postgres'
 DB_PASS = 'postgres'

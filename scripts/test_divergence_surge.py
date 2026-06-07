@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Volume Surge + FIZ/YUR Divergence — фильтр для отлова лонгов YUR."""
 import psycopg2
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 
 def zscore_past(values, window=20):
     result = [0.0] * len(values)

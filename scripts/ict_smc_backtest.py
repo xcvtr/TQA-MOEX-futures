@@ -16,7 +16,7 @@ import psycopg2, numpy as np, sys, json, time, math
 from collections import defaultdict
 from datetime import datetime
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='***')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='***')
 TICKERS = ['BR', 'NM', 'SBERF', 'AF']
 START = '2025-01-01'
 SPLIT = '2025-10-01'  # train/test split

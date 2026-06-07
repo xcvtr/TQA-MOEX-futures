@@ -9,7 +9,7 @@ Score = WR × PF / max(DD, 0.5)
 """
 import psycopg2, numpy as np, sys, time
 
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 TICKERS = ['NM', 'BR', 'SBERF', 'MM', 'AF', 'HS', 'KC', 'DX']
 SINCE = '2025-07-01'
 

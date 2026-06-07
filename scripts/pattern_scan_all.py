@@ -2,7 +2,7 @@
 """Complete pattern scan across ALL MOEX tickers - saves to file."""
 import psycopg2, sys
 from collections import defaultdict
-DB = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
 
 def zs(v, w=20):
     r=[0.0]*len(v)

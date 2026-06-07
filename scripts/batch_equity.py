@@ -21,7 +21,7 @@ from plotly.subplots import make_subplots
 
 warnings.filterwarnings("ignore")
 
-DB = dict(host="10.0.0.60", port=5432, dbname="forex", user="postgres", password="postgres")
+DB = dict(host="10.0.0.64", port=5432, dbname="forex", user="postgres", password="postgres")
 OUTPUT_DIR = Path("/home/user/.hermes/cache/screenshots/tqa/")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

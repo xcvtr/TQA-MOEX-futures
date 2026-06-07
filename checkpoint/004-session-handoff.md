@@ -47,7 +47,7 @@
 
 ## Critical info
 
-**DB:** host=10.0.0.60, port=5432, dbname=moex, user=postgres, password=postgres
+**DB:** host=10.0.0.64, port=5432, dbname=moex, user=postgres, password=postgres
 **Tables:** moex_prices_5m_oi (5m FIZ/YUR), moex_prices_5m (5m OHLCV)
 **Project:** /home/user/projects/TQA-MOEX/trading_bot/
 **Venv:** source ~/venvs/tqa/main/bin/activate
