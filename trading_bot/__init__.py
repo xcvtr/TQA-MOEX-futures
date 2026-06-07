@@ -61,6 +61,27 @@ OB_TICKERS: dict = {
     'BR': {'enabled': True, 'go': 17228, 'tick_rub': 7.43, 'minstep': 1, 'label': 'BR (Brent OB)', 'max_loss': -5.0},
 }
 
+# ─── VWAP Deviation Reversion ──────────────────────────────────────────────
+DEFAULT_VWAP_CONFIG = {
+    'dev_thresh': 2.0,
+    'horizon': 12,
+    'vwap_window': 20,
+    'atr_period': 14,
+}
+
+VWAP_TICKERS: dict = {
+    'GZ': {'enabled': True, 'go': 2065, 'tick_rub': 0.01, 'minstep': 0.01,
+           'label': 'GZ (Газпром VWAP)', 'horizon': 12, 'max_loss': -5.0},
+    'Eu': {'enabled': True, 'go': 973, 'tick_rub': 0.01, 'minstep': 0.01,
+           'label': 'Eu (Евро VWAP)', 'horizon': 12, 'max_loss': -5.0},
+    'SR': {'enabled': True, 'go': 5719, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'SR (Сбер VWAP)', 'horizon': 12, 'max_loss': -5.0},
+    'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'Si (Доллар VWAP)', 'horizon': 12, 'max_loss': -5.0},
+    'MC': {'enabled': True, 'go': 3149, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'MC (Моэкс VWAP)', 'horizon': 12, 'max_loss': -5.0},
+}
+
 DB_CREDENTIALS = {
     'host': '10.0.0.64',
     'port': 5432,
