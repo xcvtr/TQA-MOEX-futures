@@ -51,12 +51,12 @@ async def api_bars(
     bars = []
     for r in data:
         bars.append({
-            'time': r[0],
-            'open': r[1],
-            'high': r[2],
-            'low': r[3],
-            'close': r[4],
-            'volume': r[5],
+            'time': r['time'],
+            'open': r['open'],
+            'high': r['high'],
+            'low': r['low'],
+            'close': r['close'],
+            'volume': r['volume'],
         })
     return {'bars': bars, 'symbol': symbol, 'count': len(bars)}
 
@@ -80,3 +80,17 @@ async def api_freshness():
             'hours_behind': hours_behind,
         })
     return {'freshness': result, 'db_status': db_status}
+
+
+@router.get('/api/deep-test-summary')
+async def api_deep_test_summary():
+    """Serve the deep testing summary file."""
+    import os
+    summary_path = os.path.join(os.path.dirname(__file__), '../../../docs/backtest/deep_test_summary.txt')
+    try:
+        with open(summary_path) as f:
+            content = f.read()
+        return {'summary': content}
+    except FileNotFoundError:
+        return {'summary': 'Deep test summary not found. Run tests first.'}
+        

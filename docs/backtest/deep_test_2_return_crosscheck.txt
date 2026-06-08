@@ -1,0 +1,25 @@
+=== RETURN CROSS-CHECK ===
+
+
+Volume Surge on HS (82 signals):
+  Volume Surge on HS: 0 errors / 82 signals
+
+Mean Reversion on NM (100 signals):
+  Mean Reversion on NM: 0 errors / 100 signals
+
+Order Block on SBERF (1 signals):
+  Order Block on SBERF: 0 errors / 1 signals
+
+VWAP on GZ (100 signals):
+  VWAP on GZ: 0 errors / 100 signals
+
+OTC on CNYRUBF (100 signals):
+  OTC on CNYRUBF: 0 errors / 100 signals
+
+Retail Trap on CNYRUBF (100 signals):
+  Retail Trap on CNYRUBF: 0 errors / 100 signals
+
+OI Divergence on SV (91 signals):
+  OI Divergence on SV: 0 errors / 91 signals
+
+Total: 0 errors / 574 signals

@@ -1,0 +1,9 @@
+=== MONTE CARLO: VWAP on GZ ===
+
+  Actual signals: 8441
+  Actual WR: 55.8%
+
+  Monte Carlo runs: 10000
+  Runs with WR >= actual: 0
+  p-value: 0.0000
+  Result: SIGNIFICANT (threshold: p<0.05)

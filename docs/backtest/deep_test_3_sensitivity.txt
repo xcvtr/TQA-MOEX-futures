@@ -1,0 +1,48 @@
+
+=== Parameter Sensitivity: VWAP on GZ ===
+
+  Base params: WR=55.8% PF=1.14 n=8441
+
+  Parameter: dev_thresh
+    dev_thresh=1.6: WR=55.8% PF=1.16 n=13214 (Δ=+0.0%)
+    dev_thresh=1.8: WR=55.7% PF=1.13 n=10624 (Δ=-0.1%)
+    dev_thresh=2.0: WR=55.8% PF=1.14 n=8441 (Δ=+0.0%) (BASE)
+    dev_thresh=2.2: WR=55.5% PF=1.1 n=6681 (Δ=-0.3%)
+    dev_thresh=2.4: WR=55.5% PF=1.1 n=5372 (Δ=-0.3%)
+
+  Parameter: horizon
+    horizon=6: WR=55.6% PF=1.2 n=8441 (Δ=-0.2%)
+    horizon=9: WR=56.1% PF=1.15 n=8441 (Δ=+0.3%)
+    horizon=12: WR=55.8% PF=1.14 n=8441 (Δ=+0.0%) (BASE)
+    horizon=15: WR=55.3% PF=1.16 n=8441 (Δ=-0.5%)
+    horizon=18: WR=55.3% PF=1.13 n=8441 (Δ=-0.5%)
+
+  Parameter: vwap_window
+    vwap_window=10: WR=53.7% PF=1.04 n=4760 (Δ=-2.1%)
+    vwap_window=15: WR=55.2% PF=1.11 n=6469 (Δ=-0.6%)
+    vwap_window=20: WR=55.8% PF=1.14 n=8441 (Δ=+0.0%) (BASE)
+    vwap_window=30: WR=55.2% PF=1.1 n=12122 (Δ=-0.6%)
+    vwap_window=50: WR=54.3% PF=1.13 n=17854 (Δ=-1.5%)
+
+  Verdict: ROBUST (15/15 configs within 5% of base WR)
+
+
+=== Parameter Sensitivity: OB on SBERF ===
+
+  Base params: WR=0.0% PF=0.0 n=1
+
+  Parameter: body_mul
+    body_mul=1.2: WR=0.0% PF=0.0 n=1 (Δ=+0.0%)
+    body_mul=1.35: WR=0.0% PF=0.0 n=1 (Δ=+0.0%)
+    body_mul=1.5: WR=0.0% PF=0.0 n=1 (Δ=+0.0%) (BASE)
+    body_mul=1.65: WR=0.0% PF=0.0 n=1 (Δ=+0.0%)
+    body_mul=1.8: WR=0.0% PF=0.0 n=1 (Δ=+0.0%)
+
+  Parameter: horizon
+    horizon=2: WR=0.0% PF=0.0 n=1 (Δ=+0.0%)
+    horizon=3: WR=0.0% PF=0.0 n=1 (Δ=+0.0%)
+    horizon=4: WR=0.0% PF=0.0 n=1 (Δ=+0.0%) (BASE)
+    horizon=6: WR=0.0% PF=0.0 n=1 (Δ=+0.0%)
+    horizon=8: WR=0.0% PF=0.0 n=1 (Δ=+0.0%)
+
+  Verdict: ROBUST (10/10 configs within 5% of base WR)

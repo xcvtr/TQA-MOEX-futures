@@ -12,7 +12,7 @@ def compute_stats(signals):
 
     total_gain = sum(s['return_pct'] for s in won) if won else 0
     total_loss = abs(sum(s['return_pct'] for s in lost)) if lost else 0
-    pf = total_gain / total_loss if total_loss > 0 else (float('inf') if total_gain > 0 else 0)
+    pf = total_gain / total_loss if total_loss > 0 else (999.99 if total_gain > 0 else 0)
 
     eq = equity_curve(signals)
     dd = max_drawdown(eq)

@@ -116,6 +116,26 @@ tr:hover td { background: #0f346055; }
     <h3>📋 Сигналы (OOS)</h3>
     <div id="bt-signals"><p style="color:#888;font-size:13px">Нет данных</p></div>
   </div>
+  <!-- 🧪 Deep Testing Verdicts -->
+  <div class="card">
+    <h3>🧪 Глубокое тестирование — вердикт</h3>
+    <div id="deep-test-verdicts">
+      <table>
+        <tr><th>Стратегия</th><th>WR</th><th>Std</th><th>PF</th><th>Sig</th><th>Вердикт</th></tr>
+        <tr><td>VWAP</td><td>55.9%</td><td>±1.7%</td><td>1.18</td><td>✅</td><td style="color:#00c853;font-weight:700">ТОРГОВАТЬ</td></tr>
+        <tr><td>Reversion</td><td>63.2%</td><td>±10.9%</td><td>2.00</td><td>⚠️</td><td style="color:#ffc107;font-weight:700">УСЛОВНО</td></tr>
+        <tr><td>OI Divergence</td><td>54.2%</td><td>±8.2%</td><td>1.13</td><td>⚠️</td><td style="color:#ffc107;font-weight:700">УСЛОВНО</td></tr>
+        <tr><td>VS (Volume Surge)</td><td>48.9%</td><td>±36%</td><td>0.75</td><td>❌</td><td style="color:#ff5252;font-weight:700">НЕ ТОРГОВАТЬ</td></tr>
+        <tr><td>OB (Order Block)</td><td>—</td><td>—</td><td>—</td><td>❌</td><td style="color:#ff5252;font-weight:700">НЕТ СИГНАЛОВ</td></tr>
+        <tr><td>OTC</td><td>~45%</td><td>±2.7%</td><td>0.87</td><td>❌</td><td style="color:#ff5252;font-weight:700">НЕ ТОРГОВАТЬ</td></tr>
+        <tr><td>Retail Trap</td><td>~49%</td><td>±2.3%</td><td>1.01</td><td>❌</td><td style="color:#ff5252;font-weight:700">НЕ ТОРГОВАТЬ</td></tr>
+      </table>
+      <p style="font-size:11px;color:#888;margin-top:8px">
+        Walk-Forward 4 фолда · Monte Carlo p=0.0000 · Sensitivity 15/15 · Cross-Check 0 ошибок
+        · <a href="/api/deep-test-summary" target="_blank" style="color:#e94560">Полный отчёт</a>
+      </p>
+    </div>
+  </div>
 </section>
 
 <!-- ═══ Portfolio ═══ -->

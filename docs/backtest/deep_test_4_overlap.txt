@@ -1,0 +1,21 @@
+=== SIGNAL OVERLAP ANALYSIS ===
+
+
+Mean Reversion vs VWAP: no shared tickers
+
+Order Block vs VWAP: no shared tickers
+
+Order Block vs Retail Trap on BR:
+    Signals A=1 B=13797 overlapping=0 ratio=0.0%
+
+Mean Reversion vs Order Block: no shared tickers
+
+OTC vs Retail Trap on CNYRUBF:
+    Signals A=11266 B=12674 overlapping=4555 ratio=40.4%
+
+OI Divergence vs Order Block on BR:
+    Signals A=247 B=1 overlapping=0 ratio=0.0%
+
+OI Divergence vs Volume Surge on BM:
+    Signals A=470 B=99 overlapping=1 ratio=1.0%
+
