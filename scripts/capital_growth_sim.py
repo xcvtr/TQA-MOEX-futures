@@ -130,7 +130,7 @@ def collect_all_signals() -> List[Dict]:
             if not rows:
                 print(f"    ⚠ Нет данных для {ticker}")
                 continue
-            sigs = detect_order_block_signals(ticker, rows, DEFAULT_OB_CONFIG)
+            sigs = detect_order_block_signals(ticker, rows, {**DEFAULT_OB_CONFIG, **cfg, 'max_signal_age': 999999})
             for s in sigs:
                 if 'strategy' not in s:
                     s['strategy'] = 'order_block'
@@ -165,27 +165,9 @@ def collect_all_signals() -> List[Dict]:
             errors.append(msg)
             print(f"    ⚠ {msg}")
 
-    # --- 4. VWAP Deviation ---
-    for ticker, cfg in VWAP_TICKERS.items():
-        if not cfg.get('enabled', True):
-            continue
-        print(f"  [VWAP] Загрузка {ticker}...")
-        try:
-            rows = vwap_load(ticker, HISTORY_DAYS)
-            if not rows:
-                print(f"    ⚠ Нет данных для {ticker}")
-                continue
-            sigs = detect_vwap_signals_limit(ticker, rows, DEFAULT_VWAP_CONFIG)
-            for s in sigs:
-                if 'strategy' not in s or s['strategy'] == 'vwap':
-                    s['strategy'] = 'vwap_deviation'
-                s['ticker'] = ticker
-            all_signals.extend(sigs)
-            print(f"    → {len(sigs)} сигналов")
-        except Exception as e:
-            msg = f"VWAP {ticker}: {e}"
-            errors.append(msg)
-            print(f"    ⚠ {msg}")
+    # --- VWAP Deviation — excluded (97% signal flood, breaks walk-forward)
+    print("  [VWAP] SKIPPED — produces 97% of signals, rare tail events dominate")
+    _ = VWAP_TICKERS  # keep import reference
 
     # --- 5. OI Divergence ---
     for ticker, cfg in OI_DIVERGENCE_TICKERS.items():
@@ -302,19 +284,16 @@ def simulate(
                 'direction': pos['direction'],
                 'contracts': pos['contracts'],
                 'entry_price': pos['entry_price'],
-                'exit_price': pos['exit_price'],
-                'strategy': pos.get('strategy', ''),
-                'locked_go': pos['locked_go'],
             })
 
-        # ── Drawdown limit check ──
-        dd = (peak - capital) / peak if peak > 0 else 0
-        if dd > max_dd_limit:
-            continue  # stop opening new positions
-
-        # ── Concurrent positions limit ──
+        # ── Проверка лимита concurrent ──
         if len(active) >= max_concurrent:
             continue
+
+        # ── Drawdown limit check — hard stop ──
+        dd = (peak - capital) / peak if peak > 0 else 0
+        if dd > max_dd_limit:
+            break  # stop trading, preserve remaining capital
 
         # ── Get ticker config ──
         try:
@@ -451,22 +430,22 @@ def split_folds(signals: List[Dict]) -> List[Dict]:
 
 
 def score_func(final_capital: float, equity: List[float], initial_capital: float) -> float:
-    """Награда за рост со штрафом за просадку."""
+    """Calmar ratio: return / max_drawdown. Штрафует за просадку сильнее."""
     mdd = max_drawdown(equity)
     ret = (final_capital - initial_capital) / initial_capital
-    if ret <= 0:
-        return ret
-    return ret * (1 - mdd / 2)
+    if ret <= 0 or mdd <= 0.001:
+        return ret  # отрицательный ≈ 0 return — плохо
+    return ret / mdd  # Calmar ratio — сколько % роста на 1% просадки
 
 
 def grid_search(signals: List[Dict], initial_capital: float) -> Dict:
     """Grid search по параметрам риск-менеджмента."""
     param_grid = {
-        'margin_usage': [0.05, 0.1, 0.15, 0.2, 0.25, 0.3],
+        'margin_usage': [0.03, 0.05, 0.08, 0.1, 0.12, 0.15],
         'max_concurrent': [1, 2, 3],
-        'max_dd_limit': [0.15, 0.20, 0.25, 0.30],
+        'max_dd_limit': [0.15, 0.20, 0.25],
     }
-    # 6 × 3 × 4 = 72 комбинации (убрал агрессивные 0.4, 0.5)
+    # 6 × 3 × 3 = 54 комбинации
 
     best_score = -float('inf')
     best_params = None
