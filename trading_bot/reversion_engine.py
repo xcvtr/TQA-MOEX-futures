@@ -208,3 +208,119 @@ def detect_mean_reversion_signals(
         })
 
     return signals
+
+
+def detect_mean_reversion_signals_limit(
+    symbol: str,
+    rows: List[Tuple[str, float, float, float, float, float]],
+    config: dict,
+) -> List[Dict[str, object]]:
+    """
+    Limit-order variant of Mean Reversion.
+
+    LONG: limit_price = low[i], fill when low[j] <= limit_price
+    SHORT: limit_price = high[i], fill when high[j] >= limit_price
+    Search fill within limit_lookback bars after trigger.
+    """
+    mid_low = config.get('mid_low', 0.3)
+    mid_high = config.get('mid_high', 0.7)
+    horizon = config.get('horizon', 12)
+    vol_thresh = config.get('vol_thresh', 1.5)
+    range_mul = config.get('range_mul', 1.5)
+    lookback = config.get('lookback_bars', 3)
+    limit_lookback = config.get('limit_lookback', 5)
+
+    n = len(rows)
+    if n < 50:
+        return []
+
+    times = [r[0] for r in rows]
+    opens = [r[1] for r in rows]
+    highs = [r[2] for r in rows]
+    lows = [r[3] for r in rows]
+    closes = [r[4] for r in rows]
+    volumes = [r[5] for r in rows]
+
+    rng = [highs[i] - lows[i] for i in range(n)]
+    wz = _zs(volumes, 20)
+    pos = [(closes[i] - lows[i]) / max(rng[i], 0.001) for i in range(n)]
+    mr = _rolling_median(rng, 50)
+
+    signals: List[Dict[str, object]] = []
+    min_idx = 25
+
+    for i in range(min_idx, n):
+        if i + 1 >= n:
+            break
+        if i + horizon >= n:
+            continue
+
+        if wz[i] < vol_thresh:
+            continue
+        if rng[i] < mr[i] * range_mul:
+            continue
+        if pos[i] < mid_low or pos[i] > mid_high:
+            continue
+        if i < lookback:
+            continue
+
+        prior_closes = closes[i - lookback:i]
+        prior_opens = opens[i - lookback:i]
+        prior_cc = [prior_closes[j] - prior_opens[j] for j in range(lookback)]
+
+        all_up = all(pc > 0 for pc in prior_cc)
+        all_down = all(pc < 0 for pc in prior_cc)
+
+        if not all_up and not all_down:
+            continue
+
+        direction = 'SHORT' if all_up else 'LONG'
+
+        if direction == 'LONG':
+            limit_price = lows[i]
+        else:
+            limit_price = highs[i]
+
+        fill_bar = None
+        max_j = min(i + 1 + limit_lookback, n)
+        for j in range(i + 1, max_j):
+            if direction == 'LONG' and lows[j] <= limit_price:
+                fill_bar = j
+                break
+            elif direction == 'SHORT' and highs[j] >= limit_price:
+                fill_bar = j
+                break
+
+        if fill_bar is None:
+            continue
+
+        ex = fill_bar + horizon
+        if ex >= n:
+            continue
+
+        entry = limit_price
+        if entry <= 0:
+            continue
+
+        exit_price = closes[ex]
+
+        if direction == 'LONG':
+            return_pct = (exit_price - entry) / entry * 100.0
+        else:
+            return_pct = (entry - exit_price) / entry * 100.0
+
+        signals.append({
+            'ticker': symbol,
+            'direction': direction,
+            'entry': round(entry, 4),
+            'exit': round(exit_price, 4),
+            'time': times[i],
+            'vol_z': round(wz[i], 4),
+            'return_pct': round(return_pct, 4),
+            'strategy': 'reversion',
+            'idx': i,
+            'fill_bar': fill_bar,
+            'limit_price': round(limit_price, 4),
+        })
+
+    return signals

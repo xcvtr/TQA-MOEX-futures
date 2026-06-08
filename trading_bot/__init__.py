@@ -24,6 +24,7 @@ DEFAULT_CONFIG: StrategyConfig = {
     'horizon': 6,
     'strategy': 'vol_surge',
     'yur_dom_ratio': 1.5,
+    'limit_lookback': 5,
 }
 
 
@@ -39,6 +40,7 @@ DEFAULT_REVERSION_CONFIG = {
     'vol_thresh': 1.5,
     'range_mul': 1.5,
     'lookback_bars': 3,
+    'limit_lookback': 5,
 }
 
 REVERSION_TICKERS: dict = {
@@ -98,6 +100,7 @@ DEFAULT_VWAP_CONFIG = {
     'horizon': 12,
     'vwap_window': 20,
     'atr_period': 14,
+    'limit_lookback': 5,
 }
 
 VWAP_TICKERS: dict = {
@@ -120,6 +123,7 @@ DEFAULT_OI_DIVERGENCE_CONFIG = {
     'bear_threshold': 0.95,
     'bull_threshold': 1.05,
     'horizon': 6,
+    'limit_lookback': 5,
 }
 
 OI_DIVERGENCE_TICKERS: dict = {

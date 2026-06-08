@@ -63,7 +63,9 @@ def load_data(symbol: str, days: int = 30) -> List[Row]:
             oi.yur_sell,
             p.close,
             p.volume,
-            p.open
+            p.open,
+            p.high,
+            p.low
         FROM moex_prices_5m_oi oi
         JOIN moex_prices_5m p
             ON p.symbol = oi.symbol AND p.time = oi.time
@@ -87,6 +89,8 @@ def load_data(symbol: str, days: int = 30) -> List[Row]:
                     float(rec[5]),   # close
                     float(rec[6]),   # volume
                     float(rec[7]),   # open
+                    float(rec[8]),   # high
+                    float(rec[9]),   # low
                 ))
     finally:
         conn.close()

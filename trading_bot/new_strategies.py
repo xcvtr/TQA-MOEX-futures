@@ -441,6 +441,111 @@ def detect_oi_divergence_signals(merged, config=None):
     return signals
 
 
+def detect_oi_divergence_signals_limit(merged, config=None):
+    """
+    Limit-order variant of OI Divergence.
+
+    LONG: limit_price = low[i], fill when low[j] <= limit_price
+    SHORT: limit_price = high[i], fill when high[j] >= limit_price
+    Search fill within limit_lookback bars after trigger.
+    """
+    default = {'lookback': 20, 'horizon': 6, 'extreme_window': 10,
+               'bear_threshold': 0.95, 'bull_threshold': 1.05,
+               'limit_lookback': 5}
+    config = {**default, **(config or {})}
+
+    n = len(merged)
+    if n < 50:
+        return []
+    if n < config['lookback'] + config['extreme_window'] + 5:
+        return []
+
+    closes = [r['close'] for r in merged]
+    oi_vals = [r['total_oi'] for r in merged]
+    highs = [r['high'] for r in merged]
+    lows = [r['low'] for r in merged]
+    lookback = config['lookback']
+    ext_w = config['extreme_window']
+    horizon = config['horizon']
+    bear_th = config['bear_threshold']
+    bull_th = config['bull_threshold']
+    limit_lookback = config['limit_lookback']
+
+    signals = []
+    min_idx = lookback + 5
+
+    for i in range(min_idx, n):
+        if i + 1 >= n:
+            break
+        if i + horizon >= n:
+            continue
+
+        search_start = max(0, i - lookback)
+        search_end = max(search_start + 1, i - ext_w)
+        if search_end <= search_start:
+            continue
+
+        max_idx = search_start
+        min_idx_val = search_start
+        for j in range(search_start, search_end):
+            if closes[j] > closes[max_idx]:
+                max_idx = j
+            if closes[j] < closes[min_idx_val]:
+                min_idx_val = j
+
+        direction = None
+        if closes[i] > closes[max_idx] and oi_vals[i] < oi_vals[max_idx] * bear_th:
+            direction = 'SHORT'
+        elif closes[i] < closes[min_idx_val] and oi_vals[i] > oi_vals[min_idx_val] * bull_th:
+            direction = 'LONG'
+
+        if direction is None:
+            continue
+
+        if direction == 'LONG':
+            limit_price = lows[i]
+        else:
+            limit_price = highs[i]
+
+        fill_bar = None
+        max_j = min(i + 1 + limit_lookback, n)
+        for j in range(i + 1, max_j):
+            if direction == 'LONG' and lows[j] <= limit_price:
+                fill_bar = j
+                break
+            elif direction == 'SHORT' and highs[j] >= limit_price:
+                fill_bar = j
+                break
+
+        if fill_bar is None:
+            continue
+
+        ex = fill_bar + horizon
+        if ex >= n:
+            continue
+
+        entry = limit_price
+        if entry <= 0:
+            continue
+
+        exit_price = merged[ex]['close']
+
+        if direction == 'LONG':
+            ret = (exit_price - entry) / entry * 100
+        else:
+            ret = (entry - exit_price) / entry * 100
+
+        signals.append({
+            'ticker': merged[0].get('symbol', '?'), 'direction': direction,
+            'entry': round(entry, 4), 'exit': round(exit_price, 4),
+            'time': merged[i]['time'], 'return_pct': round(ret, 4),
+            'strategy': 'oi_divergence', 'idx': i,
+            'fill_bar': fill_bar, 'limit_price': round(limit_price, 4),
+        })
+
+    return signals
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # Backtest Harness
 # ═════════════════════════════════════════════════════════════════════════════

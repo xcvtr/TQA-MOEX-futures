@@ -47,10 +47,10 @@ def zs(vals: List[float], w: int = 20) -> List[float]:
 # ── signal detection ─────────────────────────────────────────────────────────
 
 
-Row = Tuple[str, float, float, float, float, float, float, float]
+Row = Tuple[str, float, float, float, float, float, float, float, float, float]
 """
 Формат строки данных:
-    (time, fiz_buy, fiz_sell, yur_buy, yur_sell, close, volume, open)
+    (time, fiz_buy, fiz_sell, yur_buy, yur_sell, close, volume, open, high, low)
 """
 
 Signal = Dict[str, object]
@@ -59,13 +59,16 @@ Signal = Dict[str, object]
     {
         'time':       str,    # время свечи-триггера
         'direction':  str,    # 'LONG' | 'SHORT'
-        'entry':      float,  # цена входа (open[i+1])
+        'entry':      float,  # цена входа
         'exit':       float,  # цена выхода (close[i+horizon])
         'return_pct': float,  # доходность в процентах
         'vol_z':      float,  # z-score объёма в момент сигнала
         'yur_z':      float,  # z-score активности юрлиц
         'fiz_z':      float,  # z-score активности физлиц
         'idx':        int,    # индекс сигнала в исходном массиве rows
+        # limit-специфичные:
+        'fill_bar':   int,    # индекс бара, на котором заполнился лимитник
+        'limit_price': float, # цена лимитного ордера
     }
 """
 
@@ -185,6 +188,108 @@ def detect_signals(
             'yur_z':      round(yur_z[i], 4),
             'fiz_z':      round(fiz_z[i], 4),
             'idx':        i,
+        })
+
+    return signals
+
+
+def detect_signals_limit(
+    rows: List[Row],
+    config: Optional[StrategyConfig] = None,
+) -> List[Signal]:
+    """
+    Limit-order variant of detect_signals.
+
+    LONG: limit_price = low[i], fill when low[j] <= limit_price
+    SHORT: limit_price = high[i], fill when high[j] >= limit_price
+    Search fill within limit_lookback bars after trigger.
+    """
+    if config is None:
+        from . import DEFAULT_CONFIG
+        cfg = dict(DEFAULT_CONFIG)
+    else:
+        cfg = dict(config)
+
+    strategy   = cfg.get('strategy', 'vol_surge')
+    vol_thresh = cfg.get('vol_thresh', 2.0)
+    div_thresh = cfg.get('div_thresh', 1.5)
+    horizon    = cfg.get('horizon', 6)
+    yur_dom_ratio = cfg.get('yur_dom_ratio', 1.5)
+    limit_lookback = cfg.get('limit_lookback', 5)
+
+    w = 20
+    vol_z, fiz_z, yur_z, fiz_vol, yur_vol = _compute_z_scores(rows, w)
+
+    n = len(rows)
+    signals: List[Signal] = []
+
+    for i in range(w, n):
+        if i + 1 >= n:
+            break
+        if i + horizon >= n:
+            continue
+
+        if strategy == 'vol_surge':
+            if vol_z[i] < vol_thresh:
+                continue
+            if abs(fiz_z[i]) < div_thresh or abs(yur_z[i]) < div_thresh:
+                continue
+            if fiz_z[i] * yur_z[i] >= 0:
+                continue
+        elif strategy == 'yur_dom':
+            if vol_z[i] < vol_thresh:
+                continue
+            if abs(yur_z[i]) < 1.0:
+                continue
+            if yur_vol[i] <= fiz_vol[i] * yur_dom_ratio:
+                continue
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+
+        direction = 'LONG' if yur_z[i] > 0 else 'SHORT'
+
+        if direction == 'LONG':
+            limit_price = rows[i][9]  # low[i]
+        else:
+            limit_price = rows[i][8]  # high[i]
+
+        fill_bar = None
+        max_j = min(i + 1 + limit_lookback, n)
+        for j in range(i + 1, max_j):
+            if direction == 'LONG' and rows[j][9] <= limit_price:
+                fill_bar = j
+                break
+            elif direction == 'SHORT' and rows[j][8] >= limit_price:
+                fill_bar = j
+                break
+
+        if fill_bar is None:
+            continue
+
+        ex = fill_bar + horizon
+        if ex >= n:
+            continue
+
+        entry = limit_price
+        exit_ = rows[ex][5]
+
+        if direction == 'LONG':
+            return_pct = (exit_ - entry) / entry * 100.0
+        else:
+            return_pct = (entry - exit_) / entry * 100.0
+
+        signals.append({
+            'time':       rows[i][0],
+            'direction':  direction,
+            'entry':      entry,
+            'exit':       exit_,
+            'return_pct': round(return_pct, 4),
+            'vol_z':      round(vol_z[i], 4),
+            'yur_z':      round(yur_z[i], 4),
+            'fiz_z':      round(fiz_z[i], 4),
+            'idx':        i,
+            'fill_bar':   fill_bar,
+            'limit_price': limit_price,
         })
 
     return signals

@@ -184,3 +184,103 @@ def detect_vwap_signals(
         })
 
     return signals
+
+
+def detect_vwap_signals_limit(
+    symbol: str,
+    rows: List[Dict],
+    config: dict,
+) -> List[Dict]:
+    """
+    Limit-order variant of VWAP Deviation Reversion.
+
+    LONG: limit_price = low[i], fill when low[j] <= limit_price
+    SHORT: limit_price = high[i], fill when high[j] >= limit_price
+    Search fill within limit_lookback bars after trigger.
+    """
+    dev_thresh = config.get('dev_thresh', 2.0)
+    horizon = config.get('horizon', 12)
+    vwap_w = config.get('vwap_window', 20)
+    atr_p = config.get('atr_period', 14)
+    limit_lookback = config.get('limit_lookback', 5)
+
+    n = len(rows)
+    if n < max(vwap_w, atr_p) + 10:
+        return []
+
+    closes = [r['close'] for r in rows]
+    volumes = [r['volume'] for r in rows]
+    highs = [r['high'] for r in rows]
+    lows = [r['low'] for r in rows]
+
+    vwap = _calc_vwap(closes, volumes, vwap_w)
+    atr = _calc_atr(highs, lows, closes, atr_p)
+
+    signals: List[Dict] = []
+    min_idx = max(vwap_w, atr_p) + 5
+
+    for i in range(min_idx, n):
+        if i + 1 >= n:
+            break
+        if i + horizon >= n:
+            continue
+        if atr[i] <= 0:
+            continue
+
+        dev = (closes[i] - vwap[i]) / atr[i]
+
+        if dev > dev_thresh:
+            direction = 'SHORT'
+        elif dev < -dev_thresh:
+            direction = 'LONG'
+        else:
+            continue
+
+        if direction == 'LONG':
+            limit_price = lows[i]
+        else:
+            limit_price = highs[i]
+
+        fill_bar = None
+        max_j = min(i + 1 + limit_lookback, n)
+        for j in range(i + 1, max_j):
+            if direction == 'LONG' and lows[j] <= limit_price:
+                fill_bar = j
+                break
+            elif direction == 'SHORT' and highs[j] >= limit_price:
+                fill_bar = j
+                break
+
+        if fill_bar is None:
+            continue
+
+        ex = fill_bar + horizon
+        if ex >= n:
+            continue
+
+        entry = limit_price
+        if entry <= 0:
+            continue
+
+        exit_price = rows[ex]['close']
+
+        if direction == 'LONG':
+            return_pct = (exit_price - entry) / entry * 100.0
+        else:
+            return_pct = (entry - exit_price) / entry * 100.0
+
+        signals.append({
+            'ticker': symbol,
+            'direction': direction,
+            'entry': round(entry, 4),
+            'exit': round(exit_price, 4),
+            'time': rows[i]['time'],
+            'return_pct': round(return_pct, 4),
+            'strategy': 'vwap',
+            'idx': i,
+            'deviation': round(dev, 4),
+            'fill_bar': fill_bar,
+            'limit_price': round(limit_price, 4),
+        })
+
+    return signals
