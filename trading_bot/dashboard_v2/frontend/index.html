@@ -340,16 +340,33 @@ function populateBacktestStrategies() {
 }
 
 function updateBTTickers() {
-  const stratName = document.getElementById('bt-strategy').value;
-  const strat = allStrategies.find(s => s.name === stratName);
-  const sel = document.getElementById('bt-ticker');
-  sel.innerHTML = '';
-  if (!strat) return;
-  Object.keys(strat.tickers || {}).forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t;
-    opt.textContent = (strat.tickers[t]?.label || t) + ' (' + t + ')';
-    sel.appendChild(opt);
+  // Show ALL available tickers, not just strategy-configured ones
+  fetch('/api/tickers').then(r => r.json()).then(d => {
+    const stratName = document.getElementById('bt-strategy').value;
+    const sel = document.getElementById('bt-ticker');
+    sel.innerHTML = '';
+    const strat = allStrategies.find(s => s.name === stratName);
+    (d.tickers || []).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      // If strategy has a label for this ticker, show it
+      const label = strat?.tickers?.[t]?.label || t;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    });
+  }).catch(() => {
+    // Fallback: show strategy tickers only
+    const stratName = document.getElementById('bt-strategy').value;
+    const strat = allStrategies.find(s => s.name === stratName);
+    const sel = document.getElementById('bt-ticker');
+    sel.innerHTML = '';
+    if (!strat) return;
+    Object.keys(strat.tickers || {}).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = strat.tickers[t]?.label || t;
+      sel.appendChild(opt);
+    });
   });
 }
 

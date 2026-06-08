@@ -38,6 +38,14 @@ async def api_markets():
     return {'markets': result}
 
 
+@router.get('/api/tickers')
+async def api_tickers():
+    """Все тикеры из БД (по свежести данных)."""
+    freshness = get_freshness()
+    tickers = sorted(freshness.keys())
+    return {'tickers': tickers, 'count': len(tickers)}
+
+
 @router.get('/api/bars')
 async def api_bars(
     symbol: str = Query(..., description='Тикер'),
