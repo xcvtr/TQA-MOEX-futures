@@ -45,7 +45,7 @@ DEFAULT_REVERSION_CONFIG = {
 
 REVERSION_TICKERS: dict = {
     'NM': {'enabled': True, 'go': 1405, 'tick_rub': 1.0, 'minstep': 1, 'label': 'NM (фьючерс Reversion)', 'max_loss': -5.0},
-    'AF': {'enabled': True, 'go': 7000, 'tick_rub': 0.74, 'minstep': 1, 'label': 'AF (Africa Reversion)', 'max_loss': -5.0},
+    'AF': {'enabled': True, 'go': 7000, 'tick_rub': 0.74, 'minstep': 1, 'label': 'AF (Africa Reversion 15m)', 'horizon': 12, 'max_loss': -5.0, 'tf': '15m'},
 }
 
 # ─── Order Blocks (Variant D — Limit at OB Level) ──────────────────────────

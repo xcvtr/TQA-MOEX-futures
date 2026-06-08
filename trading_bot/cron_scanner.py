@@ -96,9 +96,25 @@ def main() -> str:
         rev_cfg = {**DEFAULT_REVERSION_CONFIG, **cfg}
         try:
             price_rows = load_price_data(sym, days=730)
-            if price_rows and len(price_rows) >= 50:
-                sigs = detect_mean_reversion_signals_limit(sym, price_rows, rev_cfg)
-                rev_signals.extend(sigs)
+            if not price_rows or len(price_rows) < 50:
+                continue
+            
+            # Per-ticker TF resampling
+            ticker_tf = cfg.get('tf', '5m')
+            if ticker_tf != '5m':
+                df = pd.DataFrame(price_rows, columns=['time','open','high','low','close','volume'])
+                df['time'] = pd.to_datetime(df['time'])
+                df.set_index('time', inplace=True)
+                rule_map = {'15m': '15min', '30m': '30min', 'H1': '1h'}
+                rule = rule_map.get(ticker_tf, ticker_tf)
+                df = df.resample(rule).agg({
+                    'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum',
+                }).dropna()
+                price_rows = [(idx.isoformat(), r['open'], r['high'], r['low'], r['close'], r['volume'])
+                              for idx, r in df.iterrows()]
+            
+            sigs = detect_mean_reversion_signals_limit(sym, price_rows, rev_cfg)
+            rev_signals.extend(sigs)
         except Exception as e:
             alerts.append(f"[WARN] Reversion scan {sym} error: {e}")
 
