@@ -84,15 +84,17 @@ VWAP_TICKERS: dict = {
 
 # ─── OI Divergence ──────────────────────────────────────────────────────────
 DEFAULT_OI_DIVERGENCE_CONFIG = {
-    'oi_z_thresh': 0.5,
-    'price_z_thresh': 0.5,
+    'lookback': 20,
+    'extreme_window': 10,
+    'bear_threshold': 0.95,
+    'bull_threshold': 1.05,
     'horizon': 6,
 }
 
 OI_DIVERGENCE_TICKERS: dict = {
-    'RI': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'RI (RTS OI Div)', 'max_loss': -5.0},
-    'GL': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'GL (GOLD OI Div)', 'max_loss': -5.0},
-    'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'Si (USD/RUB OI Div)', 'max_loss': -5.0},
+    'RI': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'RI (RTS OI Div)', 'horizon': 6, 'max_loss': -5.0},
+    'GL': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'GL (GOLD OI Div)', 'horizon': 6, 'max_loss': -5.0},
+    'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'Si (USD/RUB OI Div)', 'horizon': 6, 'max_loss': -5.0},
 }
 
 DB_CREDENTIALS = {
