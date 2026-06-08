@@ -46,19 +46,50 @@ REVERSION_TICKERS: dict = {
     'AF': {'enabled': True, 'go': 7000, 'tick_rub': 0.74, 'minstep': 1, 'label': 'AF (Africa Reversion)', 'max_loss': -5.0},
 }
 
-# ─── Order Blocks (ICT Smart Money) ─────────────────────────────────────────
+# ─── Order Blocks (Variant D — Limit at OB Level) ──────────────────────────
 DEFAULT_OB_CONFIG = {
     'body_mul': 1.5,
     'range_mul': 1.2,
-    'horizon': 4,
+    'horizon': 2,
     'lookback': 20,
-    'min_history': 50,
-    'max_lookback_bars': 5,
+    'limit_lookback': 5,
+    'max_signal_age': 6,
+    'min_history': 100,
 }
 
 OB_TICKERS: dict = {
-    'SBERF': {'enabled': True, 'go': 6620, 'tick_rub': 1.0, 'minstep': 1, 'label': 'SBERF (Сбер OB)', 'max_loss': -5.0},
-    'BR': {'enabled': True, 'go': 17228, 'tick_rub': 7.43, 'minstep': 1, 'label': 'BR (Brent OB)', 'max_loss': -5.0},
+    # Core portfolio (DD <5%)
+    'UC': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'UC (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+    'ED': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'ED (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+    'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'Si (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+    'RM': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'RM (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+    'KC': {'enabled': True, 'go': 2500, 'tick_rub': 80.0, 'minstep': 0.01,
+           'label': 'KC (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+    'NA': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'NA (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+    'GD': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'GD (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+    # Expansion tier (DD 5-10%, half weight)
+    'RI': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 1,
+           'label': 'RI (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
+    'LK': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'LK (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
+    'SBERF': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 1,
+              'label': 'SBERF (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
+    'GK': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'GK (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
+    'MC': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'MC (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
+    'RN': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'RN (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
+    'IMOEXF': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
+               'label': 'IMOEXF (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
+    'YD': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
+           'label': 'YD (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
 }
 
 # ─── VWAP Deviation Reversion ──────────────────────────────────────────────

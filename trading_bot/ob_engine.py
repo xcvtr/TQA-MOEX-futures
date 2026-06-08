@@ -1,66 +1,44 @@
 """
-Order Block Engine — ICT Smart Money Order Blocks на MOEX 5m.
+Order Block Engine — Variant D (Limit at OB Level).
 
-Суть:
-  1. Находим бар с сильным импульсом (displacement): body > 1.5× медиана тела за 20 баров
-  2. Order Block = свеча НЕПОСРЕДСТВЕННО перед displacement — зона институциональных заявок
-  3. Вход: на открытии displacement-бара в сторону импульса
-  4. Выход: через horizon баров
+Логика (ICT Smart Money с лимитными ордерами):
+  1. Загружаем 5m данные, ресемплим до H1
+  2. Находим displacement: body > 1.5× медиана тела за 20 баров И range > 1.2× медиана range
+  3. Order Block = свеча ПЕРЕД displacement
+  4. Лимитный ордер на уровне OB:
+     - LONG: limit BUY на low[ob_idx]
+     - SHORT: limit SELL на high[ob_idx]
+  5. Ждём до limit_lookback=5 баров H1 для исполнения
+  6. Если заполнился: entry = уровень OB, exit = close[fill_bar + horizon]
+  7. Возвращаем только свежие сигналы (последние limit_lookback + 1 баров)
 
-Почему работает (149K сигналов, WR 62-71%, PF 1.9):
-  - На 5m Мосбирзы часты микродвижения с последующим откатом
-  - Order Block = зона консолидации перед импульсом = лимитные заявки розницы
-  - Институционалы ломают их и двигают цену дальше
-
-Лучшие тикеры (из backtest checkpoint 007):
-  - SBERF: LONG h=4 (70% WR, PF 4.27, DD 2%) / SHORT h=4 (71% WR, PF 3.60, DD 2.6%)
-  - BR: LONG h=4 (72% WR, PF 2.06) / SHORT h=4 (72% WR, PF 2.38)
-  - NM: LONG h=4 (67% WR, PF 2.16) / SHORT h=4 (67% WR, PF 1.41)
-  - AF: LONG h=4 (67% WR, PF 2.17) / SHORT h=4 (68% WR, PF 1.71)
+Параметры:
+  body_mul=1.5, range_mul=1.2, lookback=20
+  horizon=2, limit_lookback=5, max_signal_age=6
 """
+
+import pandas as pd
+import numpy as np
 from typing import List, Dict, Tuple
+from datetime import datetime, timedelta, timezone
 
 
-# ── helpers ──────────────────────────────────────────────────────────────
+def _rolling_median(arr, w=20):
+    """Fast rolling median over PREVIOUS w values. No look-ahead."""
+    s = pd.Series(arr)
+    out = s.rolling(window=w, min_periods=1).median().shift(1)
+    out[:1] = arr[0]
+    return out.ffill().fillna(arr[0]).values
 
 
-def _rolling_median(arr: List[float], w: int = 20) -> List[float]:
-    """Rolling median of PREVIOUS w values. NO look-ahead."""
-    out: List[float] = [0.0] * len(arr)
-    for i in range(len(arr)):
-        if i == 0:
-            win = [arr[0]]
-        elif i < w:
-            win = arr[:i]
-        else:
-            win = arr[i - w:i]
-        if not win:
-            win = [arr[0]]
-        sorted_win = sorted(win)
-        mid = len(sorted_win) // 2
-        if len(sorted_win) % 2 == 0:
-            out[i] = (sorted_win[mid - 1] + sorted_win[mid]) / 2.0
-        else:
-            out[i] = float(sorted_win[mid])
-    return out
-
-
-# ── data loading ────────────────────────────────────────────────────────
-
-
-def load_price_data(symbol: str, days: int = 7) -> List[Tuple[str, float, float, float, float, float]]:
-    """
-    Load raw OHLCV 5m price data from DB.
-
-    Returns list of (time, open, high, low, close, volume), ordered by time asc.
-    """
+def load_price_data(symbol: str, days: int = 30) -> List[Tuple]:
+    """Load 5m OHLCV from DB."""
     import psycopg2
-    from . import DB_CREDENTIALS
-    from datetime import datetime, timedelta, timezone
 
+    DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    rows: List[Tuple[str, float, float, float, float, float]] = []
-    conn = psycopg2.connect(**DB_CREDENTIALS)
+    rows = []
+    conn = psycopg2.connect(**DB)
     try:
         cur = conn.cursor()
         cur.execute("""
@@ -71,154 +49,139 @@ def load_price_data(symbol: str, days: int = 7) -> List[Tuple[str, float, float,
         """, (symbol, since))
         for rec in cur:
             time_str = rec[0].isoformat() if hasattr(rec[0], 'isoformat') else str(rec[0])
-            rows.append((
-                time_str,
-                float(rec[1]),  # open
-                float(rec[2]),  # high
-                float(rec[3]),  # low
-                float(rec[4]),  # close
-                float(rec[5]),  # volume
-            ))
+            rows.append((time_str, float(rec[1]), float(rec[2]), float(rec[3]), float(rec[4]), float(rec[5])))
         cur.close()
     finally:
         conn.close()
     return rows
 
 
-# ── signal detection ────────────────────────────────────────────────────
-
-
-DEFAULT_OB_CONFIG = {
-    'body_mul': 1.5,       # displacement: body > body_mul × median body
-    'range_mul': 1.2,      # displacement: range > range_mul × median range (доп. фильтр)
-    'horizon': 4,           # выход через N баров (5m бара = 20 мин)
-    'lookback': 20,         # окно для rolling median
-    'min_history': 50,      # минимальное число баров для анализа
-    'max_lookback_bars': 5, # ищем displacement только в последних N барах (свежесть)
-}
+def resample_h1(rows: List[Tuple]) -> pd.DataFrame:
+    """Resample 5m data to H1 OHLCV."""
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
+    df['time'] = pd.to_datetime(df['time'])
+    df.set_index('time', inplace=True)
+    resampled = df.resample('1h').agg({
+        'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum',
+    })
+    resampled.dropna(inplace=True)
+    return resampled
 
 
 def detect_order_block_signals(
     symbol: str,
-    rows: List[Tuple[str, float, float, float, float, float]],
+    rows: List[Tuple],
     config: dict,
-) -> List[Dict[str, object]]:
+) -> List[Dict]:
     """
-    Detect Order Block signals.
+    Detect Order Block signals (Variant D — Limit at OB Level).
 
     Parameters
     ----------
     symbol : str
         Ticker code.
-    rows : List[Tuple[str, float, float, float, float, float]]
-        List of (time, open, high, low, close, volume) tuples, ordered by time asc.
+    rows : List[Tuple]
+        5m OHLCV: (time, open, high, low, close, volume), asc.
     config : dict
-        Configuration:
-            body_mul        — displacement multiplier vs median body (default 1.5)
-            range_mul       — displacement range multiplier vs median range (default 1.2)
-            horizon         — exit horizon in bars (default 4)
-            lookback        — rolling median window (default 20)
-            min_history     — minimum bars needed (default 50)
-            max_lookback_bars — search displacement in last N bars (default 5)
+        body_mul, range_mul, lookback, horizon, limit_lookback, max_signal_age
 
     Returns
     -------
-    List[Dict[str, object]]
-        List of Signal dicts:
-            ticker, direction, entry, exit, time, return_pct,
-            strategy='order_block', idx, ob_level, displacement_idx
+    List[Dict]
+        Signals with ticker, direction, entry, exit, time, strategy='order_block'.
     """
     body_mul = config.get('body_mul', 1.5)
     range_mul = config.get('range_mul', 1.2)
-    horizon = config.get('horizon', 4)
     lookback = config.get('lookback', 20)
-    min_history = config.get('min_history', 50)
-    max_lookback = config.get('max_lookback_bars', 5)
+    horizon = config.get('horizon', 2)
+    limit_lookback = config.get('limit_lookback', 5)
+    max_signal_age = config.get('max_signal_age', 6)
+    min_history = config.get('min_history', 100)
 
-    n = len(rows)
+    # Resample to H1
+    df = resample_h1(rows)
+    n = len(df)
     if n < min_history:
         return []
 
-    # Extract arrays
-    times = [r[0] for r in rows]
-    opens = [r[1] for r in rows]
-    highs = [r[2] for r in rows]
-    lows = [r[3] for r in rows]
-    closes = [r[4] for r in rows]
+    o = df['open'].values.astype(float)
+    h = df['high'].values.astype(float)
+    l = df['low'].values.astype(float)
+    c = df['close'].values.astype(float)
+    times = df.index
 
-    # Compute indicators (no look-ahead)
-    bodies = [abs(closes[i] - opens[i]) for i in range(n)]
-    ranges = [highs[i] - lows[i] for i in range(n)]
+    # Compute indicators
+    bodies = np.abs(c - o)
+    ranges = h - l
     med_body = _rolling_median(bodies, lookback)
     med_range = _rolling_median(ranges, lookback)
 
-    signals: List[Dict[str, object]] = []
-
-    # Ищем displacement только в последних max_lookback барах (свежие сигналы)
-    search_start = max(lookback + 1, n - max_lookback)
-    if search_start >= n:
-        return []
-
-    for i in range(search_start, n):
-        # Проверяем, что это displacement (сильный импульс)
-        body = bodies[i]
-        rng = ranges[i]
-        if body <= 0 or rng <= 0:
+    # Find all displacements
+    displ = []
+    for i in range(lookback + 1, n):
+        if bodies[i] <= 0 or ranges[i] <= 0 or med_body[i] <= 0 or med_range[i] <= 0:
             continue
-        if med_body[i] <= 0 or med_range[i] <= 0:
-            continue
+        if bodies[i] > med_body[i] * body_mul and ranges[i] > med_range[i] * range_mul:
+            direction = 'LONG' if c[i] > o[i] else 'SHORT'
+            displ.append({'idx': i, 'direction': direction, 'ob_idx': i - 1})
 
-        is_displacement = (
-            body > med_body[i] * body_mul
-            and rng > med_range[i] * range_mul
-        )
-        if not is_displacement:
-            continue
+    signals = []
+    for d in displ:
+        i = d['idx']
+        direction = d['direction']
+        ob_idx = d['ob_idx']
 
-        # Displacement найден. OB = свеча перед ним
-        ob_idx = i - 1
-        if ob_idx < 0:
-            continue
-
-        # Определяем направление
-        if closes[i] > opens[i]:
-            # Бычье displacement → LONG
-            direction = 'LONG'
-            ob_level = lows[ob_idx]  # опорный уровень OB
+        # OB level
+        if direction == 'LONG':
+            level = l[ob_idx]
         else:
-            # Медвежье displacement → SHORT
-            direction = 'SHORT'
-            ob_level = highs[ob_idx]
+            level = h[ob_idx]
 
-        # Entry: открытие displacement-бара (фактически, текущая цена на момент скана)
-        entry = opens[i]
-        if entry <= 0:
+        # Look for limit fill within limit_lookback H1 bars
+        fill_bar = None
+        for j in range(i, min(i + limit_lookback, n)):
+            if direction == 'LONG' and l[j] <= level:
+                fill_bar = j
+                break
+            elif direction == 'SHORT' and h[j] >= level:
+                fill_bar = j
+                break
+
+        if fill_bar is None:
             continue
 
-        # Выход через horizon баров
-        exit_idx = i + horizon - 1  # -1 потому что мы на displacement-баре i
-        if exit_idx >= n:
-            exit_price = closes[-1]
-        else:
-            exit_price = closes[exit_idx]
+        # Exit after horizon from fill
+        ex = fill_bar + horizon
+        if ex >= n:
+            continue
+
+        entry = level
+        exit_price = c[ex]
 
         if direction == 'LONG':
             return_pct = (exit_price - entry) / entry * 100.0
         else:
             return_pct = (entry - exit_price) / entry * 100.0
 
-        # Формируем сигнал
+        # Only signal if recent enough (within max_signal_age bars of now)
+        signal_age = n - 1 - fill_bar
+        if signal_age > max_signal_age:
+            continue
+
         signal = {
             'ticker': symbol,
             'direction': direction,
             'entry': round(entry, 4),
             'exit': round(exit_price, 4),
-            'time': times[ob_idx],  # время OB-бара (начало формации)
+            'time': times[ob_idx].isoformat(),
             'return_pct': round(return_pct, 4),
             'strategy': 'order_block',
             'idx': ob_idx,
-            'ob_level': round(ob_level, 4),
-            'displacement_idx': i,
+            'ob_level': round(level, 4),
+            'fill_bar': fill_bar,
+            'horizon': horizon,
         }
         signals.append(signal)
 

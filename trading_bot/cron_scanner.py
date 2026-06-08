@@ -80,8 +80,8 @@ def main() -> str:
             continue
         ob_cfg = {**DEFAULT_OB_CONFIG, **cfg}
         try:
-            price_rows = ob_load_price_data(sym, days=14)  # OB needs less history, but data lags up to 1 week
-            if price_rows and len(price_rows) >= 50:
+            price_rows = ob_load_price_data(sym, days=30)  # 30 days of 5m for H1 resample
+            if price_rows and len(price_rows) >= 100:
                 sigs = detect_order_block_signals(sym, price_rows, ob_cfg)
                 ob_signals.extend(sigs)
         except Exception as e:
@@ -164,10 +164,19 @@ def main() -> str:
     except ImportError:
         pass  # filters module not installed — skip ADX filtering
 
-    # Filter: only signals from last 30 minutes (recent, not historical)
+    # Filter: only recent signals (not historical)
     from datetime import timedelta
     cutoff = now - timedelta(minutes=30)
-    signals = [s for s in signals if s.get('time', '')[:16] >= cutoff.strftime('%Y-%m-%dT%H:%M')]
+    ob_cutoff = now - timedelta(hours=6)  # OB on H1, needs wider window
+    filtered = []
+    for s in signals:
+        if s.get('strategy') == 'order_block':
+            if s.get('time', '')[:16] >= ob_cutoff.strftime('%Y-%m-%dT%H:%M'):
+                filtered.append(s)
+        else:
+            if s.get('time', '')[:16] >= cutoff.strftime('%Y-%m-%dT%H:%M'):
+                filtered.append(s)
+    signals = filtered
 
     # 6. Check exits (horizon/stop)
     # Convert signals to format tracker expects
