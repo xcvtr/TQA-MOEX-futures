@@ -47,14 +47,45 @@ def main() -> str:
     positions = load_positions()
     alerts.append(f"[{now:%H:%M}] Открыто: {sum(1 for p in positions if p['status']=='open')}")
 
-    # 2. Build configs and scan (Volume Surge)
+    # 2. Build configs and scan (Volume Surge) — limit entry
     configs = {}
     for sym in SCAN_SYMBOLS:
         cfg = TICKERS.get(sym, {})
         if cfg.get('enabled', True):
             configs[sym] = {**DEFAULT_CONFIG, **cfg}
 
-    signals = scan_all(configs)
+    # Use limit entry for VS with per-ticker TF
+    import pandas as pd
+    vs_signals = []
+    for sym, cfg in configs.items():
+        try:
+            rows = load_data(sym, days=730)
+            if not rows or len(rows) < 50:
+                continue
+            
+            # Per-ticker timeframe resampling
+            ticker_tf = cfg.get('tf', '5m')
+            if ticker_tf != '5m':
+                df = pd.DataFrame(rows, columns=['time','open','high','low','close','volume','fiz_buy','fiz_sell','yur_buy','yur_sell'])
+                df['time'] = pd.to_datetime(df['time'])
+                df.set_index('time', inplace=True)
+                rule_map = {'15m': '15min', '30m': '30min', 'H1': '1h'}
+                rule = rule_map.get(ticker_tf, ticker_tf)
+                df = df.resample(rule).agg({
+                    'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last',
+                    'volume': 'sum', 'fiz_buy': 'sum', 'fiz_sell': 'sum',
+                    'yur_buy': 'sum', 'yur_sell': 'sum',
+                }).dropna()
+                # Convert back to rows format
+                rows = [(idx.isoformat(), r['open'], r['high'], r['low'], r['close'],
+                        r['volume'], r['fiz_buy'], r['fiz_sell'], r['yur_buy'], r['yur_sell'])
+                        for idx, r in df.iterrows()]
+            
+            sigs = detect_signals_limit(rows, cfg)
+            vs_signals.extend(sigs)
+        except Exception as e:
+            alerts.append(f"[WARN] VS scan {sym} error: {e}")
+    signals = vs_signals
     vs_count = len(signals)
 
     # 3. Reversion scanning
@@ -64,9 +95,9 @@ def main() -> str:
             continue
         rev_cfg = {**DEFAULT_REVERSION_CONFIG, **cfg}
         try:
-            price_rows = load_price_data(sym, days=30)
+            price_rows = load_price_data(sym, days=730)
             if price_rows and len(price_rows) >= 50:
-                sigs = detect_mean_reversion_signals(sym, price_rows, rev_cfg)
+                sigs = detect_mean_reversion_signals_limit(sym, price_rows, rev_cfg)
                 rev_signals.extend(sigs)
         except Exception as e:
             alerts.append(f"[WARN] Reversion scan {sym} error: {e}")
@@ -96,9 +127,9 @@ def main() -> str:
             continue
         vwap_cfg = {**DEFAULT_VWAP_CONFIG, **cfg}
         try:
-            price_rows = vwap_load_price_data(sym, days=30)
+            price_rows = vwap_load_price_data(sym, days=730)
             if price_rows and len(price_rows) >= 50:
-                sigs = detect_vwap_signals(sym, price_rows, vwap_cfg)
+                sigs = detect_vwap_signals_limit(sym, price_rows, vwap_cfg)
                 vwap_signals.extend(sigs)
         except Exception as e:
             alerts.append(f"[WARN] VWAP scan {sym} error: {e}")
@@ -112,12 +143,12 @@ def main() -> str:
             continue
         oi_div_cfg = {**DEFAULT_OI_DIVERGENCE_CONFIG, **cfg}
         try:
-            ohlcv = load_ohlcv(sym, days=30)
-            oi = load_oi(sym, days=30)
+            ohlcv = load_ohlcv(sym, days=730)
+            oi = load_oi(sym, days=730)
             if ohlcv and oi and len(ohlcv) >= 50:
                 merged = merge_ohlcv_oi(ohlcv, oi)
                 if merged and len(merged) >= 50:
-                    sigs = detect_oi_divergence_signals(merged, oi_div_cfg)
+                    sigs = detect_oi_divergence_signals_limit(merged, oi_div_cfg)
                     oi_div_signals.extend(sigs)
         except Exception as e:
             alerts.append(f"[WARN] OI Div scan {sym} error: {e}")
