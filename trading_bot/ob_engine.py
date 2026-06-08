@@ -56,14 +56,14 @@ def load_price_data(symbol: str, days: int = 30) -> List[Tuple]:
     return rows
 
 
-def resample_h1(rows: List[Tuple]) -> pd.DataFrame:
-    """Resample 5m data to H1 OHLCV."""
+def resample_h1(rows: List[Tuple], rule: str = '1h') -> pd.DataFrame:
+    """Resample 5m data to target TF OHLCV."""
     if not rows:
         return pd.DataFrame()
     df = pd.DataFrame(rows, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
     df['time'] = pd.to_datetime(df['time'])
     df.set_index('time', inplace=True)
-    resampled = df.resample('1h').agg({
+    resampled = df.resample(rule).agg({
         'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum',
     })
     resampled.dropna(inplace=True)
@@ -99,9 +99,14 @@ def detect_order_block_signals(
     limit_lookback = config.get('limit_lookback', 5)
     max_signal_age = config.get('max_signal_age', 6)
     min_history = config.get('min_history', 100)
+    resample_rule = config.get('tf', 'H1')
 
-    # Resample to H1
-    df = resample_h1(rows)
+    # Map TF names to pandas rules
+    rule_map = {'5m': '5min', '15m': '15min', '30m': '30min', 'H1': '1h', 'H2': '2h', 'H4': '4h'}
+    rule = rule_map.get(resample_rule, '1h')
+
+    # Resample to target TF
+    df = resample_h1(rows, rule)
     n = len(df)
     if n < min_history:
         return []

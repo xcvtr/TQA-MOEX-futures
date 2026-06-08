@@ -120,14 +120,14 @@ def main() -> str:
 
     rev_count = len(rev_signals)
 
-    # 3b. Order Block scanning
+    # 3b. Order Block scanning (per-ticker TF from config)
     ob_signals = []
     for sym, cfg in OB_TICKERS.items():
         if not cfg.get('enabled', True):
             continue
         ob_cfg = {**DEFAULT_OB_CONFIG, **cfg}
         try:
-            price_rows = ob_load_price_data(sym, days=30)  # 30 days of 5m for H1 resample
+            price_rows = ob_load_price_data(sym, days=730)
             if price_rows and len(price_rows) >= 100:
                 sigs = detect_order_block_signals(sym, price_rows, ob_cfg)
                 ob_signals.extend(sigs)
@@ -214,7 +214,7 @@ def main() -> str:
     # Filter: only recent signals (not historical)
     from datetime import timedelta
     cutoff = now - timedelta(minutes=30)
-    ob_cutoff = now - timedelta(hours=6)  # OB on H1, needs wider window
+    ob_cutoff = now - timedelta(hours=24)  # OB on H1/H2/H4, wide window for higher TFs
     filtered = []
     for s in signals:
         if s.get('strategy') == 'order_block':

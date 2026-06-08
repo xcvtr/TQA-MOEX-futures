@@ -62,19 +62,19 @@ DEFAULT_OB_CONFIG = {
 OB_TICKERS: dict = {
     # Core portfolio (DD <5%)
     'UC': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
-           'label': 'UC (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+           'label': 'UC (OB Core H2)', 'horizon': 2, 'max_loss': -5.0, 'tf': 'H2'},
     'ED': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
-           'label': 'ED (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+           'label': 'ED (OB Core H4)', 'horizon': 2, 'max_loss': -5.0, 'tf': 'H4'},
     'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01,
-           'label': 'Si (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+           'label': 'Si (OB Core H2)', 'horizon': 2, 'max_loss': -5.0, 'tf': 'H2'},
     'RM': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
            'label': 'RM (OB Core)', 'horizon': 2, 'max_loss': -5.0},
     'KC': {'enabled': True, 'go': 2500, 'tick_rub': 80.0, 'minstep': 0.01,
-           'label': 'KC (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+           'label': 'KC (OB Core H4)', 'horizon': 2, 'max_loss': -5.0, 'tf': 'H4'},
     'NA': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
            'label': 'NA (OB Core)', 'horizon': 2, 'max_loss': -5.0},
     'GD': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01,
-           'label': 'GD (OB Core)', 'horizon': 2, 'max_loss': -5.0},
+           'label': 'GD (OB Core H2)', 'horizon': 2, 'max_loss': -5.0, 'tf': 'H2'},
     # Expansion tier (DD 5-10%, half weight)
     'RI': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 1,
            'label': 'RI (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
@@ -83,7 +83,7 @@ OB_TICKERS: dict = {
     'SBERF': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 1,
               'label': 'SBERF (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
     'GK': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
-           'label': 'GK (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
+           'label': 'GK (OB Exp H4)', 'horizon': 2, 'max_loss': -5.0, 'tf': 'H4'},
     'MC': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
            'label': 'MC (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
     'RN': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
@@ -91,7 +91,7 @@ OB_TICKERS: dict = {
     'IMOEXF': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
                'label': 'IMOEXF (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
     'YD': {'enabled': True, 'go': 2500, 'tick_rub': 1.0, 'minstep': 0.01,
-           'label': 'YD (OB Exp)', 'horizon': 2, 'max_loss': -5.0},
+           'label': 'YD (OB Exp H4)', 'horizon': 2, 'max_loss': -5.0, 'tf': 'H4'},
 }
 
 # ─── VWAP Deviation Reversion ──────────────────────────────────────────────
