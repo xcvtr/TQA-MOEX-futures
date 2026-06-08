@@ -1,0 +1,9 @@
+H1 Scan Summary — all strategies on 59 tickers
+Generated: 2026-06-08 13:02
+
+Strategy        Tickers   Best tk     WR%     PF      vs M5 WR
+----------------------------------------------------------------------
+vwap            59        KC         62.7   2.00    55.9   (+6.8)
+reversion       54        VI         100.0  999.99  63.2   (+36.8)
+order_block     27        AL         100.0  999.99  50.0   (+50.0)
+volume_surge    12        AL         100.0  999.99  48.9   (+51.1)

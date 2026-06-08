@@ -1,0 +1,7 @@
+Full scan: reversion on 59 tickers (30d data)
+Generated: 2026-06-08 12:58
+
+Ticker   Sig    WR%     PF      Total
+----------------------------------------
+NM         4      100.0    999.99   13      
+AF         5      80.0     13.78    16      

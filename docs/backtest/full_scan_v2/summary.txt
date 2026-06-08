@@ -1,0 +1,19 @@
+Full scan v2 — ALL 7 strategies × M5 + H1 on 59 tickers
+Generated: 2026-06-08 13:07
+
+Strategy                  TF    Tickers    Best tk      Best WR    Best PF    Avg WR    
+-------------------------------------------------------------------------------------
+VWAP Deviation            m5    59         SBERF        57.2     % 1.35      52.4     %
+VWAP Deviation            h1    59         KC           62.7     % 2.00      50.9     %
+Mean Reversion            m5    55         DX           100.0    % 999.99    53.2     %
+Mean Reversion            h1    54         GL           100.0    % 999.99    54.0     %
+Order Block               m5    30         AL           100.0    % 999.99    67.5     %
+Order Block               h1    28         AL           100.0    % 999.99    80.1     %
+Volume Surge              m5    57         CH           75.0     % 0.94      46.4     %
+Volume Surge              h1    12         AL           100.0    % 999.99    56.9     %
+OI Trend Confirmation     m5    59         FF           56.6     % 1.46      46.2     %
+OI Trend Confirmation     h1    59         VI           60.0     % 1.82      49.6     %
+Retail Trap               m5    59         CH           52.3     % 1.03      48.3     %
+Retail Trap               h1    59         PT           59.1     % 1.56      49.9     %
+OI Divergence             m5    57         GAZPF        100.0    % 999.99    51.7     %
+OI Divergence             h1    59         AU           73.1     % 11.29     49.5     %

@@ -10,7 +10,7 @@ Usage:
 import sys, os, json
 from datetime import datetime
 
-from . import SCAN_SYMBOLS, DEFAULT_CONFIG, TICKERS, DB_CREDENTIALS, REVERSION_TICKERS, DEFAULT_REVERSION_CONFIG, OB_TICKERS, DEFAULT_OB_CONFIG, VWAP_TICKERS, DEFAULT_VWAP_CONFIG
+from . import SCAN_SYMBOLS, DEFAULT_CONFIG, TICKERS, DB_CREDENTIALS, REVERSION_TICKERS, DEFAULT_REVERSION_CONFIG, OB_TICKERS, DEFAULT_OB_CONFIG, VWAP_TICKERS, DEFAULT_VWAP_CONFIG, OI_DIVERGENCE_TICKERS, DEFAULT_OI_DIVERGENCE_CONFIG
 from .engine import detect_signals
 from .scanner import load_data, scan_all, format_signal
 from .tracker import load_positions, check_exits, open_position, get_stats
@@ -18,6 +18,7 @@ from .alerts import send_alert, format_signal_alert, format_position_update, for
 from .reversion_engine import detect_mean_reversion_signals, load_price_data
 from .ob_engine import detect_order_block_signals, load_price_data as ob_load_price_data
 from .vwap_engine import detect_vwap_signals, load_price_data as vwap_load_price_data
+from .new_strategies import detect_oi_divergence_signals, load_ohlcv, load_oi, merge_ohlcv_oi
 
 
 def healthcheck() -> dict:
@@ -104,10 +105,30 @@ def main() -> str:
 
     vwap_count = len(vwap_signals)
 
+    # 3d. OI Divergence scanning
+    oi_div_signals = []
+    for sym, cfg in OI_DIVERGENCE_TICKERS.items():
+        if not cfg.get('enabled', True):
+            continue
+        oi_div_cfg = {**DEFAULT_OI_DIVERGENCE_CONFIG, **cfg}
+        try:
+            ohlcv = load_ohlcv(sym, days=30)
+            oi = load_oi(sym, days=30)
+            if ohlcv and oi and len(ohlcv) >= 50:
+                merged = merge_ohlcv_oi(ohlcv, oi)
+                if merged and len(merged) >= 50:
+                    sigs = detect_oi_divergence_signals(merged, oi_div_cfg)
+                    oi_div_signals.extend(sigs)
+        except Exception as e:
+            alerts.append(f"[WARN] OI Div scan {sym} error: {e}")
+
+    oi_div_count = len(oi_div_signals)
+
     # 4. Merge all signals
     signals.extend(rev_signals)
     signals.extend(ob_signals)
     signals.extend(vwap_signals)
+    signals.extend(oi_div_signals)
 
     # 5. Apply ADX regime filter — skip if filters module doesn't exist
     try:
@@ -118,7 +139,7 @@ def main() -> str:
         all_adx_tickers = set()
         for sig in signals:
             tk = sig['ticker']
-            cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, OB_TICKERS.get(tk, VWAP_TICKERS.get(tk, {}))))
+            cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, OB_TICKERS.get(tk, VWAP_TICKERS.get(tk, OI_DIVERGENCE_TICKERS.get(tk, {})))))
             if cfg.get('adx_filter', False):
                 all_adx_tickers.add(tk)
         for tk in all_adx_tickers:
@@ -127,7 +148,7 @@ def main() -> str:
         adx_filtered_signals = []
         for sig in signals:
             tk = sig['ticker']
-            cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, OB_TICKERS.get(tk, VWAP_TICKERS.get(tk, {}))))
+            cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, OB_TICKERS.get(tk, VWAP_TICKERS.get(tk, OI_DIVERGENCE_TICKERS.get(tk, {})))))
             if cfg.get('adx_filter', False):
                 rows = adx_data_cache.get(tk, [])
                 if rows and len(rows) > 20:
@@ -177,7 +198,7 @@ def main() -> str:
         if tk in active_symbols:
             continue
         # Check if we already have a signal for this ticker
-        cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, OB_TICKERS.get(tk, VWAP_TICKERS.get(tk, {}))))
+        cfg = TICKERS.get(tk, REVERSION_TICKERS.get(tk, OB_TICKERS.get(tk, VWAP_TICKERS.get(tk, OI_DIVERGENCE_TICKERS.get(tk, {})))))
         label = cfg.get('label', tk)
         go = cfg.get('go', 5000)
         horizon = cfg.get('horizon', 12)
@@ -200,7 +221,7 @@ def main() -> str:
     # 9. Status line
     sig_count = len(signals)
     open_count = sum(1 for p in load_positions() if p['status'] == 'open')
-    status = f"[SCAN] VS: {vs_count} sig | Reversion: {rev_count} sig | OB: {ob_count} sig | VWAP: {vwap_count} sig | Open: {open_count} | Новых: {opened}"
+    status = f"[SCAN] VS: {vs_count} sig | Reversion: {rev_count} sig | OB: {ob_count} sig | VWAP: {vwap_count} sig | OI Div: {oi_div_count} sig | Open: {open_count} | Новых: {opened}"
     alerts.append(status)
     print("\n".join(alerts))
     

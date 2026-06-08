@@ -49,12 +49,12 @@ TICKER_TO_ASSET = {
     "SBERF": "SBERF", "GL": "GL", "X5": "X5", "YD": "YDEX",
     "BM": "BRM", "CC": "COCOA", "CE": "COPPER", "CH": "CHINA",
     "DX": "DAX", "FF": "FNI", "GK": "GMKN", "HS": "HANG",
-    "IB": "IBIT", "KC": "COFFEE", "MC": "MXI", "MY": "MY",
-    "NA": "NASD", "NR": "NICKEL", "OJ": "ORANGE", "RB": "RUBBER",
-    "RL": "RURAL", "RM": "RTSM", "SE": "SGZH", "SS": "SMLT",
+    "IB": "IBIT", "KC": "COFFEE", "MC": "MXI",
+    "NA": "NASD", "NR": "NICKEL", "OJ": "ORANGE",
+    "RM": "RTSM", "SE": "SGZH", "SS": "SMLT",
     "W4": "WHEAT", "UC": "UCNY", "AU": "AUDU",
     "TN": "T", "SF": "SFIN",
-    "CR": "CR", "MN": "MN",
+    "CR": "CNY", "MN": "MGNT", "MY": "MOEXCNY", "RB": "RGBI", "RL": "RUAL",
     "MX": "MXI",
 }
 ASSET_TO_TICKER = {v: k for k, v in TICKER_TO_ASSET.items()}
@@ -62,9 +62,7 @@ ASSET_TO_TICKER = {v: k for k, v in TICKER_TO_ASSET.items()}
 # Tickers that use direct Alor symbol (not quarterly contract names)
 DIRECT_SYMBOLS = {"CNYRUBF", "EURRUBF", "GLDRUBF", "USDRUBF", "SBERF", "GAZPF", "IMOEXF"}
 
-# Tickers that exist in MOEX OI (futoi) but have NO tradable contracts on Alor/MOEX futures
-# These are only loaded into openinterest_moex, not moex_prices_5m
-OI_ONLY_TICKERS = {"CR", "MN", "MY", "RB", "RL"}
+# (no OI-only tickers — all have tradeable contracts)
 
 # Tickers with extremely low liquidity (<60 real candles/day on front-month)
 # Loading them produces mostly noise — excluded from 5m table
@@ -79,6 +77,8 @@ HIGH_LIQUIDITY_TICKERS = {
     # KEEP tickers (Volume Surge + Divergence)
     "AF", "AL", "CE", "DX", "HS", "HY", "MG", "NM", "NR",
     "OJ", "PD", "SE", "SF", "SN", "SP", "TN", "TT", "W4", "YD",
+    # Restored tickers (were OI-only, now have tradeable contracts)
+    "CR", "MN", "MY", "RB", "RL",
 }
 
 
@@ -87,7 +87,7 @@ def get_db():
         host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
         user=DB_USER, password=DB_PASSWORD,
     )
-    conn.autocommit = False
+    conn.autocommit = True
     return conn
 
 
@@ -238,7 +238,6 @@ def save_batch(conn, records: list) -> int:
                    contract=EXCLUDED.contract, updated_at=NOW()""",
             records)
         n = cur.rowcount
-    conn.commit()
     return n
 
 

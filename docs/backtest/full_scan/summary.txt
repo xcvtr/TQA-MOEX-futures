@@ -1,0 +1,9 @@
+Full scan summary - all 4 strategies on 59 tickers
+Generated: 2026-06-08 12:58
+
+Strategy        Tickers with sig  Best ticker     Best WR   Worst ticker    Worst WR
+-----------------------------------------------------------------------------------------------
+vwap            5                  MC              63.1%        Si              46.5%       
+volume_surge    3                  BM              100.0%       HY              0.0%        
+reversion       2                  NM              100.0%       AF              80.0%       
+order_block     2                  BR              100.0%       SBERF           0.0%        

@@ -8,9 +8,9 @@ import csv
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from . import CAPITAL, MARGIN_USAGE, TICKERS, REVERSION_TICKERS, OB_TICKERS, VWAP_TICKERS
+from . import CAPITAL, MARGIN_USAGE, TICKERS, REVERSION_TICKERS, OB_TICKERS, VWAP_TICKERS, OI_DIVERGENCE_TICKERS
 
-ALL_TICKERS = {**TICKERS, **REVERSION_TICKERS, **OB_TICKERS, **VWAP_TICKERS}
+ALL_TICKERS = {**TICKERS, **REVERSION_TICKERS, **OB_TICKERS, **VWAP_TICKERS, **OI_DIVERGENCE_TICKERS}
 
 POSITIONS_FILE = os.path.join(os.path.dirname(__file__), 'positions.json')
 TRADES_LOG = os.path.join(os.path.dirname(__file__), 'trades.csv')

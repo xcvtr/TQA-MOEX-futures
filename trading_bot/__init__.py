@@ -82,6 +82,19 @@ VWAP_TICKERS: dict = {
            'label': 'MC (Моэкс VWAP)', 'horizon': 12, 'max_loss': -5.0},
 }
 
+# ─── OI Divergence ──────────────────────────────────────────────────────────
+DEFAULT_OI_DIVERGENCE_CONFIG = {
+    'oi_z_thresh': 0.5,
+    'price_z_thresh': 0.5,
+    'horizon': 6,
+}
+
+OI_DIVERGENCE_TICKERS: dict = {
+    'RI': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'RI (RTS OI Div)', 'max_loss': -5.0},
+    'GL': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'GL (GOLD OI Div)', 'max_loss': -5.0},
+    'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'Si (USD/RUB OI Div)', 'max_loss': -5.0},
+}
+
 DB_CREDENTIALS = {
     'host': '10.0.0.64',
     'port': 5432,
