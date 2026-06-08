@@ -1,0 +1,3 @@
+fold,margin_usage,max_concurrent,max_dd_limit,train_return_pct,train_max_dd,test_return_pct,test_max_dd
+fold_1,0.1,2,0.15,4084386.9,0.2321,2.0,0.3756
+fold_2,0.05,2,0.2,19528.47,0.615,-39.56,0.7064

@@ -1,0 +1,33 @@
+============================================================
+  CAPITAL GROWTH SIMULATION — SUMMARY
+============================================================
+  Initial capital: 100,000 RUB
+  Final capital:   61,645.00 RUB
+  Total return:    -38.35%
+  Max drawdown:    70.6%
+  Total trades:    25
+  History:         730 days
+
+  Walk-Forward Folds:
+    fold_1:
+      Train: 25835 sig → +4084386.90% (maxDD 23.2%)
+      Test:  28563 sig → +2.00% (maxDD 37.6%)
+      Params: margin=0.1, concurrent=2, dd_limit=0.15
+    fold_2:
+      Train: 25389 sig → +19528.47% (maxDD 61.5%)
+      Test:  15552 sig → -39.56% (maxDD 70.6%)
+      Params: margin=0.05, concurrent=2, dd_limit=0.2
+
+  COMBINED TEST (concatenated):
+    Start:  100,000 RUB
+    Final:  61,645.00 RUB
+    Return: -38.35%
+    Max DD: 70.6%
+    Trades: 25
+
+  Output files:
+    /home/user/projects/TQA-MOEX/docs/plans/capital_growth/results.json
+    /home/user/projects/TQA-MOEX/docs/plans/capital_growth/equity_curve.csv
+    /home/user/projects/TQA-MOEX/docs/plans/capital_growth/summary.txt
+    /home/user/projects/TQA-MOEX/docs/plans/capital_growth/optimal_params.csv
+============================================================
