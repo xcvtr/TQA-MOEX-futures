@@ -1,0 +1,50 @@
+{
+  "initial_capital": 100000,
+  "final_capital": 147514.44999999998,
+  "total_return_pct": 47.51,
+  "max_drawdown_pct": 8.01,
+  "total_trades": 146,
+  "history_days": 730,
+  "fold_results": [
+    {
+      "fold": "fold_1",
+      "train_signals": 523,
+      "test_signals": 587,
+      "best_params": {
+        "margin_usage": 0.03,
+        "max_concurrent": 2,
+        "total_margin_limit": 0.03,
+        "max_dd_limit": 0.05,
+        "stop_loss_pct": 0.005
+      },
+      "train_return_pct": 0.75,
+      "train_max_dd": 0.0125,
+      "test_return_pct": 1.52,
+      "test_max_dd": 0.0066,
+      "test_trades": 52,
+      "dd_threshold_used": 0.05,
+      "avg_margin_pct": 1.4,
+      "max_margin_pct": 2.8
+    },
+    {
+      "fold": "fold_2",
+      "train_signals": 453,
+      "test_signals": 354,
+      "best_params": {
+        "margin_usage": 0.05,
+        "max_concurrent": 2,
+        "total_margin_limit": 0.1,
+        "max_dd_limit": 0.05,
+        "stop_loss_pct": 0.005
+      },
+      "train_return_pct": 12.68,
+      "train_max_dd": 0.0305,
+      "test_return_pct": 45.3,
+      "test_max_dd": 0.0801,
+      "test_trades": 94,
+      "dd_threshold_used": 0.05,
+      "avg_margin_pct": 5.0,
+      "max_margin_pct": 8.9
+    }
+  ]
+}

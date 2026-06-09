@@ -1,40 +1,42 @@
 {
   "initial_capital": 100000,
-  "final_capital": -1627265832200.0,
-  "total_return_pct": -1627265932.2,
-  "max_drawdown_pct": 101.26,
-  "total_trades": 18,
+  "final_capital": 266912.0199999999,
+  "total_return_pct": 166.91,
+  "max_drawdown_pct": 38.74,
+  "total_trades": 133,
   "history_days": 730,
   "fold_results": [
     {
       "fold": "fold_1",
-      "train_signals": 5252,
-      "test_signals": 6673,
+      "train_signals": 523,
+      "test_signals": 587,
       "best_params": {
-        "margin_usage": 0.15,
-        "max_concurrent": 1,
-        "max_dd_limit": 0.2
+        "margin_usage": 0.02,
+        "max_concurrent": 5,
+        "max_dd_limit": 0.2,
+        "stop_loss_pct": 0.02
       },
-      "train_return_pct": 60605.87,
-      "train_max_dd": 0.1635,
-      "test_return_pct": 7115349706.7,
-      "test_max_dd": 0.945,
-      "test_trades": 13
+      "train_return_pct": -62.5,
+      "train_max_dd": 0.6268,
+      "test_return_pct": 90.85,
+      "test_max_dd": 0.237,
+      "test_trades": 46
     },
     {
       "fold": "fold_2",
-      "train_signals": 6036,
-      "test_signals": 3340,
+      "train_signals": 453,
+      "test_signals": 354,
       "best_params": {
-        "margin_usage": 0.08,
-        "max_concurrent": 3,
-        "max_dd_limit": 0.25
+        "margin_usage": 0.02,
+        "max_concurrent": 5,
+        "max_dd_limit": 0.2,
+        "stop_loss_pct": 0.03
       },
-      "train_return_pct": 456469.95,
-      "train_max_dd": 0.2691,
-      "test_return_pct": -122.87,
-      "test_max_dd": 1.1936,
-      "test_trades": 5
+      "train_return_pct": 147.99,
+      "train_max_dd": 0.9439,
+      "test_return_pct": 39.85,
+      "test_max_dd": 0.3874,
+      "test_trades": 87
     }
   ]
 }
