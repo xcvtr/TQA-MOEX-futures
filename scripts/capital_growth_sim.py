@@ -163,6 +163,37 @@ def adjust_exit_for_stop(sig: dict, stop_pct: float) -> dict:
     return sig
 
 
+
+
+def adjust_exit_for_hedge(sig: dict, hedge_premium_pct: float, hedge_strike_pct: float) -> dict:
+    """Option hedge вместо stop-loss.
+    
+    Покупаем PUT (LONG) или CALL (SHORT) с OTM страйком.
+    - Премия платится на каждую сделку (уменьшает return)
+    - Убыток ограничен hedge_strike_pct
+    - Позиция НЕ выбивается досрочно
+    """
+    sig = dict(sig)
+    entry = sig['entry']
+    exit_p = sig['exit']
+    direction = sig['direction']
+    
+    if direction == 'LONG':
+        raw_ret = (exit_p - entry) / entry
+    else:
+        raw_ret = (entry - exit_p) / entry
+    
+    hedged_ret = raw_ret - hedge_premium_pct
+    if hedged_ret < -hedge_strike_pct:
+        hedged_ret = -hedge_strike_pct
+    
+    if direction == 'LONG':
+        effective_exit = entry * (1 + hedged_ret)
+    else:
+        effective_exit = entry * (1 - hedged_ret)
+    sig['exit'] = round(effective_exit, 2)
+    return sig
+
 # ── 1. Сбор сигналов ────────────────────────────────────────────────────────
 
 
@@ -572,7 +603,316 @@ def simulate_adaptive(
     }
 
 
-# ── 3. Walk-Forward ──────────────────────────────────────────────────────
+
+
+
+# ── 2b. Adaptive + Option Hedge Simulation ─────────────────────
+
+
+def simulate_adaptive_hedge(
+    signals: List[Dict],
+    initial_capital: float,
+    base_margin_usage: float,
+    max_concurrent: int,
+    base_total_margin_limit: float,
+    max_dd_limit: float,
+    hedge_premium_pct: float = 0.003,
+    hedge_strike_pct: float = 0.01,
+) -> Dict:
+    """Adaptive risk with OPTION HEDGE instead of stop-loss.
+    
+    Каждая сделка хеджируется опционом:
+    - Премия платится на каждую сделку
+    - Убыток ограничен hedge_strike_pct
+    - Позиция живёт до горизонта
+    """
+    capital = float(initial_capital)
+    equity = [capital]
+    margin_ratio_history = [0.0]
+    peak = capital
+    compression_history = [1.0]
+    active: Dict[str, Dict] = {}
+    trades: List[Dict] = []
+
+    def _total_equity() -> float:
+        return capital + sum(p['locked_go'] for p in active.values())
+
+    def _record_margin_usage():
+        te = _total_equity()
+        if te > 0:
+            locked = sum(p['locked_go'] for p in active.values())
+            margin_ratio_history.append(locked / te)
+        else:
+            margin_ratio_history.append(0.0)
+
+    for sig_idx, sig in enumerate(signals):
+        tk = sig.get('ticker', '')
+        if not tk or tk not in ALL_TICKER_CONFIGS:
+            continue
+
+        te = _total_equity()
+        if te > peak:
+            peak = te
+        compression = te / peak if peak > 0 else 1.0
+        compression = min(compression, 1.0)
+        compression = max(compression, 0.3)
+        compression_history.append(compression)
+
+        adaptive_margin = base_margin_usage * compression
+        adaptive_tm_limit = base_total_margin_limit * compression
+
+        dd = (peak - te) / peak if peak > 0 else 0
+        if dd > max_dd_limit:
+            for t in list(active.keys()):
+                pos = active.pop(t)
+                pnl = calc_pnl(pos['direction'], pos['entry_price'], pos['exit_price'], pos['contracts'], t)
+                capital += pos['locked_go'] + pnl
+            equity.append(_total_equity())
+            _record_margin_usage()
+            break
+
+        if tk in active:
+            pos = active.pop(tk)
+            pnl = calc_pnl(pos['direction'], pos['entry_price'], pos['exit_price'], pos['contracts'], tk)
+            capital += pos['locked_go'] + pnl
+            peak = max(peak, _total_equity())
+            equity.append(_total_equity())
+            _record_margin_usage()
+            trades.append({
+                'ticker': tk, 'pnl': pnl,
+                'entry_time': pos['entry_time'],
+                'exit_time': pos.get('exit_time', sig.get('time', '')),
+                'direction': pos['direction'],
+                'contracts': pos['contracts'],
+                'entry_price': pos['entry_price'],
+            })
+
+        if len(active) >= max_concurrent:
+            continue
+
+        try:
+            cfg = ALL_TICKER_CONFIGS[tk]
+        except KeyError:
+            continue
+        go = cfg.get('go', 0)
+        if go <= 0:
+            continue
+
+        total_cap = _total_equity()
+        max_risk = total_cap * adaptive_margin
+        contracts = int(max_risk // go) if max_risk >= go else 0
+        if contracts < 1:
+            continue
+        locked_go = contracts * go
+
+        total_locked = sum(p['locked_go'] for p in active.values())
+        if total_locked + locked_go > total_cap * adaptive_tm_limit:
+            continue
+
+        # ── Apply OPTION HEDGE ──
+        sig = adjust_exit_for_hedge(sig, hedge_premium_pct, hedge_strike_pct)
+
+        entry_price = sig.get('entry', 0)
+        exit_price = sig.get('exit', 0)
+        direction = sig.get('direction', 'LONG')
+
+        if locked_go > capital:
+            continue
+        capital -= locked_go
+
+        active[tk] = {
+            'entry_price': entry_price, 'exit_price': exit_price,
+            'direction': direction, 'contracts': contracts,
+            'entry_time': sig.get('time', ''),
+            'exit_time': sig.get('time', ''),
+            'strategy': sig.get('strategy', ''),
+            'locked_go': locked_go,
+        }
+        _record_margin_usage()
+
+    for tk in list(active.keys()):
+        pos = active.pop(tk)
+        pnl = calc_pnl(pos['direction'], pos['entry_price'], pos['exit_price'], pos['contracts'], tk)
+        capital += pos['locked_go'] + pnl
+        peak = max(peak, _total_equity())
+        equity.append(_total_equity())
+        _record_margin_usage()
+
+    return {
+        'final_capital': round(_total_equity(), 2),
+        'equity': equity,
+        'trades': trades,
+        'margin_ratio': margin_ratio_history,
+        'compression': compression_history,
+    }
+
+
+# ── 2d. Hybrid Hedge/SL Simulation ──────────────────────────
+
+
+STRATEGY_HEDGE_MAP = {
+    # Strategies that use option hedge (high WR)
+    'oi_divergence': 'hedge',
+    # Strategies that use stop-loss (lower WR, premium not worth it)
+    'reversion': 'stop',
+}
+
+
+def simulate_adaptive_hybrid(
+    signals: List[Dict],
+    initial_capital: float,
+    base_margin_usage: float,
+    max_concurrent: int,
+    base_total_margin_limit: float,
+    max_dd_limit: float,
+    hedge_premium_pct: float = 0.002,
+    hedge_strike_pct: float = 0.005,
+    stop_loss_pct: float = 0.02,
+) -> Dict:
+    """Adaptive risk with per-strategy choice: HEDGE (high WR) or STOP (low WR).
+
+    OI Divergence → option hedge (survive to horizon, premium is worth it)
+    Mean Reversion → stop-loss (cut quickly, premium not worth it)
+    """
+    capital = float(initial_capital)
+    equity = [capital]
+    margin_ratio_history = [0.0]
+    peak = capital
+    compression_history = [1.0]
+    active: Dict[str, Dict] = {}
+    trades: List[Dict] = []
+
+    def _total_equity() -> float:
+        return capital + sum(p['locked_go'] for p in active.values())
+
+    def _record_margin_usage():
+        te = _total_equity()
+        if te > 0:
+            locked = sum(p['locked_go'] for p in active.values())
+            margin_ratio_history.append(locked / te)
+        else:
+            margin_ratio_history.append(0.0)
+
+    for sig_idx, sig in enumerate(signals):
+        tk = sig.get('ticker', '')
+        if not tk or tk not in ALL_TICKER_CONFIGS:
+            continue
+
+        te = _total_equity()
+        if te > peak:
+            peak = te
+        compression = te / peak if peak > 0 else 1.0
+        compression = min(compression, 1.0)
+        compression = max(compression, 0.3)
+        compression_history.append(compression)
+
+        adaptive_margin = base_margin_usage * compression
+        adaptive_tm_limit = base_total_margin_limit * compression
+
+        dd = (peak - te) / peak if peak > 0 else 0
+        if dd > max_dd_limit:
+            for t in list(active.keys()):
+                pos = active.pop(t)
+                pnl = calc_pnl(pos['direction'], pos['entry_price'], pos['exit_price'], pos['contracts'], t)
+                capital += pos['locked_go'] + pnl
+            equity.append(_total_equity())
+            _record_margin_usage()
+            break
+
+        if tk in active:
+            pos = active.pop(tk)
+            pnl = calc_pnl(pos['direction'], pos['entry_price'], pos['exit_price'], pos['contracts'], tk)
+            capital += pos['locked_go'] + pnl
+            peak = max(peak, _total_equity())
+            equity.append(_total_equity())
+            _record_margin_usage()
+            trades.append({
+                'ticker': tk, 'pnl': pnl,
+                'entry_time': pos['entry_time'],
+                'exit_time': pos.get('exit_time', sig.get('time', '')),
+                'direction': pos['direction'],
+                'contracts': pos['contracts'],
+                'entry_price': pos['entry_price'],
+            })
+
+        if len(active) >= max_concurrent:
+            continue
+
+        try:
+            cfg = ALL_TICKER_CONFIGS[tk]
+        except KeyError:
+            continue
+        go = cfg.get('go', 0)
+        if go <= 0:
+            continue
+
+        total_cap = _total_equity()
+        max_risk = total_cap * adaptive_margin
+        contracts = int(max_risk // go) if max_risk >= go else 0
+        if contracts < 1:
+            continue
+        locked_go = contracts * go
+
+        total_locked = sum(p['locked_go'] for p in active.values())
+        if total_locked + locked_go > total_cap * adaptive_tm_limit:
+            continue
+
+        # ── Per-strategy risk method ──
+        strategy = sig.get('strategy', 'unknown')
+        method = STRATEGY_HEDGE_MAP.get(strategy, 'stop')
+
+        if method == 'hedge':
+            sig = adjust_exit_for_hedge(sig, hedge_premium_pct, hedge_strike_pct)
+        else:
+            # Inline stop-loss: cap loss at stop_loss_pct
+            sig = dict(sig)
+            entry_price_in = sig['entry']
+            exit_price_in = sig['exit']
+            direction_in = sig['direction']
+            raw_ret = (exit_price_in - entry_price_in) / entry_price_in if direction_in == 'LONG' else (entry_price_in - exit_price_in) / entry_price_in
+            if raw_ret < -stop_loss_pct:
+                capped_ret = -stop_loss_pct
+                if direction_in == 'LONG':
+                    sig['exit'] = round(entry_price_in * (1 + capped_ret), 2)
+                else:
+                    sig['exit'] = round(entry_price_in * (1 - capped_ret), 2)
+
+        entry_price = sig.get('entry', 0)
+        exit_price = sig.get('exit', 0)
+        direction = sig.get('direction', 'LONG')
+
+        if locked_go > capital:
+            continue
+        capital -= locked_go
+
+        active[tk] = {
+            'entry_price': entry_price, 'exit_price': exit_price,
+            'direction': direction, 'contracts': contracts,
+            'entry_time': sig.get('time', ''),
+            'exit_time': sig.get('time', ''),
+            'strategy': sig.get('strategy', ''),
+            'locked_go': locked_go,
+        }
+        _record_margin_usage()
+
+    for tk in list(active.keys()):
+        pos = active.pop(tk)
+        pnl = calc_pnl(pos['direction'], pos['entry_price'], pos['exit_price'], pos['contracts'], tk)
+        capital += pos['locked_go'] + pnl
+        peak = max(peak, _total_equity())
+        equity.append(_total_equity())
+        _record_margin_usage()
+
+    return {
+        'final_capital': round(_total_equity(), 2),
+        'equity': equity,
+        'trades': trades,
+        'margin_ratio': margin_ratio_history,
+        'compression': compression_history,
+    }
+
+
+# ── 3. Walk-Forward ───────────────────────────────────────────
 
 
 def get_date_bounds(signals: List[Dict]) -> tuple:

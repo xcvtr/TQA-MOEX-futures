@@ -132,6 +132,76 @@ OI_DIVERGENCE_TICKERS: dict = {
     'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'Si (USD/RUB OI Div)', 'horizon': 6, 'max_loss': -5.0},
 }
 
+# ─── Whale Detection (OI Volume Burst) ──────────────────────────────────────
+DEFAULT_WHALE_CONFIG = {
+    'yur_z_thresh': 2.5,
+    'horizon': 12,
+    'fiz_z_max': 1.5,
+}
+
+WHALE_TICKERS: dict = {
+    'RI': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'RI (Whale OI)', 'horizon': 12, 'max_loss': -5.0},
+    'GL': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'GL (Whale OI)', 'horizon': 12, 'max_loss': -5.0},
+    'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'Si (Whale OI)', 'horizon': 12, 'max_loss': -5.0},
+    'NM': {'enabled': True, 'go': 1405, 'tick_rub': 1.0, 'minstep': 1, 'label': 'NM (Whale OI)', 'horizon': 12, 'max_loss': -5.0},
+}
+
+# ─── Momentum Breakout + OI Confirmation ─────────────────────────────────────
+DEFAULT_MOMENTUM_CONFIG = {
+    'lookback': 20,
+    'horizon': 24,
+    'oi_growth_min': 0.0,
+    'require_yur_dom': True,
+}
+
+MOMENTUM_TICKERS: dict = {
+    'RI': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'RI (Momentum OI)', 'horizon': 24, 'max_loss': -5.0},
+    'GL': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'GL (Momentum OI)', 'horizon': 24, 'max_loss': -5.0},
+    'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'Si (Momentum OI)', 'horizon': 24, 'max_loss': -5.0},
+    'NM': {'enabled': True, 'go': 1405, 'tick_rub': 1.0, 'minstep': 1, 'label': 'NM (Momentum OI)', 'horizon': 24, 'max_loss': -5.0},
+}
+
+# ─── Volume Profile / HVN ────────────────────────────────────────────────────
+DEFAULT_PROFILE_CONFIG = {
+    'lookback': 20,
+    'vol_mult': 2.0,
+    'n_buckets': 10,
+    'horizon': 12,
+    'hvn_touch_pct': 0.01,
+}
+
+PROFILE_TICKERS: dict = {
+    'Si': {'enabled': True, 'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'Si (Profile HVN)', 'horizon': 12, 'max_loss': -5.0},
+    'RI': {'enabled': True, 'go': 5000, 'tick_rub': 1.0, 'minstep': 1, 'label': 'RI (Profile HVN)', 'horizon': 12, 'max_loss': -5.0},
+    'NM': {'enabled': True, 'go': 1405, 'tick_rub': 1.0, 'minstep': 1, 'label': 'NM (Profile HVN)', 'horizon': 12, 'max_loss': -5.0},
+    'SR': {'enabled': True, 'go': 5719, 'tick_rub': 1.0, 'minstep': 0.01, 'label': 'SR (Profile HVN)', 'horizon': 12, 'max_loss': -5.0},
+    'GZ': {'enabled': True, 'go': 2065, 'tick_rub': 0.01, 'minstep': 0.01, 'label': 'GZ (Profile HVN)', 'horizon': 12, 'max_loss': -5.0},
+}
+
+# ─── Spread Trading (Pairs) ──────────────────────────────────────────────────
+DEFAULT_SPREAD_CONFIG = {
+    'entry_z': 2.0,
+    'exit_z': 0.5,
+    'horizon': 12,
+    'lookback': 60,
+}
+
+SPREAD_TICKERS: dict = {
+    'Si/BR': {'enabled': True, 'go_pair': 2000, 'tick_rub': 1.0, 'minstep': 0.0001, 'label': 'Si/BR (Spread)', 'horizon': 12, 'max_loss': -5.0},
+    'RI/GL': {'enabled': True, 'go_pair': 5000, 'tick_rub': 1.0, 'minstep': 0.0001, 'label': 'RI/GL (Spread)', 'horizon': 12, 'max_loss': -5.0},
+    'NM/AF': {'enabled': True, 'go_pair': 4000, 'tick_rub': 1.0, 'minstep': 0.0001, 'label': 'NM/AF (Spread)', 'horizon': 12, 'max_loss': -5.0},
+}
+
+# ─── Additional tickers for spread pairs ─────────────────────────────────────
+SPREAD_COMPONENT_TICKERS: dict = {
+    'BR': {'go': 3000, 'tick_rub': 1.0, 'minstep': 0.01},
+    'AF': {'go': 7000, 'tick_rub': 0.74, 'minstep': 1},
+    'Si': {'go': 1000, 'tick_rub': 1.0, 'minstep': 0.01},
+    'RI': {'go': 5000, 'tick_rub': 1.0, 'minstep': 1},
+    'GL': {'go': 5000, 'tick_rub': 1.0, 'minstep': 0.01},
+    'NM': {'go': 1405, 'tick_rub': 1.0, 'minstep': 1},
+}
+
 DB_CREDENTIALS = {
     'host': '10.0.0.64',
     'port': 5432,

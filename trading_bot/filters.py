@@ -193,6 +193,99 @@ def add_regime_filter(
 # ── statistics ────────────────────────────────────────────────────────────────
 
 
+def add_regime_filter_adx(
+    signals: List[Dict],
+    close_prices: List[float],
+    signal_indices: List[int],
+    adx_min: int = 25,
+    adx_max: int = 100,
+    period: int = 14,
+) -> List[Dict]:
+    """
+    ADX regime filter: keep signals only when ADX is in [adx_min, adx_max].
+    ADX > 25 = strong trend. ADX < 15 = weak/no trend (filter out).
+    ADX > adx_max = extremely overextended (optional cap).
+
+    Returns filtered signals.
+    """
+    if not signals:
+        return []
+
+    adx = calc_adx(close_prices, period)
+    filtered = []
+
+    for sig, idx in zip(signals, signal_indices):
+        if idx < len(adx) and adx_min <= adx[idx] <= adx_max:
+            filtered.append(sig)
+
+    return filtered
+
+
+def calc_atr(highs: List[float], lows: List[float], closes: List[float], period: int = 14) -> List[float]:
+    """
+    Calculate Average True Range, NO look-ahead.
+    """
+    n = len(highs)
+    tr = [0.0] * n
+    for i in range(1, n):
+        tr[i] = max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i - 1]),
+            abs(lows[i] - closes[i - 1]),
+        )
+    atr = [0.0] * n
+    for i in range(period, n):
+        atr[i] = sum(tr[i - period:i]) / period
+    return atr
+
+
+def add_atr_channel_filter(
+    signals: List[Dict],
+    highs: List[float],
+    lows: List[float],
+    closes: List[float],
+    signal_indices: List[int],
+    atr_mult: float = 1.5,
+    period: int = 14,
+) -> List[Dict]:
+    """
+    ATR channel filter: signal only if close is OUTSIDE the ATR channel.
+    Channel = rolling mean ± atr_mult * ATR.
+    Used for OI Divergence v2: price must break ATR channel + OI diverge.
+
+    Returns filtered signals with additional fields.
+    """
+    if not signals:
+        return []
+
+    n = len(closes)
+    atr = calc_atr(highs, lows, closes, period)
+
+    # Rolling mean (SMA) for channel center
+    sma = [0.0] * n
+    for i in range(period, n):
+        sma[i] = sum(closes[i - period:i]) / period
+
+    filtered = []
+    for sig, idx in zip(signals, signal_indices):
+        if idx >= len(atr) or idx >= len(sma) or atr[idx] <= 0:
+            continue
+        ch_upper = sma[idx] + atr_mult * atr[idx]
+        ch_lower = sma[idx] - atr_mult * atr[idx]
+        close = closes[idx] if idx < len(closes) else 0
+
+        # LONG: close below channel (oversold)
+        # SHORT: close above channel (overbought)
+        if sig.get('direction') == 'LONG' and close < ch_lower:
+            sig['atr_break'] = True
+            filtered.append(sig)
+        elif sig.get('direction') == 'SHORT' and close > ch_upper:
+            sig['atr_break'] = True
+            filtered.append(sig)
+
+    return filtered
+
+
 def compute_stats(signals: List[Dict]) -> Dict[str, float]:
     """
     Вычислить статистику по списку сигналов.

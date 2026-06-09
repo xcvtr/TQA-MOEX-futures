@@ -1,0 +1,80 @@
+========================================================================
+  PHASE 1 DIAGNOSTICS — Strategy V2 Baseline
+========================================================================
+Date: 2026-06-10
+DB: host=10.0.0.64, db=moex
+Data window: 730 days (full sample)
+
+────────────────────────────────────────────────────────────────────────
+  TICKER DATA OVERVIEW (65 tickers in DB)
+────────────────────────────────────────────────────────────────────────
+moex_prices_5m:    5,876,550 rows
+moex_prices_5m_oi: 9,599,758 rows
+All tickers have >1 year data except: KC (1yr), BM (1.5yr), HS (3yr+)
+
+────────────────────────────────────────────────────────────────────────
+  STRATEGY DIAGNOSTICS BY TICKER
+────────────────────────────────────────────────────────────────────────
+
+RI:
+  OI Divergence: 749 sig, WR=53.9%, PF=1.22, avgRet=0.02%, DD=5.4%
+  OTC:           20483 sig, WR=45.8%, PF=0.94, avgRet=-0.01%, DD=307.4%
+  Retail Trap:   24741 sig, WR=47.9%, PF=0.98, avgRet=-0.0%, DD=91.5%
+  VWAP:          18259 sig, WR=51.5%, PF=1.0, avgRet=-0.0%, DD=94.0%
+
+GL:
+  OI Divergence: 283 sig, WR=61.8%, PF=1.52, avgRet=0.06%, DD=9.2%
+  OTC:           19097 sig, WR=47.2%, PF=0.9, avgRet=-0.01%, DD=348.7%
+  Retail Trap:   24248 sig, WR=50.0%, PF=0.97, avgRet=-0.0%, DD=172.2%
+  VWAP:          23621 sig, WR=51.8%, PF=1.14, avgRet=0.02%, DD=72.0%
+
+Si:
+  OI Divergence: 96 sig, WR=61.5%, PF=1.32, avgRet=0.04%, DD=3.3%
+  OTC:           10861 sig, WR=46.6%, PF=0.97, avgRet=-0.0%, DD=64.1%
+  Retail Trap:   13246 sig, WR=49.2%, PF=1.1, avgRet=0.01%, DD=62.6%
+  VWAP:          18277 sig, WR=52.7%, PF=1.0, avgRet=0.0%, DD=82.2%
+
+NM:
+  OI Divergence: 130 sig, WR=60.8%, PF=1.31, avgRet=0.04%, DD=6.9%
+  OTC:           15284 sig, WR=47.6%, PF=0.93, avgRet=-0.02%, DD=321.7%
+  Retail Trap:   18335 sig, WR=49.6%, PF=0.98, avgRet=-0.0%, DD=165.4%
+  VWAP:          22476 sig, WR=50.8%, PF=1.08, avgRet=0.01%, DD=172.7%
+
+CNYRUBF:
+  OI Divergence: 63 sig, WR=63.5%, PF=4.2, avgRet=0.13%, DD=1.4%
+  VWAP:          15248 sig, WR=51.9%, PF=0.98, avgRet=-0.0%, DD=47.0%
+
+GZ:
+  VWAP:          15264 sig, WR=55.4%, PF=1.13, avgRet=0.02%, DD=56.1%
+
+SR:
+  VWAP:          19275 sig, WR=53.3%, PF=1.06, avgRet=0.01%, DD=70.7%
+
+NA:
+  OI Divergence: 37 sig, WR=62.2%, PF=2.71, avgRet=0.09%, DD=1.0%
+
+ED:
+  OI Divergence: 236 sig, WR=55.1%, PF=1.91, avgRet=0.02%, DD=1.5%
+
+KC:
+  OI Divergence: 214 sig, WR=52.8%, PF=1.19, avgRet=0.03%, DD=5.0%
+
+IMOEXF:
+  OI Divergence: 85 sig, WR=48.2%, PF=1.68, avgRet=0.08%, DD=5.1%
+
+────────────────────────────────────────────────────────────────────────
+  KEY FINDINGS
+────────────────────────────────────────────────────────────────────────
+1. OI Divergence is strongest strategy: GL (61.8%), Si (61.5%), NM (60.8%),
+   CNYRUBF (63.5%), NA (62.2%). All have WR>60%.
+2. VWAP works best on GZ (55.4%), SR (53.3%), MC (53.7%)
+3. OTC and Retail Trap have WR<50% on most tickers — negative edge
+4. All base strategies generate 100-750 signals/2yr on OI Divergence
+5. Volume and OI data available for most tickers (good for new strategies)
+
+────────────────────────────────────────────────────────────────────────
+  DISABLED/SKIPPED STRATEGIES VERDICT
+────────────────────────────────────────────────────────────────────────
+Volume Surge: DISABLED (confirmed: WR<50%, avg ret negative, no salvage)
+Order Block:  DISABLED (regime-dependent, needs SL rework)
+VWAP:         SKIPPED (97% signal flood — keep as filter, not standalone)
