@@ -8,6 +8,7 @@ portfolio_sweep.py — Compare classic FIFO vs Portfolio (priority+correlation) 
 4. Report TOP-10 per DD level + comparison
 """
 
+import json
 import os, sys
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
@@ -271,6 +272,18 @@ def collect_signals(score_threshold: float = 0.3) -> List[Dict]:
                 print(f"    -> 0 signals")
                 continue
 
+            # Precompute ATR and ADX for volatility-aware stops
+            closes_series = [r['close'] for r in merged]
+            highs_series = [r['high'] for r in merged]
+            lows_series = [r['low'] for r in merged]
+            try:
+                from trading_bot.filters import calc_atr, calc_adx
+                atr_vals = calc_atr(highs_series, lows_series, closes_series, 14)
+                adx_vals = calc_adx(closes_series, 14)
+            except ImportError:
+                atr_vals = []
+                adx_vals = []
+
             scored = 0
             passed = 0
             for s in sigs:
@@ -281,6 +294,12 @@ def collect_signals(score_threshold: float = 0.3) -> List[Dict]:
                 s['score'] = quality['total']
                 s['score_components'] = quality['components']
                 s['ticker'] = sym
+                # Volatility data for ATR-adaptive stops
+                if atr_vals and idx < len(atr_vals) and closes_series[idx] > 0:
+                    s['atr_value'] = atr_vals[idx]
+                    s['atr_pct'] = atr_vals[idx] / closes_series[idx]
+                if adx_vals and idx < len(adx_vals):
+                    s['adx_value'] = adx_vals[idx]
                 scored += 1
                 if quality['total'] >= score_threshold:
                     passed += 1
@@ -298,6 +317,17 @@ def collect_signals(score_threshold: float = 0.3) -> List[Dict]:
         print(f"  Errors: {len(errors)}")
         for e in errors[:5]:
             print(f"    - {e}")
+
+    # Cache signals for fast re-runs
+    cache_path = os.path.join(PROJECT_ROOT, '.signals_cache.json')
+    try:
+        # Store minimal signal data (drop bulky score_components)
+        minimal = [{k: v for k, v in s.items() if k != 'score_components'} for s in all_signals]
+        with open(cache_path, 'w') as f:
+            json.dump(minimal, f)
+        print(f"  💾 Cached {len(minimal)} signals to {cache_path}")
+    except Exception as e:
+        print(f"  ⚠ Cache save failed: {e}")
 
     return all_signals
 
@@ -350,6 +380,10 @@ def run_sweep(all_signals: List[Dict]):
                         max_dd_limit=0.20,
                         stop_loss_pct=sl,
                         score_threshold=0.0,
+                        use_score_sizing=True,
+                        use_score_eviction=True,
+                        atr_stop_mult=2.0,
+                        use_score_decay=True,
                     )
 
                     for tag, res, store in [('FIFO', res_fifo, fifo_results), ('PF', res_pf, pf_results)]:
@@ -382,12 +416,13 @@ def run_sweep(all_signals: List[Dict]):
     # Build output
     lines = []
     lines.append("=" * 80)
-    lines.append("  PORTFOLIO OPTIMIZER: FIFO vs Portfolio (priority+correlation)")
+    lines.append("  PORTFOLIO OPTIMIZER v2: FIFO vs Portfolio (score+ATR+decay)")
     lines.append(f"  Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     lines.append(f"  Signals: {len(all_signals)} (OI Divergence, horizon=12, score >= 0.3)")
     lines.append(f"  Tickers: {len(QUALIFIED_TICKERS)} (WR>52%)")
     lines.append(f"  Initial capital: {initial_capital:,} RUB")
     lines.append(f"  Grid: mu={param_grid['mu']}, mc={param_grid['mc']}, tm={param_grid['tm']}, sl={param_grid['sl']}")
+    lines.append(f"  v2: score_sizing=Y, score_eviction=Y, atr_stop=2.0, score_decay=Y")
     lines.append(f"  Total: {count} combinations x 2 = {count * 2} simulations")
     lines.append("=" * 80)
     lines.append("")

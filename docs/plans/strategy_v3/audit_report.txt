@@ -1,0 +1,133 @@
+═══════════════════════════════════════════════════════════════════════════════
+  AUDIT REPORT — Portfolio Optimizer Results
+  Date: 2026-06-10
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  CRITICAL FINDING: ALL portfolio sweep results are INVALID                 ║
+║  due to look-ahead bias in eviction exit prices.                           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+═══ 1. ROOT CAUSE: Look-ahead bias in position exit on eviction ═══════════════
+
+File: trading_bot/portfolio.py, lines 225-242
+
+When a position is evicted (max_concurrent reached + higher-priority signal),
+the PnL is computed using pos['exit_price'] — which is the signal's PRE-COMPUTED
+exit price at the horizon (12 bars ahead).
+
+But the eviction occurs at the TIME of the incoming signal, which may be BEFORE
+the evicted position's horizon has elapsed. The exit price comes from a future
+bar that hasn't been reached in simulation time.
+
+Example:
+  1. Signal for ticker A at bar 100: exit_price = close of bar 112 (horizon=12)
+  2. Position A is opened at bar 100 with exit_price = close[112]
+  3. Signal for ticker B arrives at bar 103
+  4. If portfolio is full and B has higher priority, A is evicted
+  5. PnL uses close[112] — but simulation time is only at bar 103!
+  6. close[112] is 9 bars in the future → LOOK-AHEAD BIAS
+
+The same bias exists in the FIFO version (portfolio_sweep.py:168-173) when a new
+signal for the SAME ticker closes an old position. However, Portfolio is affected
+DISPROPORTIONATELY because:
+  - FIFO only closes same-ticker positions (rare, ~1 overlap per ticker)
+  - Portfolio evicts ANY lower-priority ticker whenever at max_concurrent
+  - With 7093 signals across 47 tickers, evictions are FREQUENT
+
+═══ 2. THE +34,526% EXPLAINED ═════════════════════════════════════════════════
+
+Param combo: mu=0.15 mc=5 tm=0.3 sl=0.02 → 935 trades, 34526.3% return
+
+This is NOT a real result — it's the product of:
+  (a) Frequent evictions closing positions at future (favorable) prices
+  (b) Stop-loss at 2% limiting losses on the few losers
+  (c) The 2% stop-loss is applied ONCE at entry and doesn't adjust for market
+      conditions — it's a simple cap, not a real SL simulation
+  (d) With 935 trades, even a small per-trade advantage from look-ahead
+      compounds to astronomical levels
+
+The FIFO version with identical params would produce ~0% or negative return
+(not in top 10), confirming the result is an artifact of eviction logic.
+
+═══ 3. THE +692% EXPLAINED ═════════════════════════════════════════════════════
+
+Param combo: mu=0.2 mc=5 tm=0.2 sl=0.02 → 1052 trades, 691.6% return
+
+Same mechanism, less extreme because tm=0.2 (vs 0.3) restricts margin limit
+to 20% of equity, reducing number of concurrent positions and thus evictions.
+
+The Portfolio vs FIFO gap (691.6% vs 39.5% = 17.5x) is ENTIRELY due to
+look-ahead in eviction exit prices — NOT superior portfolio construction.
+
+═══ 4. LOOK-AHEAD BIAS: SIGNAL GENERATION ═════════════════════════════════════
+
+  _zs() [new_strategies.py:32]         — uses vals[i-w:i] only  ✅ NO bias
+  _rolling_median() [new_strategies.py:44] — uses arr[:i] only  ✅ NO bias
+  calc_adx() [filters.py:43]           — uses close[:i+1] only ✅ NO bias
+  calc_atr() [filters.py:224]          — uses data[:i] only    ✅ NO bias
+  VWAP [new_strategies.py:304-308]     — uses [i-w:i] only     ✅ NO bias
+  compute_quality_score() [strategy_cascade.py:133]
+    - data[:idx+1] for all calculations ✅ NO bias
+    - Segment isolation is correct      ✅ NO bias
+
+Signal generation and quality scoring are CLEAN — no look-ahead bias.
+
+═══ 5. SIGNAL idx INTEGRITY ════════════════════════════════════════════════════
+
+  - idx = trigger bar index (i) in merged data
+  - signal['time'] = merged[i]['time']  ✅ correct mapping
+  - compute_quality_score(merged, idx) uses data[:idx+1]  ✅ correct
+  - Signal['entry'] = limit_price (low/high of trigger bar for limit orders)
+  - Signal['exit'] = merged[ex]['close'] where ex = fill_bar + horizon
+  - The exit price is the theoretical forward return — correct for signal
+    generation, but problematic when used EARLY in eviction
+
+═══ 6. PnL CALCULATION VERIFICATION ═══════════════════════════════════════════
+
+  _calc_pnl() [portfolio.py:120-127]:
+    PnL = (exit - entry) / minstep * tick_rub * contracts
+    minstep=0.01, tick_rub=1.0 for most tickers ✅
+    KC: tick_rub=80.0 — 1 tick = 80 RUB ✅ (verified against MOEX specs)
+    GZ: tick_rub=0.01 — 1 tick = 0.01 RUB ✅
+
+  No division by zero (minstep > 0 for all configs)  ✅
+  Direction handling for SHORT: moves = -moves  ✅
+
+═══ 7. EQUITY CURVE ANOMALIES ═════════════════════════════════════════════════
+
+  All equity curves from Portfolio sweep are contaminated by look-ahead bias.
+  Individual equity curve inspection is not meaningful — the bias affects
+  EVERY eviction event.
+
+═══ 8. SUMMARY — WHICH RESULTS ARE REAL ═══════════════════════════════════════
+
+  ❌ PF ret=34526.3%  — BOGUS (look-ahead in eviction)
+  ❌ PF ret=691.6%    — BOGUS (same cause)
+  ❌ PF ret=520.2%    — BOGUS (same cause)
+  ❌ PF ret=327.1%    — BOGUS (same cause)
+  ❌ All other PF results > 100% — BOGUS
+
+  ✅ FIFO ret=39.5%   — PLAUSIBLE (minimal look-ahead, only same-ticker overlap)
+  ✅ FIFO ret=187.8%  — SUSPICIOUS (13 trades only — too few for statistical
+     significance, but not caused by bug)
+
+  ALL Portfolio results with return > ~100% are artifacts of the exit price
+  look-ahead bias in eviction. The correlation group and priority logic MAY
+  still be valid, but the simulation framework invalidates the quantitative
+  results.
+
+═══ 9. RECOMMENDATION ═════════════════════════════════════════════════════════
+
+  To fix, the exit price for an evicted position must be the exit price at
+  the CURRENT bar (or entry + stop-loss if applicable), NOT the pre-computed
+  horizon exit price. The position should be marked to market at eviction time.
+
+  Two approaches:
+  1. (Simple) When evicting, close at the current signal's exit price rather
+     than the stored exit_price. This is a rough approximation.
+  2. (Correct) Store the entry bar index and horizon, and look up the actual
+     close price at the eviction time. This requires the full OHLCV data to
+     be available in simulate_adaptive_portfolio().
+
+  The same fix should be applied to the FIFO version for same-ticker overlaps.
+
+═══════════════════════════════════════════════════════════════════════════════

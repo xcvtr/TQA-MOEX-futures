@@ -82,6 +82,9 @@ def main() -> str:
                         for idx, r in df.iterrows()]
             
             sigs = detect_signals_limit(rows, cfg)
+            # VS engine doesn't include ticker in signals — add it
+            for s in sigs:
+                s['ticker'] = sym
             vs_signals.extend(sigs)
         except Exception as e:
             alerts.append(f"[WARN] VS scan {sym} error: {e}")
@@ -180,7 +183,7 @@ def main() -> str:
     # 5. Apply ADX regime filter — skip if filters module doesn't exist
     try:
         from trading_bot.filters import calc_adx
-        from trading_bot.scanner import load_data
+        from trading_bot.scanner import load_data as _adx_load_data
         adx_data_cache = {}
         # Pre-load for all tickers that might be checked
         all_adx_tickers = set()
@@ -190,7 +193,7 @@ def main() -> str:
             if cfg.get('adx_filter', False):
                 all_adx_tickers.add(tk)
         for tk in all_adx_tickers:
-            adx_data_cache[tk] = load_data(tk, days=30)
+            adx_data_cache[tk] = _adx_load_data(tk, days=30)
 
         adx_filtered_signals = []
         for sig in signals:
