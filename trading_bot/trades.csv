@@ -52,3 +52,7 @@ time,symbol,direction,entry,exit,contracts,pnl_pct,pnl_rub,status2026-06-09T12:0
 2026-06-09T13:00:00,MC,SHORT,2546.05,2546.05,7,0.0,-0.0,closed_horizon
 2026-06-09T12:00:00,IMOEXF,LONG,2514.0,2538.5,9,0.97,22050.0,closed_horizon
 2026-06-09T13:00:00,IMOEXF,SHORT,2538.5,2538.5,9,0.0,-0.0,closed_horizon
+2026-06-09T13:00:00,IMOEXF,SHORT,2538.5,,9,,,open
+2026-06-09T13:00:00,MC,SHORT,2546.05,,7,,,open
+2026-06-09T13:00:00,IMOEXF,SHORT,2538.5,2538.5,9,0.0,-0.0,closed_horizon
+2026-06-09T13:00:00,MC,SHORT,2546.05,2546.05,7,0.0,-0.0,closed_signal_lost

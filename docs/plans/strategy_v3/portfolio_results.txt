@@ -1,6 +1,6 @@
 ================================================================================
   PORTFOLIO OPTIMIZER v2: FIFO vs Portfolio (score+ATR+decay)
-  Date: 2026-06-10 08:36
+  Date: 2026-06-10 20:31
   Signals: 7093 (OI Divergence, horizon=12, score >= 0.3)
   Tickers: 47 (WR>52%)
   Initial capital: 100,000 RUB
@@ -89,7 +89,7 @@
   BEST COMBINATION BY CALMAR (overall)
 ================================================================================
   FIFO: ret=187.8% DD=36.11% Calmar=5.20 trades=13 mu=0.1 mc=5 tm=0.3 sl=0.01
-  PF: ret=61.3% DD=30.60% Calmar=2.00 trades=163 mu=0.1 mc=8 tm=0.3 sl=0.01
+  PF: ret=5878.4% DD=21.12% Calmar=278.32 trades=907 mu=0.2 mc=3 tm=0.15 sl=0.01
 
 
 ================================================================================
@@ -104,9 +104,9 @@
     best return: 187.8%
 
   PF:
-    avg return: -6997.8%
-    avg DD:     471.97%
-    avg Calmar: -9.81
-    avg trades: 100
-    best Calmar: 2.00
-    best return: 65.2%
+    avg return: -149.0%
+    avg DD:     476.02%
+    avg Calmar: 15.20
+    avg trades: 187
+    best Calmar: 278.32
+    best return: 5878.4%

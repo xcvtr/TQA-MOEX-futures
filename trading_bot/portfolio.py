@@ -151,6 +151,7 @@ def simulate_adaptive_portfolio(
     max_dd_limit: float,
     stop_loss_pct: float = 0.02,
     score_threshold: float = 0.0,
+    max_hold_bars: int = 40,
     # ── v2 improvements ──
     use_score_sizing: bool = True,
     use_score_eviction: bool = True,
@@ -245,6 +246,41 @@ def simulate_adaptive_portfolio(
             _record_margin_usage()
             break
 
+        # ── Dynamic Time-stop (v3: score-adaptive + ADX modulator) ──
+        if max_hold_bars > 0:
+            for t in list(active.keys()):
+                active[t]['bars_held'] = active[t].get('bars_held', 0) + 1
+                pos_score = active[t].get('score', 0.3)
+                # Score-каскад: hold_limit = max_hold * (0.5 + score), clamp [10, 80]
+                hold_limit = int(max_hold_bars * (0.5 + pos_score))
+                hold_limit = max(10, min(hold_limit, 80))
+                # ADX модулятор
+                adx_val = active[t].get('adx_value', 0)
+                if adx_val > 25:
+                    hold_limit = int(hold_limit * 1.5)
+                elif adx_val > 0 and adx_val < 15:
+                    hold_limit = int(hold_limit * 0.7)
+                hold_limit = max(hold_limit, 1)
+                if active[t]['bars_held'] >= hold_limit:
+                    pos = active.pop(t)
+                    # Close at exit_price (set at entry time, no look-ahead)
+                    pnl = _calc_pnl(pos['direction'], pos['entry_price'], pos['exit_price'], pos['contracts'], t)
+                    capital += pos['locked_go'] + pnl
+                    if use_score_decay:
+                        if pnl > 0:
+                            consecutive_wins[t] = consecutive_wins.get(t, 0) + 1
+                        else:
+                            consecutive_wins[t] = 0
+                    peak = max(peak, _total_equity())
+                    equity.append(_total_equity())
+                    _record_margin_usage()
+                    trades.append({
+                        'ticker': t, 'pnl': pnl,
+                        'entry_time': pos.get('entry_time', ''),
+                        'exit_time': sig.get('time', ''),
+                        'direction': pos['direction'],
+                        'contracts': pos['contracts'],
+                    })
         # ── Same-ticker rollover: close old at current price ──
         if tk in active:
             close_price = _get_current_price(sig)
@@ -393,6 +429,7 @@ def simulate_adaptive_portfolio(
             'group': group,
             'score': sig_score,
             'last_price': entry_price,
+            'bars_held': 0,
         }
         _record_margin_usage()
 

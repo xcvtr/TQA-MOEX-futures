@@ -246,8 +246,34 @@ def simulate_adaptive(
     }
 
 
+CACHE_PATH = os.path.join(PROJECT_ROOT, '.signals_cache.json')
+
+
+def _load_cache():
+    """Load signals from cache if available and fresh enough."""
+    if not os.path.exists(CACHE_PATH):
+        return None
+    try:
+        with open(CACHE_PATH, 'r') as f:
+            data = json.load(f)
+        if data and len(data) > 0:
+            print(f"  ✅ Loaded {len(data)} signals from cache ({CACHE_PATH})")
+            return data
+    except Exception as e:
+        print(f"  ⚠ Cache load failed: {e}")
+    return None
+
+
 def collect_signals(score_threshold: float = 0.3) -> List[Dict]:
     """Load OI Divergence signals + compute quality score. Filter by score_threshold."""
+    # Try cache first
+    cached = _load_cache()
+    if cached is not None:
+        # Verify that cached signals have required fields
+        if all(k in cached[0] for k in ('score', 'entry', 'exit', 'ticker', 'time', 'direction')):
+            return cached
+        print("  ⚠ Cache format mismatch, re-collecting...")
+
     all_signals = []
     errors = []
 
