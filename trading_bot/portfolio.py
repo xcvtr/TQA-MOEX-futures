@@ -157,6 +157,7 @@ def simulate_adaptive_portfolio(
     use_score_eviction: bool = True,
     atr_stop_mult: float = 0.0,
     use_score_decay: bool = True,
+    use_mtm: bool = True,
 ) -> Dict:
     """
     Portfolio-aware simulation with v2 improvements.
@@ -179,7 +180,14 @@ def simulate_adaptive_portfolio(
     consecutive_wins: Dict[str, int] = {}
 
     def _total_equity():
-        return capital + sum(p['locked_go'] for p in active.values())
+        base = capital + sum(p['locked_go'] for p in active.values())
+        if use_mtm:
+            mtm_pnl = 0.0
+            for tk_pos, p in active.items():
+                current_est = p.get('last_price', p['entry_price'])
+                mtm_pnl += _calc_pnl(p['direction'], p['entry_price'], current_est, p['contracts'], tk_pos)
+            return base + mtm_pnl
+        return base
 
     def _record_margin_usage():
         te = _total_equity()
@@ -224,6 +232,10 @@ def simulate_adaptive_portfolio(
         if sig_score < eff_th:
             continue
 
+        current_price = _get_current_price(sig)
+        if use_mtm and tk in active:
+            active[tk]['last_price'] = current_price
+
         te = _total_equity()
         if te > peak:
             peak = te
@@ -236,7 +248,6 @@ def simulate_adaptive_portfolio(
 
         dd = (peak - te) / peak if peak > 0 else 0
         if dd > max_dd_limit:
-            current_price = _get_current_price(sig)
             for t in list(active.keys()):
                 pos = active.pop(t)
                 close_price = current_price if t == tk else pos.get('last_price', pos['entry_price'])
@@ -250,6 +261,8 @@ def simulate_adaptive_portfolio(
         if max_hold_bars > 0:
             for t in list(active.keys()):
                 active[t]['bars_held'] = active[t].get('bars_held', 0) + 1
+                if t == tk:
+                    active[t]['last_price'] = current_price
                 pos_score = active[t].get('score', 0.3)
                 # Score-каскад: hold_limit = max_hold * (0.5 + score), clamp [10, 80]
                 hold_limit = int(max_hold_bars * (0.5 + pos_score))
@@ -283,7 +296,7 @@ def simulate_adaptive_portfolio(
                     })
         # ── Same-ticker rollover: close old at current price ──
         if tk in active:
-            close_price = _get_current_price(sig)
+            close_price = current_price
             pnl, pos = _close_position(tk, close_price)
             capital += pos['locked_go'] + pnl
             # Update score decay
@@ -326,7 +339,7 @@ def simulate_adaptive_portfolio(
                 if new_val <= worst_val:
                     continue
                 pos = active.pop(worst_tk)
-                close_price = _get_current_price(sig)
+                close_price = current_price
                 pnl = _calc_pnl(pos['direction'], pos['entry_price'], close_price, pos['contracts'], worst_tk)
                 # Update score decay for evicted position
                 if use_score_decay:
@@ -352,7 +365,7 @@ def simulate_adaptive_portfolio(
                 if priority >= worst_priority:
                     continue
                 pos = active.pop(worst_tk)
-                close_price = _get_current_price(sig)
+                close_price = current_price
                 pnl = _calc_pnl(pos['direction'], pos['entry_price'], close_price, pos['contracts'], worst_tk)
                 capital += pos['locked_go'] + pnl
                 peak = max(peak, _total_equity())
