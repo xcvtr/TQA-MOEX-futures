@@ -1,0 +1,962 @@
+[
+  {
+    "mode": "smart_money",
+    "hold": 10,
+    "sl": 0.01,
+    "mean_ret": 56.96,
+    "mean_dd": 4.42,
+    "min_ret": -5.12,
+    "max_dd": 7.77,
+    "score": 11.6
+  },
+  {
+    "mode": "smart_money",
+    "hold": 7,
+    "sl": 0.01,
+    "mean_ret": 45.39,
+    "mean_dd": 4.03,
+    "min_ret": -4.01,
+    "max_dd": 7.54,
+    "score": 10.13
+  },
+  {
+    "mode": "yb_up",
+    "hold": 10,
+    "sl": 0.01,
+    "mean_ret": 74.1,
+    "mean_dd": 6.73,
+    "min_ret": -3.77,
+    "max_dd": 11.68,
+    "score": 9.91
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 10,
+    "sl": 0.01,
+    "mean_ret": 35.34,
+    "mean_dd": 3.94,
+    "min_ret": -7.27,
+    "max_dd": 7.27,
+    "score": 8.08
+  },
+  {
+    "mode": "yb_up",
+    "hold": 7,
+    "sl": 0.01,
+    "mean_ret": 58.07,
+    "mean_dd": 6.67,
+    "min_ret": -4.87,
+    "max_dd": 11.32,
+    "score": 7.84
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 7,
+    "sl": 0.01,
+    "mean_ret": 29.69,
+    "mean_dd": 3.65,
+    "min_ret": -6.75,
+    "max_dd": 6.78,
+    "score": 7.32
+  },
+  {
+    "mode": "yb_up",
+    "hold": 5,
+    "sl": 0.01,
+    "mean_ret": 40.12,
+    "mean_dd": 5.47,
+    "min_ret": -4.53,
+    "max_dd": 9.56,
+    "score": 6.61
+  },
+  {
+    "mode": "yb_up",
+    "hold": 10,
+    "sl": 0.02,
+    "mean_ret": 69.14,
+    "mean_dd": 9.43,
+    "min_ret": -10.24,
+    "max_dd": 14.32,
+    "score": 6.6
+  },
+  {
+    "mode": "smart_money",
+    "hold": 5,
+    "sl": 0.01,
+    "mean_ret": 29.32,
+    "mean_dd": 4.01,
+    "min_ret": -4.44,
+    "max_dd": 6.84,
+    "score": 6.58
+  },
+  {
+    "mode": "yb_up",
+    "hold": 2,
+    "sl": 0.01,
+    "mean_ret": 18.53,
+    "mean_dd": 2.92,
+    "min_ret": 5.13,
+    "max_dd": 5.54,
+    "score": 6.34
+  },
+  {
+    "mode": "smart_money",
+    "hold": 10,
+    "sl": 0.02,
+    "mean_ret": 50.94,
+    "mean_dd": 7.47,
+    "min_ret": -10.31,
+    "max_dd": 14.18,
+    "score": 6.13
+  },
+  {
+    "mode": "smart_money",
+    "hold": 7,
+    "sl": 0.02,
+    "mean_ret": 42.32,
+    "mean_dd": 6.35,
+    "min_ret": -5.32,
+    "max_dd": 13.47,
+    "score": 6.0
+  },
+  {
+    "mode": "yb_up",
+    "hold": 3,
+    "sl": 0.01,
+    "mean_ret": 25.73,
+    "mean_dd": 4.15,
+    "min_ret": -0.8,
+    "max_dd": 7.81,
+    "score": 5.58
+  },
+  {
+    "mode": "yb_up",
+    "hold": 7,
+    "sl": 0.02,
+    "mean_ret": 52.45,
+    "mean_dd": 8.76,
+    "min_ret": -4.42,
+    "max_dd": 14.53,
+    "score": 5.39
+  },
+  {
+    "mode": "yb_up",
+    "hold": 3,
+    "sl": 0.02,
+    "mean_ret": 23.78,
+    "mean_dd": 4.43,
+    "min_ret": 2.6,
+    "max_dd": 6.74,
+    "score": 5.37
+  },
+  {
+    "mode": "smart_money",
+    "hold": 2,
+    "sl": 0.01,
+    "mean_ret": 13.32,
+    "mean_dd": 2.51,
+    "min_ret": 1.12,
+    "max_dd": 5.29,
+    "score": 5.32
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 7,
+    "sl": 0.02,
+    "mean_ret": 27.11,
+    "mean_dd": 4.61,
+    "min_ret": -4.96,
+    "max_dd": 7.5,
+    "score": 5.29
+  },
+  {
+    "mode": "yb_up",
+    "hold": 10,
+    "sl": 0.03,
+    "mean_ret": 66.26,
+    "mean_dd": 11.35,
+    "min_ret": -10.13,
+    "max_dd": 19.6,
+    "score": 5.26
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 5,
+    "sl": 0.01,
+    "mean_ret": 6.45,
+    "mean_dd": 1.23,
+    "min_ret": 0.35,
+    "max_dd": 1.8,
+    "score": 5.25
+  },
+  {
+    "mode": "smart_money",
+    "hold": 3,
+    "sl": 0.01,
+    "mean_ret": 18.44,
+    "mean_dd": 3.19,
+    "min_ret": -0.2,
+    "max_dd": 6.28,
+    "score": 5.19
+  },
+  {
+    "mode": "yb_up",
+    "hold": 10,
+    "sl": 0.05,
+    "mean_ret": 82.74,
+    "mean_dd": 12.92,
+    "min_ret": -10.4,
+    "max_dd": 28.9,
+    "score": 5.12
+  },
+  {
+    "mode": "smart_money",
+    "hold": 1,
+    "sl": 0.01,
+    "mean_ret": 9.58,
+    "mean_dd": 1.88,
+    "min_ret": 3.21,
+    "max_dd": 2.82,
+    "score": 5.09
+  },
+  {
+    "mode": "smart_money",
+    "hold": 10,
+    "sl": 0.03,
+    "mean_ret": 49.41,
+    "mean_dd": 8.9,
+    "min_ret": -12.08,
+    "max_dd": 16.75,
+    "score": 4.99
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 10,
+    "sl": 0.05,
+    "mean_ret": 39.68,
+    "mean_dd": 6.66,
+    "min_ret": -9.15,
+    "max_dd": 18.25,
+    "score": 4.77
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 7,
+    "sl": 0.01,
+    "mean_ret": 6.7,
+    "mean_dd": 1.27,
+    "min_ret": -0.51,
+    "max_dd": 2.0,
+    "score": 4.75
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 5,
+    "sl": 0.01,
+    "mean_ret": 17.81,
+    "mean_dd": 3.43,
+    "min_ret": -6.17,
+    "max_dd": 6.17,
+    "score": 4.67
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 10,
+    "sl": 0.02,
+    "mean_ret": 32.55,
+    "mean_dd": 5.68,
+    "min_ret": -8.31,
+    "max_dd": 8.99,
+    "score": 4.59
+  },
+  {
+    "mode": "yb_up",
+    "hold": 1,
+    "sl": 0.01,
+    "mean_ret": 11.89,
+    "mean_dd": 2.6,
+    "min_ret": 5.37,
+    "max_dd": 4.14,
+    "score": 4.58
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 10,
+    "sl": 0.01,
+    "mean_ret": 8.98,
+    "mean_dd": 1.59,
+    "min_ret": -0.58,
+    "max_dd": 2.8,
+    "score": 4.53
+  },
+  {
+    "mode": "yb_up",
+    "hold": 10,
+    "sl": 0.0,
+    "mean_ret": 81.46,
+    "mean_dd": 14.59,
+    "min_ret": -20.73,
+    "max_dd": 43.85,
+    "score": 4.47
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 10,
+    "sl": 0.0,
+    "mean_ret": 39.69,
+    "mean_dd": 7.43,
+    "min_ret": -5.32,
+    "max_dd": 25.45,
+    "score": 4.27
+  },
+  {
+    "mode": "smart_money",
+    "hold": 7,
+    "sl": 0.03,
+    "mean_ret": 39.11,
+    "mean_dd": 8.38,
+    "min_ret": -7.98,
+    "max_dd": 18.34,
+    "score": 4.2
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 7,
+    "sl": 0.05,
+    "mean_ret": 28.47,
+    "mean_dd": 6.09,
+    "min_ret": -6.99,
+    "max_dd": 13.46,
+    "score": 4.2
+  },
+  {
+    "mode": "smart_money",
+    "hold": 5,
+    "sl": 0.02,
+    "mean_ret": 25.87,
+    "mean_dd": 5.81,
+    "min_ret": -5.83,
+    "max_dd": 10.37,
+    "score": 4.01
+  },
+  {
+    "mode": "yb_up",
+    "hold": 5,
+    "sl": 0.02,
+    "mean_ret": 35.28,
+    "mean_dd": 8.01,
+    "min_ret": -4.18,
+    "max_dd": 14.51,
+    "score": 3.96
+  },
+  {
+    "mode": "smart_money",
+    "hold": 10,
+    "sl": 0.05,
+    "mean_ret": 54.04,
+    "mean_dd": 11.09,
+    "min_ret": -11.09,
+    "max_dd": 25.65,
+    "score": 3.9
+  },
+  {
+    "mode": "smart_money",
+    "hold": 3,
+    "sl": 0.02,
+    "mean_ret": 17.09,
+    "mean_dd": 4.39,
+    "min_ret": 2.74,
+    "max_dd": 10.03,
+    "score": 3.89
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 7,
+    "sl": 0.02,
+    "mean_ret": 7.97,
+    "mean_dd": 2.13,
+    "min_ret": 2.24,
+    "max_dd": 3.75,
+    "score": 3.74
+  },
+  {
+    "mode": "smart_money",
+    "hold": 7,
+    "sl": 0.05,
+    "mean_ret": 38.25,
+    "mean_dd": 9.2,
+    "min_ret": -3.5,
+    "max_dd": 24.11,
+    "score": 3.74
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 10,
+    "sl": 0.03,
+    "mean_ret": 30.93,
+    "mean_dd": 6.82,
+    "min_ret": -8.34,
+    "max_dd": 11.79,
+    "score": 3.63
+  },
+  {
+    "mode": "smart_money",
+    "hold": 10,
+    "sl": 0.0,
+    "mean_ret": 53.36,
+    "mean_dd": 11.8,
+    "min_ret": -15.77,
+    "max_dd": 33.84,
+    "score": 3.62
+  },
+  {
+    "mode": "yb_up",
+    "hold": 7,
+    "sl": 0.05,
+    "mean_ret": 48.6,
+    "mean_dd": 12.2,
+    "min_ret": -3.29,
+    "max_dd": 26.54,
+    "score": 3.59
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 10,
+    "sl": 0.02,
+    "mean_ret": 9.96,
+    "mean_dd": 2.53,
+    "min_ret": -2.86,
+    "max_dd": 5.57,
+    "score": 3.54
+  },
+  {
+    "mode": "yb_up",
+    "hold": 2,
+    "sl": 0.02,
+    "mean_ret": 15.25,
+    "mean_dd": 4.32,
+    "min_ret": 3.11,
+    "max_dd": 8.37,
+    "score": 3.53
+  },
+  {
+    "mode": "smart_money",
+    "hold": 1,
+    "sl": 0.02,
+    "mean_ret": 8.08,
+    "mean_dd": 2.32,
+    "min_ret": 0.68,
+    "max_dd": 4.19,
+    "score": 3.48
+  },
+  {
+    "mode": "yb_up",
+    "hold": 7,
+    "sl": 0.03,
+    "mean_ret": 44.59,
+    "mean_dd": 11.7,
+    "min_ret": -6.38,
+    "max_dd": 21.23,
+    "score": 3.43
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 5,
+    "sl": 0.02,
+    "mean_ret": 7.2,
+    "mean_dd": 2.1,
+    "min_ret": 2.22,
+    "max_dd": 3.57,
+    "score": 3.42
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 7,
+    "sl": 0.0,
+    "mean_ret": 27.91,
+    "mean_dd": 7.43,
+    "min_ret": -6.99,
+    "max_dd": 18.55,
+    "score": 3.38
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 7,
+    "sl": 0.03,
+    "mean_ret": 23.8,
+    "mean_dd": 6.42,
+    "min_ret": -7.5,
+    "max_dd": 10.3,
+    "score": 3.34
+  },
+  {
+    "mode": "yb_up",
+    "hold": 3,
+    "sl": 0.03,
+    "mean_ret": 20.71,
+    "mean_dd": 5.74,
+    "min_ret": -0.97,
+    "max_dd": 9.68,
+    "score": 3.25
+  },
+  {
+    "mode": "smart_money",
+    "hold": 2,
+    "sl": 0.02,
+    "mean_ret": 11.89,
+    "mean_dd": 3.7,
+    "min_ret": 2.9,
+    "max_dd": 8.97,
+    "score": 3.21
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 5,
+    "sl": 0.05,
+    "mean_ret": 17.08,
+    "mean_dd": 4.84,
+    "min_ret": -3.17,
+    "max_dd": 8.84,
+    "score": 3.17
+  },
+  {
+    "mode": "smart_money",
+    "hold": 1,
+    "sl": 0.0,
+    "mean_ret": 7.82,
+    "mean_dd": 2.5,
+    "min_ret": 0.68,
+    "max_dd": 5.09,
+    "score": 3.13
+  },
+  {
+    "mode": "smart_money",
+    "hold": 1,
+    "sl": 0.05,
+    "mean_ret": 7.82,
+    "mean_dd": 2.5,
+    "min_ret": 0.68,
+    "max_dd": 5.09,
+    "score": 3.13
+  },
+  {
+    "mode": "smart_money",
+    "hold": 1,
+    "sl": 0.03,
+    "mean_ret": 7.82,
+    "mean_dd": 2.5,
+    "min_ret": 0.68,
+    "max_dd": 5.1,
+    "score": 3.12
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 3,
+    "sl": 0.01,
+    "mean_ret": 10.06,
+    "mean_dd": 2.96,
+    "min_ret": -2.47,
+    "max_dd": 4.93,
+    "score": 3.06
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 5,
+    "sl": 0.0,
+    "mean_ret": 17.46,
+    "mean_dd": 5.3,
+    "min_ret": -3.17,
+    "max_dd": 11.14,
+    "score": 2.96
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 7,
+    "sl": 0.0,
+    "mean_ret": 8.56,
+    "mean_dd": 2.89,
+    "min_ret": 2.59,
+    "max_dd": 6.3,
+    "score": 2.96
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 5,
+    "sl": 0.02,
+    "mean_ret": 15.6,
+    "mean_dd": 4.89,
+    "min_ret": -6.66,
+    "max_dd": 6.66,
+    "score": 2.87
+  },
+  {
+    "mode": "smart_money",
+    "hold": 5,
+    "sl": 0.03,
+    "mean_ret": 23.13,
+    "mean_dd": 7.42,
+    "min_ret": -8.19,
+    "max_dd": 14.32,
+    "score": 2.81
+  },
+  {
+    "mode": "yb_up",
+    "hold": 5,
+    "sl": 0.03,
+    "mean_ret": 31.49,
+    "mean_dd": 10.11,
+    "min_ret": -6.96,
+    "max_dd": 19.58,
+    "score": 2.8
+  },
+  {
+    "mode": "yb_up",
+    "hold": 1,
+    "sl": 0.02,
+    "mean_ret": 9.52,
+    "mean_dd": 3.43,
+    "min_ret": 4.02,
+    "max_dd": 6.08,
+    "score": 2.77
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 10,
+    "sl": 0.05,
+    "mean_ret": 9.39,
+    "mean_dd": 3.12,
+    "min_ret": -6.93,
+    "max_dd": 6.93,
+    "score": 2.71
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 7,
+    "sl": 0.05,
+    "mean_ret": 7.48,
+    "mean_dd": 2.55,
+    "min_ret": -1.68,
+    "max_dd": 4.98,
+    "score": 2.64
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 1,
+    "sl": 0.01,
+    "mean_ret": 5.34,
+    "mean_dd": 1.86,
+    "min_ret": -1.08,
+    "max_dd": 3.08,
+    "score": 2.59
+  },
+  {
+    "mode": "yb_up",
+    "hold": 1,
+    "sl": 0.03,
+    "mean_ret": 9.14,
+    "mean_dd": 3.53,
+    "min_ret": 4.02,
+    "max_dd": 6.08,
+    "score": 2.59
+  },
+  {
+    "mode": "yb_up",
+    "hold": 1,
+    "sl": 0.05,
+    "mean_ret": 8.89,
+    "mean_dd": 3.43,
+    "min_ret": 3.51,
+    "max_dd": 6.08,
+    "score": 2.59
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 10,
+    "sl": 0.0,
+    "mean_ret": 9.87,
+    "mean_dd": 3.5,
+    "min_ret": -2.81,
+    "max_dd": 7.34,
+    "score": 2.54
+  },
+  {
+    "mode": "smart_money",
+    "hold": 3,
+    "sl": 0.03,
+    "mean_ret": 15.37,
+    "mean_dd": 5.51,
+    "min_ret": -0.84,
+    "max_dd": 13.08,
+    "score": 2.51
+  },
+  {
+    "mode": "yb_up",
+    "hold": 1,
+    "sl": 0.0,
+    "mean_ret": 8.96,
+    "mean_dd": 3.63,
+    "min_ret": 3.85,
+    "max_dd": 6.08,
+    "score": 2.47
+  },
+  {
+    "mode": "smart_money",
+    "hold": 7,
+    "sl": 0.0,
+    "mean_ret": 34.96,
+    "mean_dd": 11.34,
+    "min_ret": -8.71,
+    "max_dd": 31.37,
+    "score": 2.47
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 10,
+    "sl": 0.03,
+    "mean_ret": 9.4,
+    "mean_dd": 3.45,
+    "min_ret": -6.01,
+    "max_dd": 7.6,
+    "score": 2.45
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 5,
+    "sl": 0.0,
+    "mean_ret": 7.29,
+    "mean_dd": 3.02,
+    "min_ret": 0.72,
+    "max_dd": 4.88,
+    "score": 2.41
+  },
+  {
+    "mode": "smart_money",
+    "hold": 5,
+    "sl": 0.05,
+    "mean_ret": 21.98,
+    "mean_dd": 8.7,
+    "min_ret": -3.94,
+    "max_dd": 20.31,
+    "score": 2.27
+  },
+  {
+    "mode": "yb_up",
+    "hold": 2,
+    "sl": 0.05,
+    "mean_ret": 12.24,
+    "mean_dd": 5.47,
+    "min_ret": 0.42,
+    "max_dd": 10.42,
+    "score": 2.24
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 2,
+    "sl": 0.01,
+    "mean_ret": 6.83,
+    "mean_dd": 2.78,
+    "min_ret": -5.0,
+    "max_dd": 6.22,
+    "score": 2.21
+  },
+  {
+    "mode": "yb_up",
+    "hold": 2,
+    "sl": 0.03,
+    "mean_ret": 12.62,
+    "mean_dd": 5.19,
+    "min_ret": -0.04,
+    "max_dd": 9.53,
+    "score": 2.19
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 5,
+    "sl": 0.03,
+    "mean_ret": 14.21,
+    "mean_dd": 5.92,
+    "min_ret": -8.32,
+    "max_dd": 8.32,
+    "score": 2.16
+  },
+  {
+    "mode": "yb_up",
+    "hold": 5,
+    "sl": 0.05,
+    "mean_ret": 30.63,
+    "mean_dd": 11.55,
+    "min_ret": -5.45,
+    "max_dd": 26.51,
+    "score": 2.12
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 7,
+    "sl": 0.03,
+    "mean_ret": 6.9,
+    "mean_dd": 2.99,
+    "min_ret": -0.81,
+    "max_dd": 5.61,
+    "score": 2.08
+  },
+  {
+    "mode": "yb_up",
+    "hold": 2,
+    "sl": 0.0,
+    "mean_ret": 12.64,
+    "mean_dd": 6.19,
+    "min_ret": 0.42,
+    "max_dd": 14.03,
+    "score": 2.04
+  },
+  {
+    "mode": "smart_money",
+    "hold": 2,
+    "sl": 0.03,
+    "mean_ret": 9.83,
+    "mean_dd": 4.41,
+    "min_ret": -0.18,
+    "max_dd": 11.84,
+    "score": 2.01
+  },
+  {
+    "mode": "yb_up",
+    "hold": 3,
+    "sl": 0.05,
+    "mean_ret": 18.15,
+    "mean_dd": 7.35,
+    "min_ret": -1.28,
+    "max_dd": 12.82,
+    "score": 1.98
+  },
+  {
+    "mode": "yb_up",
+    "hold": 3,
+    "sl": 0.0,
+    "mean_ret": 18.32,
+    "mean_dd": 8.98,
+    "min_ret": -1.89,
+    "max_dd": 20.02,
+    "score": 1.84
+  },
+  {
+    "mode": "smart_money",
+    "hold": 3,
+    "sl": 0.05,
+    "mean_ret": 13.96,
+    "mean_dd": 6.91,
+    "min_ret": -3.81,
+    "max_dd": 17.81,
+    "score": 1.82
+  },
+  {
+    "mode": "smart_money",
+    "hold": 2,
+    "sl": 0.05,
+    "mean_ret": 9.52,
+    "mean_dd": 4.83,
+    "min_ret": -1.93,
+    "max_dd": 13.34,
+    "score": 1.78
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 5,
+    "sl": 0.03,
+    "mean_ret": 5.79,
+    "mean_dd": 2.99,
+    "min_ret": -0.05,
+    "max_dd": 5.4,
+    "score": 1.75
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 3,
+    "sl": 0.02,
+    "mean_ret": 8.47,
+    "mean_dd": 3.94,
+    "min_ret": -3.26,
+    "max_dd": 6.33,
+    "score": 1.72
+  },
+  {
+    "mode": "smart_money",
+    "hold": 2,
+    "sl": 0.0,
+    "mean_ret": 9.36,
+    "mean_dd": 4.97,
+    "min_ret": -2.73,
+    "max_dd": 14.07,
+    "score": 1.69
+  },
+  {
+    "mode": "smart_money",
+    "hold": 3,
+    "sl": 0.0,
+    "mean_ret": 13.39,
+    "mean_dd": 7.39,
+    "min_ret": -5.94,
+    "max_dd": 19.65,
+    "score": 1.63
+  },
+  {
+    "mode": "yb_up",
+    "hold": 5,
+    "sl": 0.0,
+    "mean_ret": 27.46,
+    "mean_dd": 13.84,
+    "min_ret": -10.06,
+    "max_dd": 32.85,
+    "score": 1.59
+  },
+  {
+    "mode": "yb_reversal",
+    "hold": 5,
+    "sl": 0.05,
+    "mean_ret": 5.28,
+    "mean_dd": 3.13,
+    "min_ret": -1.88,
+    "max_dd": 5.36,
+    "score": 1.52
+  },
+  {
+    "mode": "smart_money",
+    "hold": 5,
+    "sl": 0.0,
+    "mean_ret": 18.92,
+    "mean_dd": 10.86,
+    "min_ret": -5.3,
+    "max_dd": 27.01,
+    "score": 1.39
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 3,
+    "sl": 0.03,
+    "mean_ret": 7.05,
+    "mean_dd": 4.76,
+    "min_ret": -4.42,
+    "max_dd": 6.24,
+    "score": 1.19
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 3,
+    "sl": 0.0,
+    "mean_ret": 6.68,
+    "mean_dd": 5.74,
+    "min_ret": -3.89,
+    "max_dd": 7.29,
+    "score": 0.93
+  },
+  {
+    "mode": "yb_strong",
+    "hold": 3,
+    "sl": 0.05,
+    "mean_ret": 6.24,
+    "mean_dd": 5.48,
+    "min_ret": -3.89,
+    "max_dd": 7.29,
+    "score": 0.91
+  }
+]
