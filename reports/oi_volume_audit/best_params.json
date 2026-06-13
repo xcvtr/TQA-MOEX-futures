@@ -1,0 +1,102 @@
+[
+  {
+    "signal": "PCT_v95_yb90",
+    "category": "pct",
+    "horizon": 40,
+    "avg_wr": 0.5266,
+    "avg_ret": 0.004524,
+    "total_signals": 44308,
+    "n_tickers": 64,
+    "score": 0.4969
+  },
+  {
+    "signal": "PCT_v95_yb90",
+    "category": "pct",
+    "horizon": 80,
+    "avg_wr": 0.5297,
+    "avg_ret": 0.004312,
+    "total_signals": 44293,
+    "n_tickers": 64,
+    "score": 0.4903
+  },
+  {
+    "signal": "PCT_v90_yb90",
+    "category": "pct",
+    "horizon": 80,
+    "avg_wr": 0.516,
+    "avg_ret": 0.003604,
+    "total_signals": 82698,
+    "n_tickers": 64,
+    "score": 0.4538
+  },
+  {
+    "signal": "VYB",
+    "category": "baseline",
+    "horizon": 80,
+    "avg_wr": 0.5175,
+    "avg_ret": 0.003336,
+    "total_signals": 37066,
+    "n_tickers": 64,
+    "score": 0.4439
+  },
+  {
+    "signal": "STK_SKP_v80_yb90",
+    "category": "stk_skip",
+    "horizon": 80,
+    "avg_wr": 0.511,
+    "avg_ret": 0.003141,
+    "total_signals": 47685,
+    "n_tickers": 63,
+    "score": 0.4323
+  },
+  {
+    "signal": "SKP_v95_yb90",
+    "category": "skip",
+    "horizon": 40,
+    "avg_wr": 0.5133,
+    "avg_ret": 0.003095,
+    "total_signals": 44308,
+    "n_tickers": 64,
+    "score": 0.4318
+  },
+  {
+    "signal": "PCT_v90_yb95",
+    "category": "pct",
+    "horizon": 80,
+    "avg_wr": 0.5127,
+    "avg_ret": 0.002824,
+    "total_signals": 57438,
+    "n_tickers": 64,
+    "score": 0.4206
+  },
+  {
+    "signal": "STK_SKP_v80_yb80",
+    "category": "stk_skip",
+    "horizon": 80,
+    "avg_wr": 0.5098,
+    "avg_ret": 0.002745,
+    "total_signals": 69204,
+    "n_tickers": 63,
+    "score": 0.4157
+  },
+  {
+    "signal": "STK_SKP_v90_yb80",
+    "category": "stk_skip",
+    "horizon": 80,
+    "avg_wr": 0.5077,
+    "avg_ret": 0.002589,
+    "total_signals": 36651,
+    "n_tickers": 63,
+    "score": 0.4082
+  },
+  {
+    "signal": "PCT_v90_yb90",
+    "category": "pct",
+    "horizon": 40,
+    "avg_wr": 0.5151,
+    "avg_ret": 0.002422,
+    "total_signals": 82726,
+    "n_tickers": 64,
+    "score": 0.4059
+  }
+]

@@ -17,7 +17,7 @@ from config import CH_HOST, CH_PORT, CH_DB
 
 PORT = 5058
 
-TICKERS = ['BR', 'AF', 'SR', 'VB', 'AL', 'LK', 'NM', 'PD', 'IMOEXF', 'Eu', 'Si', 'CR']
+TICKERS = ['SN', 'AU', 'AL', 'BR', 'AF', 'SR', 'VB', 'LK', 'NM', 'PD', 'IMOEXF', 'Eu', 'Si', 'CR']
 TF_OPTIONS = {'5m': 12, '15m': 4, 'H1': 1}
 
 _ch = None
@@ -139,74 +139,81 @@ def compute_indicators(df):
         atr_series = pd.Series(tr).ewm(span=14).mean()
         atr_pct_arr = (atr_series / close * 100).fillna(0).values
     
-    # Detect trades — bidirectional
+    # Detect trades — волновой entry: TROUGH yur_net → LONG, PEAK yur_net → SHORT
+    # Держим до следующего противо-разворота или SL
     trades = []
     n = len(closes)
-    vz_th = 3.0
-    yz_th = 1.5
-    atr_th = 1.5
-    hold_max = 24
-    exit_yz = 0.5
+    lookback = 12  # 1h window для поиска локальных экстремумов
+    min_change = max(2.0, float(yur_net.std()) * 0.5)  # адаптивный: 50% от std yur_net
     sl_pct = 0.02
     
-    # Long signals: yur_net > 0, yur_z > +threshold
-    long_mask = (vol_z_arr > vz_th) & (yur_z_arr > yz_th) & (yur_net > 0) & (atr_pct_arr <= atr_th)
-    # Short signals: yur_net < 0, yur_z < -threshold
-    short_mask = (vol_z_arr > vz_th) & (yur_z_arr < -yz_th) & (yur_net < 0) & (atr_pct_arr <= atr_th)
+    # Найти все волновые развороты
+    wave_turns = []
+    for i in range(lookback, n - lookback):
+        left = yur_net[i-lookback:i]
+        right = yur_net[i:i+lookback]
+        # PEAK: yur_net[i] максимален относительно окрестности
+        if yur_net[i] == max(yur_net[i-lookback:i+lookback]) and yur_net[i] > np.mean(left) + min_change:
+            wave_turns.append({'idx': i, 'type': 'PEAK', 'val': float(yur_net[i]), 'dir': -1})  # → SHORT
+        # TROUGH: yur_net[i] минимален
+        elif yur_net[i] == min(yur_net[i-lookback:i+lookback]) and yur_net[i] < np.mean(left) - min_change:
+            wave_turns.append({'idx': i, 'type': 'TROUGH', 'val': float(yur_net[i]), 'dir': 1})  # → LONG
     
-    for sig_indices, direction in [(np.where(long_mask)[0], 1), (np.where(short_mask)[0], -1)]:
-        for idx in sig_indices:
-            if idx + 1 >= n:
-                continue
-            entry = float(df.iloc[idx+1]['open'])
-            if entry <= 0:
-                continue
-            
-            # Find exit
-            off = hold_max
-            for o in range(1, min(hold_max + 1, n - idx - 1)):
-                if abs(yur_z_arr[idx + o]) < exit_yz:
-                    off = o
-                    break
-            exit_idx = idx + off
-            if exit_idx >= n:
-                continue
-            exit_px = float(df.iloc[exit_idx]['close'])
-            hit_stop = False
-            
-            # Stop-loss check (long: -2%, short: +2%)
-            if direction == 1:
-                stop_level = entry * (1 - sl_pct)
-                for j in range(idx + 1, exit_idx + 1):
-                    if float(df.iloc[j]['low']) <= stop_level:
-                        exit_px = stop_level
-                        hit_stop = True
-                        break
-                pnl = (exit_px - entry) / 0.01 - 2
-            else:
-                stop_level = entry * (1 + sl_pct)
-                for j in range(idx + 1, exit_idx + 1):
-                    if float(df.iloc[j]['high']) >= stop_level:
-                        exit_px = stop_level
-                        hit_stop = True
-                        break
-                pnl = (entry - exit_px) / 0.01 - 2
-            pnl = round(pnl, 2)
-            
-            trades.append({
-                'entry_idx': int(idx + 1),
-                'exit_idx': int(exit_idx),
-                'entry_time': times[idx + 1],
-                'exit_time': times[exit_idx],
-                'entry_price': round(entry, 2),
-                'exit_price': round(exit_px, 2),
-                'pnl': pnl,
-                'hit_stop': hit_stop,
-                'vol_z': round(float(vol_z_arr[idx]), 2),
-                'yur_z': round(float(yur_z_arr[idx]), 2),
-                'bars_held': off,
-                'direction': direction,
-            })
+    # Сортируем по idx
+    wave_turns.sort(key=lambda x: x['idx'])
+    
+    # Отбираем: только TROUGH→LONG (т.к. PEAK→SHORT нестабилен)
+    # Вход на TROUGH, выход на следующем PEAK
+    for i in range(len(wave_turns) - 1):
+        t1 = wave_turns[i]
+        t2 = wave_turns[i+1]
+        
+        if t1['type'] != 'TROUGH' or t2['type'] != 'PEAK':
+            continue
+        
+        if t2['idx'] - t1['idx'] < 2:
+            continue  # слишком близко
+        
+        entry_idx = t1['idx'] + 1  # вход на следующем баре после разворота
+        exit_idx = t2['idx']  # выход на PEAK
+        
+        if entry_idx >= n or exit_idx >= n:
+            continue
+        
+        direction = 1  # только LONG
+        
+        entry = float(df.iloc[entry_idx]['open'])
+        if entry <= 0:
+            continue
+        
+        # SL check (2%)
+        stop_level = entry * (1 - sl_pct)
+        exit_px = float(df.iloc[exit_idx]['close'])
+        hit_stop = False
+        
+        for j in range(entry_idx, exit_idx + 1):
+            if float(df.iloc[j]['low']) <= stop_level:
+                exit_px = stop_level
+                exit_idx = j
+                hit_stop = True
+                break
+        
+        pnl = (exit_px - entry) / 0.01 - 2
+        
+        trades.append({
+            'entry_idx': int(entry_idx),
+            'exit_idx': int(exit_idx),
+            'entry_time': times[entry_idx],
+            'exit_time': times[exit_idx],
+            'entry_price': round(entry, 2),
+            'exit_price': round(exit_px, 2),
+            'pnl': round(pnl, 2),
+            'hit_stop': hit_stop,
+            'yur_net_entry': round(float(yur_net[t1['idx']]), 2),
+            'yur_net_exit': round(float(yur_net[t2['idx']]), 2),
+            'bars_held': exit_idx - entry_idx,
+            'direction': direction,
+        })
     
     return {
         'times': times,
@@ -551,11 +558,9 @@ function loadData(){
   }
   // If no saved dates, init defaults
   if(!document.getElementById('start-date').value){
-    const now=new Date();
-    const maxCap = new Date('2026-05-18T23:50:00');
-    const ref = now < maxCap ? now : maxCap;
-    document.getElementById('end-date').value = new Date(ref.getTime() - ref.getTimezoneOffset()*60000).toISOString().slice(0,16);
-    document.getElementById('start-date').value = new Date(ref.getTime() - 7*86400000).toISOString().slice(0,16);
+    const maxDate = new Date('2026-05-22T23:50:00');
+    document.getElementById('end-date').value = new Date(maxDate.getTime() - maxDate.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    document.getElementById('start-date').value = '2025-01-01T00:00';
   }
 })();
 
