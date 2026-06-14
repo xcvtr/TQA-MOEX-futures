@@ -15,7 +15,98 @@ import numpy as np
 import pandas as pd
 from config import CH_HOST, CH_PORT, CH_DB
 
-PORT = 5058
+# Phase2 configs from scan
+_PHASE2_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports/triz_phase4/phase2_fullscan.json')
+_PHASE2 = None
+def get_phase2():
+    global _PHASE2
+    if _PHASE2 is None and os.path.exists(_PHASE2_PATH):
+        with open(_PHASE2_PATH) as f:
+            _PHASE2 = json.load(f)
+    return _PHASE2
+
+PATTERNS = {
+    'v': lambda dv,dyb,dys,dfn,dtoi: dv>0 and dtoi>0 and dyb>0,
+    's': lambda dv,dyb,dys,dfn,dtoi: dv>0 and dyb>0 and dfn<0,
+    'd': lambda dv,dyb,dys,dfn,dtoi: dv>0 and dtoi<0,
+    'y': lambda dv,dyb,dys,dfn,dtoi: dv>0 and dyb<0 and dfn>0,
+    'f': lambda dv,dyb,dys,dfn,dtoi: dv>0 and abs(dfn)>5,
+}
+PATTERN_NAMES = {'v':'vou','s':'sm','d':'vod','y':'vyf','f':'vd'}
+
+def run_phase2_bt(ticker, pattern, direction, hold, atr_mult):
+    """Run Phase2 backtest for given config, return trades list."""
+    ch = get_ch_threadsafe()
+    rows = ch.query(f"""SELECT time,open,high,low,close,volume,
+        yur_buy,yur_sell,fiz_buy,fiz_sell,total_oi
+        FROM moex.prices_5m p INNER JOIN moex.prices_5m_oi o
+        ON p.symbol=o.symbol AND p.time=o.time
+        WHERE p.symbol='{ticker}' AND p.time>='2024-01-01' AND p.time<='2026-05-01'
+        ORDER BY p.time""").result_rows
+    if not rows or len(rows) < 1000: return []
+    N = len(rows)
+    times = [str(r[0]) for r in rows]
+    opn = np.array([float(r[1]) for r in rows])
+    high = np.array([float(r[2]) for r in rows])
+    low = np.array([float(r[3]) for r in rows])
+    close = np.array([float(r[4]) for r in rows])
+    vol = np.array([float(r[5]) for r in rows])
+    yb = np.array([float(r[6]) for r in rows])
+    ys = np.array([float(r[7]) for r in rows])
+    fb = np.array([float(r[8]) for r in rows])
+    fs = np.array([float(r[9]) for r in rows])
+    toi = np.array([float(r[10]) if float(r[10]) > 0 else 1 for r in rows])
+    tr = np.zeros(N); tr[1:] = np.maximum(high[1:]-low[1:], np.maximum(abs(high[1:]-close[:-1]), abs(low[1:]-close[:-1])))
+    atr = np.full(N, np.nan)
+    for i in range(14, N): atr[i] = np.mean(tr[i-13:i+1])
+    v_m = np.mean(vol) + 1
+    yb_m = np.mean(yb) + 1
+    ys_m = np.mean(ys) + 1
+    toi_m = np.mean(toi) + 1
+    dv = np.diff(vol) / v_m
+    dyb = np.diff(yb) / yb_m
+    dys = np.diff(ys) / ys_m
+    dtoi = np.diff(toi) / toi_m
+    fiz_net = (fb - fs) / toi * 100
+    dfn = np.diff(fiz_net)
+    end_idx = N - max(hold, 2) - 1
+    vm = np.full(N, np.nan)
+    vc = np.cumsum(vol)
+    for i in range(60, N): vm[i] = (vc[i] - vc[i-60]) / 60
+    a = atr_mult; h = hold
+    trades = []
+    for i in range(64, end_idx):
+        if i >= len(dv): break
+        ep = float(opn[i+1])
+        if not PATTERNS[pattern](dv[i], dyb[i], dys[i], dfn[i], dtoi[i]): continue
+        if np.isnan(vm[i]) or vol[i] < vm[i] * 1.2: continue
+        xi = min(i+1+h, N-1)
+        if direction == 'L':
+            sp = ep * (1 - min(max(atr[i]/ep*a, 0.005), 0.05)) if not np.isnan(atr[i]) else ep * 0.95
+            r_h = ep; exit_idx = xi; xp = float(close[xi])
+            for j in range(i+1, xi+1):
+                bh = float(high[j])
+                if bh > r_h: r_h = bh
+                if not np.isnan(atr[j]): sp = max(sp, r_h * (1 - min(max(atr[j]/r_h*a, 0.005), 0.05)))
+                if float(low[j]) <= sp: xp = sp; exit_idx = j; break
+            pnl = xp - ep
+        else:
+            sp = ep * (1 + min(max(atr[i]/ep*a, 0.005), 0.05)) if not np.isnan(atr[i]) else ep * 1.05
+            r_l = ep; exit_idx = xi; xp = float(close[xi])
+            for j in range(i+1, xi+1):
+                bl = float(low[j])
+                if bl < r_l: r_l = bl
+                if not np.isnan(atr[j]): sp = min(sp, r_l * (1 + min(max(atr[j]/r_l*a, 0.005), 0.05)))
+                if float(high[j]) >= sp: xp = sp; exit_idx = j; break
+            pnl = ep - xp
+        trades.append({
+            'entry_idx': i+1, 'exit_idx': exit_idx,
+            'entry_time': str(times[i+1])[:19], 'exit_time': str(times[exit_idx])[:19],
+            'entry_price': round(ep, 2), 'exit_price': round(xp, 2), 'pnl': round(pnl, 2)
+        })
+    return trades
+
+PORT = 8086
 
 TICKERS = ['SN', 'AU', 'AL', 'BR', 'AF', 'SR', 'VB', 'LK', 'NM', 'PD', 'IMOEXF', 'Eu', 'Si', 'CR']
 TF_OPTIONS = {'5m': 12, '15m': 4, 'H1': 1}
@@ -269,10 +360,16 @@ h1{font-size:20px;margin-bottom:10px;color:#58a6ff}
 <button onclick="loadData()">⟳ Update</button>
 <span id="status" style="color:#8b949e;font-size:12px"></span>
 <label style="color:#8b949e;font-size:12px"><input type="checkbox" id="showTrades" checked onchange="loadData()"> Показать сделки</label>
+PHASE2_CONTROLS
 </div>
 <div class="stats" id="stats"></div>
 <div class="grid">
-<div class="card card-full"><h2>Price + OI (доли %)</h2><canvas id="c0"></canvas><div class="trade-info" id="tradeInfo"></div></div>
+<div class="card card-full"><h2>Price + OI (доли %)</h2><canvas id="c0"></canvas><div class="trade-info" id="tradeInfo"></div>
+<div class="card card-full" id="zoomCard" style="margin-top:8px;display:none;border:none;padding:0;background:transparent">
+  <canvas id="cz" style="width:100%;height:160px;display:block"></canvas>
+  <div id="zoomInfo" style="font-size:10px;color:#8b949e;margin-top:4px"></div>
+</div>
+</div>
 <div class="card"><h2>Fiz Long / Short %</h2><canvas id="c1"></canvas></div>
 <div class="card"><h2>Yur Long / Short %</h2><canvas id="c2"></canvas></div>
 <div class="card"><h2>Crowd Share (fiz/total) %</h2><canvas id="c3"></canvas></div>
@@ -342,6 +439,7 @@ function draw(canvasId,data,options){
   const series=options.series||[];
   const hasRightScale=series.some(s=>s.rightScale);
   const trades=options.trades||[];
+  const p2trades=options.p2trades||[];
   const showTrades=options.showTrades!==false;
   
   let yMin=Infinity,yMax=-Infinity;
@@ -407,19 +505,9 @@ function draw(canvasId,data,options){
       const xi=t.exit_idx;
       if(ei>=n||xi>=n)continue;
       
-      const ex=x(ei), ey=ry(t.entry_price);
-      const xx=x(xi), xy=ry(t.exit_price);
-      // Entry vertical line (green dashed)
-      ctx.strokeStyle='rgba(63,185,80,0.7)';
-      ctx.lineWidth=2.5;
-      ctx.setLineDash([5,4]);
-      ctx.beginPath();ctx.moveTo(ex,pad.t);ctx.lineTo(ex,pad.t+ch);ctx.stroke();
-      
-      // Exit vertical line (red dashed)
-      ctx.strokeStyle='rgba(248,81,73,0.7)';
-      ctx.lineWidth=2.5;
-      ctx.beginPath();ctx.moveTo(xx,pad.t);ctx.lineTo(xx,pad.t+ch);ctx.stroke();
-      ctx.setLineDash([]);
+    const ex=x(ei), ey=ry(t.entry_price);
+    const xx=x(xi), xy=ry(t.exit_price);
+    // Entry/exit vertical lines — removed per user
       
       // Trade arrow line (entry→exit on price scale)
       const color=t.pnl>0?COLORS.green:COLORS.red;
@@ -438,6 +526,64 @@ function draw(canvasId,data,options){
       // PnL label at exit
       ctx.fillStyle=color;
       ctx.font='bold 10px sans-serif';
+      ctx.textAlign='left';
+      ctx.fillText((t.pnl>0?'+':'')+t.pnl.toFixed(0),xx+6,xy-3);
+    }
+  }
+  
+  // PHASE2 TRADE LINES (orange — on all charts)
+  if(showTrades && p2trades.length>0 && data.times){
+    const n=data.times.length;
+    // Build a time-to-x lookup: find bar index for each trade
+    // Use entry_time and exit_time to locate on visible data
+    // We need bar indices into data.times, not raw CH indices
+    // Map trade times to local indices
+    for(const t of p2trades){
+      const et=t.entry_time.slice(0,19);
+      const xt=t.exit_time.slice(0,19);
+      let ei=-1, xi=-1;
+      for(let j=0;j<n;j++){
+        const tj=data.times[j].slice(0,19);
+        if(tj===et) ei=j;
+        if(tj===xt) xi=j;
+        if(ei>=0&&xi>=0) break;
+      }
+      if(ei<0||xi<0) continue;
+      if(ei>=n||xi>=n) continue;
+      
+      const ex=x(ei), xx=x(xi);
+      // Price uses right scale (ry) for Chart 0, left scale (y) for others
+      const priceFn = canvasId==='c0' ? ry : y;
+      const ey=priceFn(t.entry_price), xy=priceFn(t.exit_price);
+      
+      // Entry vertical line (orange dashed) — removed per user
+      
+      // Exit line — removed per user
+      
+      
+      // Arrow
+      const color=t.pnl>0?'#ffa500':'#ff4500';
+      ctx.strokeStyle=color;
+      ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(xx,xy);ctx.stroke();
+      
+      // Entry triangle
+      ctx.fillStyle='#ffa500';
+      ctx.beginPath();
+      ctx.moveTo(ex,ey-5); ctx.lineTo(ex-5,ey+3); ctx.lineTo(ex+5,ey+3);
+      ctx.closePath(); ctx.fill();
+      
+      // Exit cross
+      ctx.strokeStyle='#ff4500';
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(xx-4,xy-4); ctx.lineTo(xx+4,xy+4);
+      ctx.moveTo(xx+4,xy-4); ctx.lineTo(xx-4,xy+4);
+      ctx.stroke();
+      
+      // PnL label
+      ctx.fillStyle=color;
+      ctx.font='bold 9px sans-serif';
       ctx.textAlign='left';
       ctx.fillText((t.pnl>0?'+':'')+t.pnl.toFixed(0),xx+6,xy-3);
     }
@@ -477,7 +623,8 @@ function loadData(){
       const lastYurLong=d.yur_long[d.yur_long.length-1];
       const lastClose=d.close[d.close.length-1];
       const trades=d.trades||[];
-      _lastData = {times: d.times, n: d.times.length};
+      const p2trades=window._phase2Trades||[];
+      _lastData = {times: d.times, close: d.close, n: d.times.length, fiz_long: d.fiz_long, fiz_short: d.fiz_short, yur_long: d.yur_long, yur_short: d.yur_short};
       const tradeStats=trades.length>0?' Trades: '+trades.length+' ('+(trades.filter(t=>t.pnl>0).length)+'W/'+(trades.filter(t=>t.pnl<=0).length)+'L) Sum: '+trades.reduce((s,t)=>s+t.pnl,0).toFixed(0)+' ₽':'';
       
       document.getElementById('stats').innerHTML=
@@ -497,7 +644,7 @@ function loadData(){
         {label:'Yur Short%',values:d.yur_short,color:COLORS.yurShort,width:0.8},
         {label:'Fiz Long%',values:d.fiz_long,color:COLORS.fizLong,width:1},
         {label:'Fiz Short%',values:d.fiz_short,color:COLORS.fizShort,width:0.8},
-      ],trades:trades,showTrades:showTrades});
+      ],trades:trades,showTrades:showTrades,p2trades:p2trades});
       
       // Trade info
       let info='';
@@ -543,6 +690,40 @@ function loadData(){
   }));
 }
 
+// Click on chart 0 to show zoom for nearest trade
+document.getElementById('c0').addEventListener('click', function(e){
+  if(!window._phase2Trades || !window._phase2Trades.length) return;
+  const rect = c0.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const pw = rect.width;
+  if(px < 0 || px > pw) return;
+  const canvasW = c0.width;
+  const padL = 45, padR = 55;
+  const cw = canvasW - padL - padR;
+  const n = _lastData?.n || 0;
+  const logicalX = (px / pw) * canvasW;
+  const idx = Math.round((logicalX - padL) / cw * (n - 1));
+  if(idx < 0 || idx >= n) return;
+  // Find nearest trade
+  const allTimes = _lastData?.times || [];
+  const et = allTimes[idx]?.slice(0,19) || '';
+  let best = null, bestDist = Infinity;
+  for(const t of window._phase2Trades){
+    const te = t.entry_time.slice(0,19);
+    let ei = -1;
+    for(let j=0;j<allTimes.length;j++){if(allTimes[j].slice(0,19)===te){ei=j;break;}}
+    if(ei<0) continue;
+    const d = Math.abs(ei - idx);
+    if(d < bestDist){bestDist=d;best=t;}
+  }
+  if(!best || bestDist > Math.max(5, n/50)) return;
+  const sel = document.getElementById('p2cfg');
+  const cfgName = sel.options[sel.selectedIndex]?.text?.split(' Cal=')[0] || '';
+  const tk = document.getElementById('ticker').value;
+  const tradeIdx = window._phase2Trades.indexOf(best);
+  showZoom(best, tk, cfgName, tradeIdx);
+});
+
 // Init or restore state
 (function(){
   const saved = localStorage.getItem('moex_oi_state');
@@ -566,13 +747,206 @@ function loadData(){
 
 loadData();
 setInterval(loadData,60000);
+
+function loadPhase2Configs(){
+  const ticker=document.getElementById('ticker').value;
+  const sel=document.getElementById('p2cfg');
+  sel.innerHTML='<option value="">Loading...</option>';
+  fetch('/phase2_configs?t='+ticker).then(r=>r.json()).then(j=>{
+    if(!j.configs||!j.configs.length){sel.innerHTML='<option value="">— нет конфигов —</option>';return;}
+    let html='<option value="">— Phase2: '+j.wfa+' WFA —</option>';
+    j.configs.forEach(c=>{
+      html+='<option value="'+c.p+','+c.dr+','+c.h+','+c.am+'|'+c.i+'">'
+        +c.pn+' '+c.dr+' h='+c.h+' am='+c.am+' Cal='+c.oos_cal+' n='+c.oos_n+'</option>';
+    });
+    sel.innerHTML=html;
+    // Auto-load trades for best config
+    if(j.configs.length){
+      sel.value = j.configs[0].p+','+j.configs[0].dr+','+j.configs[0].h+','+j.configs[0].am+'|0';
+      loadPhase2();
+    }
+  }).catch(()=>{sel.innerHTML='<option value="">— error —</option>';});
+}
+
+function showZoom(trade, ticker, configName, tradeIdx){
+  const card=document.getElementById('zoomCard');
+  const cz=document.getElementById('cz');
+  const info=document.getElementById('zoomInfo');
+  card.style.display='block';
+  
+  const et=trade.entry_time.slice(0,19);
+  const xt=trade.exit_time.slice(0,19);
+  
+  // Determine zoom window around trade
+  const allTimes=_lastData.times;
+  let ei=-1, xi=-1;
+  for(let j=0;j<allTimes.length;j++){
+    if(allTimes[j].slice(0,19)===et) ei=j;
+    if(allTimes[j].slice(0,19)===xt) xi=j;
+    if(ei>=0&&xi>=0) break;
+  }
+  if(ei<0||xi<0){info.textContent='Cannot locate trade on chart';return;}
+  
+  // Zoom window: 60 bars before entry, 40 after exit
+  const margin=60;
+  const st=Math.max(0,ei-margin);
+  const en=Math.min(allTimes.length-1,xi+margin);
+  const cnt=en-st+1;
+  
+  info.innerHTML='<div style="font-size:14px"><b>'+ticker+'</b> | Entry: '+et+' @ <b>'+trade.entry_price+'</b> | Exit: '+xt+' @ <b>'+trade.exit_price+'</b> | PnL: <b style="color:'+(trade.pnl>0?'#3fb950':'#f85149')+'">'+(trade.pnl>0?'+':'')+trade.pnl.toFixed(0)+'</b> | Bars: '+(xi-ei)+' ('+((xi-ei)*5)+'min)</div>';
+  
+  // Draw zoom canvas
+  const rect=cz.parentElement.getBoundingClientRect();
+  cz.width=Math.max(rect.width-24,200)*2;
+  cz.height=500;
+  const ctx=cz.getContext('2d');
+  const W=cz.width,H=cz.height,pl=70,pr=20,pt=20,pb=45,cw=W-pl-pr,ch=H-pt-pb;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0d1117';ctx.fillRect(0,0,W,H);
+  
+  // Get price data
+  const closeVals=_lastData.close||[];
+  const sl=closeVals.slice(st,en+1);
+  if(sl.length<2){info.textContent='Not enough data';return;}
+  const mn=Math.min(...sl),mx=Math.max(...sl),rg=mx-mn||1;
+  const padY=rg*0.05;
+  const yMin=mn-padY,yMax=mx+padY,yr=yMax-yMin;
+  
+  function xj(j){return pl+(j-st)/cnt*cw;}
+  function yv(v){return pt+ch-(v-yMin)/yr*ch;}
+  
+  // Grid
+  ctx.strokeStyle='#21262d';ctx.lineWidth=0.5;
+  for(let p=0;p<=4;p++){const yy=pt+p/4*ch;ctx.beginPath();ctx.moveTo(pl,yy);ctx.lineTo(W-pr,yy);ctx.stroke();}
+  
+  // Price labels
+  ctx.fillStyle='#8b949e';ctx.font='bold 16px monospace';ctx.textAlign='right';
+  for(let p=0;p<=4;p++){ctx.fillText((yMin+p/4*yr).toFixed(1),pl-6,pt+p/4*ch+6);}
+  
+  // Price line
+  ctx.strokeStyle='#58a6ff';ctx.lineWidth=1.5;ctx.beginPath();
+  for(let j=0;j<sl.length;j++){j===0?ctx.moveTo(xj(st+j),yv(sl[j])):ctx.lineTo(xj(st+j),yv(sl[j]));}
+  ctx.stroke();
+  
+  // Time labels
+  ctx.fillStyle='#8b949e';ctx.font='bold 16px monospace';ctx.textAlign='center';
+  const ts=Math.max(1,Math.floor(cnt/6));
+  for(let j=Math.ceil(st/ts)*ts;j<=en;j+=ts){ctx.fillText(allTimes[j].slice(5,16),xj(j),H-pb+14);}
+  
+  // OI lines (second scale, right axis)
+  const oiData={fiz_long:_lastData.fiz_long,fiz_short:_lastData.fiz_short,yur_long:_lastData.yur_long,yur_short:_lastData.yur_short};
+  if(oiData.fiz_long&&oiData.fiz_long.length>st){
+    // Find min/max across all 4 OI series in zoom window
+    let oiMin=Infinity,oiMax=-Infinity;
+    for(const k of ['fiz_long','fiz_short','yur_long','yur_short']){
+      const slice=oiData[k].slice(st,en+1);
+      oiMin=Math.min(oiMin,...slice);oiMax=Math.max(oiMax,...slice);
+    }
+    const oiRg=Math.max(oiMax-oiMin,1);
+    function yoi(v){return pt+ch-(v-oiMin)/oiRg*ch;}
+    const oiColors={'fiz_long':'#2ea043','fiz_short':'#da3633','yur_long':'#58a6ff','yur_short':'#d29922'};
+    // Draw OI lines
+    for(const [k,clr] of Object.entries(oiColors)){
+      const slc=oiData[k].slice(st,en+1);
+      ctx.strokeStyle=clr;ctx.lineWidth=1;ctx.globalAlpha=0.7;
+      ctx.setLineDash(k.startsWith('yur')?[2,3]:[]);
+      ctx.beginPath();
+      for(let j=0;j<slc.length;j++){
+        j===0?ctx.moveTo(xj(st+j),yoi(slc[j])):ctx.lineTo(xj(st+j),yoi(slc[j]));
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);ctx.globalAlpha=1;
+    // OI legend (top-right)
+    ctx.font='13px sans-serif';let lx=W-pr-160,ly=pt+18;
+    ctx.fillStyle='#8b949e';ctx.fillText('OI %',lx,ly);
+    ly+=16;
+    for(const [k,clr] of Object.entries(oiColors)){
+      ctx.fillStyle=clr;ctx.fillText(k,lx,ly);ly+=14;
+    }
+    // OI right axis labels
+    ctx.fillStyle='#8b949e';ctx.font='bold 14px monospace';ctx.textAlign='left';
+    for(let p=0;p<=3;p++){ctx.fillText((oiMin+p/3*oiRg).toFixed(1),W-pr+4,pt+p/3*ch+5);}
+  }
+  
+  // Entry line (green dashed)
+  const ex=xj(ei),xx2=xj(xi);
+  const ey=yv(trade.entry_price),xy2=yv(trade.exit_price);
+  
+  // Horizontal dashed lines from price to axis
+  ctx.strokeStyle='rgba(63,185,80,0.25)';ctx.lineWidth=1;ctx.setLineDash([3,4]);
+  ctx.beginPath();ctx.moveTo(pl,ey);ctx.lineTo(ex,ey);ctx.stroke();
+  ctx.strokeStyle='rgba(248,81,73,0.25)';
+  ctx.beginPath();ctx.moveTo(xx2,xy2);ctx.lineTo(W-pr,xy2);ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Entry vertical line (green dashed)
+  ctx.strokeStyle='rgba(63,185,80,0.6)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(ex,pt);ctx.lineTo(ex,pt+ch);ctx.stroke();
+  ctx.fillStyle='#3fb950';ctx.font='bold 16px sans-serif';ctx.textAlign='left';
+  ctx.fillText('ENTRY',ex+3,pt+14);
+  
+  // Exit vertical line (red dashed)
+  ctx.strokeStyle='rgba(248,81,73,0.6)';
+  ctx.beginPath();ctx.moveTo(xx2,pt);ctx.lineTo(xx2,pt+ch);ctx.stroke();
+  ctx.fillStyle='#f85149';ctx.font='bold 16px sans-serif';ctx.fillText('EXIT',xx2+3,pt+14);
+  ctx.setLineDash([]);
+  
+  // Trade arrow
+  const clr=trade.pnl>0?'#ffa500':'#ff4500';
+  ctx.strokeStyle=clr;ctx.lineWidth=4;
+  ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(xx2,xy2);ctx.stroke();
+  
+  // Entry triangle
+  ctx.fillStyle='#ffa500';
+  ctx.beginPath();ctx.moveTo(ex,ey-10);ctx.lineTo(ex-12,ey+8);ctx.lineTo(ex+12,ey+8);ctx.closePath();ctx.fill();
+  // Trade number label
+  ctx.fillStyle='#fff';ctx.font='bold 13px monospace';ctx.textAlign='left';
+  ctx.fillText('#'+(tradeIdx!==undefined?tradeIdx+1:''),ex+16,ey+5);
+  
+  // Exit cross
+  ctx.strokeStyle='#ff4500';ctx.lineWidth=4;
+  ctx.beginPath();ctx.moveTo(xx2-10,xy2-10);ctx.lineTo(xx2+10,xy2+10);
+  ctx.moveTo(xx2+10,xy2-10);ctx.lineTo(xx2-10,xy2+10);ctx.stroke();
+}
+
+function loadPhase2(){
+  const sel=document.getElementById('p2cfg');
+  const val=sel.value;
+  if(!val||val===''){document.getElementById('p2status').textContent='Select a config first';return;}
+  const parts=val.split('|')[0].split(',');
+  const ticker=document.getElementById('ticker').value;
+  const p=parts[0],d=parts[1],h=parts[2],a=parts[3];
+  const status=document.getElementById('p2status');
+  status.textContent='Running BT...';
+  fetch('/phase2_trades?t='+ticker+'&p='+p+'&d='+d+'&h='+h+'&a='+a).then(r=>r.json()).then(trades=>{
+    if(!trades||!trades.length){status.textContent='0 trades';return;}
+    // Store phase2 trades globally
+    window._phase2Trades = trades;
+    status.textContent=trades.length+' trades loaded';
+    // Re-draw with phase2 trades
+    loadData();
+  }).catch(e=>{status.textContent='Error: '+e.message;});
+}
+
+// Load phase2 configs when ticker changes
+document.addEventListener('DOMContentLoaded', function(){
+  document.getElementById('ticker').addEventListener('change', loadPhase2Configs);
+  document.getElementById('tf').addEventListener('change', loadPhase2Configs);
+  // restore saved state then load configs
+  setTimeout(loadPhase2Configs, 500);
+});
 </script>
 </body>
 </html>"""
 
 def make_handler(tickers):
     ticker_opts = ''.join(f'<option value=\"{t}\">{t}</option>' for t in tickers)
-    html = HTML.replace('TICKER_OPTIONS', ticker_opts)
+    phase2_html = ''
+    phase2_html += '<select id=\"p2cfg\" style=\"max-width:320px\"><option value=\"\">— Phase2 —</option></select>'
+    phase2_html += '<button onclick=\"loadPhase2()\" style=\"background:#1f6feb\">▶ Phase2 сделки</button>'
+    phase2_html += '<span id=\"p2status\" style=\"color:#8b949e;font-size:12px\"></span>'
+    html = HTML.replace('TICKER_OPTIONS', ticker_opts).replace('PHASE2_CONTROLS', phase2_html)
     
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
@@ -607,10 +981,43 @@ def make_handler(tickers):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(resp.encode())
+            elif self.path.startswith('/phase2_configs'):
+                from urllib.parse import urlparse, parse_qs
+                qs = parse_qs(urlparse(self.path).query)
+                ticker = qs.get('t', ['VB'])[0]
+                p2 = get_phase2()
+                r = p2.get('results', {}).get(ticker, {}) if p2 else {}
+                cfgs = []
+                for i, c in enumerate(r.get('top_configs', [])):
+                    cfgs.append({
+                        'i': i, 'pn': c['pattern_name'], 'dr': c['direction'],
+                        'p': c['pattern'], 'h': c['hold'], 'am': c['atr_mult'],
+                        'oos_cal': round(c['oos']['calmar'], 2),
+                        'oos_n': c['oos']['n'],
+                        'score': round(c.get('score', 0), 2)
+                    })
+                self._json({'wfa': r.get('wfa_passed', 0), 'configs': cfgs})
+            elif self.path.startswith('/phase2_trades'):
+                from urllib.parse import urlparse, parse_qs
+                qs = parse_qs(urlparse(self.path).query)
+                ticker = qs.get('t', ['VB'])[0]
+                p = qs.get('p', ['v'])[0]
+                d = qs.get('d', ['L'])[0]
+                h = int(qs.get('h', [5])[0])
+                a = int(qs.get('a', [2])[0])
+                self._json(run_phase2_bt(ticker, p, d, h, a))
             else:
                 self.send_response(404); self.end_headers()
         
         def log_message(self, *a): pass
+        
+        def _json(self, data, code=200):
+            resp = json.dumps(data, default=str).encode()
+            self.send_response(code)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(resp)
     
     return Handler
 
