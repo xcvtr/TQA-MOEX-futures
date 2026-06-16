@@ -4,6 +4,7 @@ MOEX Full Price History Loader v4
 
 Fetches daily history for all futures contracts via ISS API.
 For each date, picks the contract with highest volume.
+Writes to ClickHouse (moex.prices).
 """
 
 import sys, os, json, time
@@ -11,11 +12,10 @@ from datetime import datetime, date
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, MOEX_OI_TICKERS
+from config import MOEX_OI_TICKERS, CH_HOST, CH_PORT, CH_DB
 
 import requests
-import psycopg2
-from psycopg2.extras import execute_values
+import clickhouse_connect
 
 TICKER_SET = set(MOEX_OI_TICKERS)
 REQUEST_TIMEOUT = 30
@@ -42,13 +42,8 @@ TICKER_TO_ASSET = {
 ASSET_TO_TICKER = {v: k for k, v in TICKER_TO_ASSET.items()}
 
 
-def get_db():
-    conn = psycopg2.connect(
-        host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
-        user=DB_USER, password=DB_PASSWORD,
-    )
-    conn.autocommit = False
-    return conn
+def get_ch():
+    return clickhouse_connect.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
 
 
 def get_all_secids() -> dict:
@@ -96,21 +91,21 @@ def fetch_all_pages(secid: str, from_date: str, till_date: str) -> list[dict]:
     return all_rows
 
 
-def save_batch(conn, records: list) -> int:
+def save_batch(ch, records: list) -> int:
     if not records:
         return 0
-    with conn.cursor() as cur:
-        execute_values(cur,
-            "INSERT INTO moex_prices (symbol, time, open, high, low, last, volume, open_interest, settle_price) VALUES %s ON CONFLICT (symbol, time) DO UPDATE SET open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, last=EXCLUDED.last, volume=EXCLUDED.volume, open_interest=EXCLUDED.open_interest, settle_price=EXCLUDED.settle_price",
-            records)
-        n = cur.rowcount
-    conn.commit()
-    return n
+    ch.insert(
+        "moex.prices",
+        records,
+        column_names=["symbol", "time", "open", "high", "low",
+                       "last", "volume", "open_interest", "settle_price"],
+    )
+    return len(records)
 
 
 def main():
-    print(f"=== MOEX Price History v4 [{datetime.now():%Y-%m-%d %H:%M:%S}] ===")
-    conn = get_db()
+    print(f"=== MOEX Price History v4 [{datetime.now():%Y-%m-%d %H:%M:%S}] === (ClickHouse)")
+    ch = get_ch()
     contracts = get_all_secids()
     print(f"Assets: {len(contracts)}")
     total = 0
@@ -151,14 +146,13 @@ def main():
             records.append((ticker, f"{td}T23:50:00", open_, high, low, close, vol, oi, settle))
 
         if records:
-            n = save_batch(conn, records)
+            n = save_batch(ch, records)
             total += n
-            print(f"  {len(records)} days, {n} new/updated")
+            print(f"  {len(records)} days, {n} saved to CH")
 
         time.sleep(0.15)
 
     print(f"\n=== Done: {total} records ===")
-    conn.close()
 
 
 if __name__ == "__main__":

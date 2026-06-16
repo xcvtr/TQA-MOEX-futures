@@ -2,7 +2,7 @@
 """
 MOEX Open Interest Loader
 
-Fetches OI data from MOEX ISS API and stores in PostgreSQL.
+Fetches OI data from MOEX ISS API and stores in ClickHouse.
 Based on the Excavator MQL5 EA module (DataProviders/MOEX_OI.h).
 
 API: https://iss.moex.com/iss/analyticalproducts/futoi/securities/{ticker}.csv
@@ -24,8 +24,8 @@ from datetime import datetime, timedelta, date
 from typing import Optional
 
 import requests
-import psycopg2
-from psycopg2.extras import execute_values
+
+import clickhouse_connect
 
 # Add project to path
 sys.path.insert(0, str(os.path.dirname(os.path.abspath(__file__))))
@@ -40,10 +40,9 @@ if env_path.exists():
             os.environ.setdefault(k.strip(), v.strip())
 
 from config import (
-    DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD,
     MOEX_OI_TICKERS, START_DATE, DAYS_BACKFILL,
     REQUEST_TIMEOUT, RETRY_ATTEMPTS, RETRY_DELAY,
-    MOEX_LOGIN, MOEX_PASSWORD,
+    MOEX_LOGIN, MOEX_PASSWORD, CH_HOST, CH_PORT, CH_DB,
 )
 
 logging.basicConfig(
@@ -54,34 +53,24 @@ logging.basicConfig(
 log = logging.getLogger("moex_oi")
 
 
-# ── Database ──────────────────────────────────────────────────────────────
-
-def get_db():
-    """Connect to the moex database."""
-    conn = psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-    )
-    conn.autocommit = False
-    return conn
+# ── ClickHouse ─────────────────────────────────────────────────────────
 
 
-def get_last_date(conn, ticker: str) -> Optional[date]:
+def get_ch():
+    return clickhouse_connect.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+
+
+def get_last_date(ch, ticker: str) -> Optional[date]:
     """Get the last date we have data for this ticker."""
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT MAX(time)::date FROM openinterest_moex WHERE symbol = %s",
-            (ticker,)
-        )
-        row = cur.fetchone()
-        return row[0] if row and row[0] else None
+    row = ch.query(
+        "SELECT max(time)::Date FROM moex.openinterest WHERE symbol = {ticker:String}",
+        parameters={"ticker": ticker},
+    ).result_rows
+    return row[0][0] if row and row[0][0] else None
 
 
-def save_oi_records(conn, ticker: str, records: list[dict]) -> int:
-    """Insert OI records into DB. Returns count of inserted rows."""
+def save_oi_records(ch, ticker: str, records: list[dict]) -> int:
+    """Insert OI records into CH. Returns count of inserted rows."""
     if not records:
         return 0
 
@@ -101,22 +90,13 @@ def save_oi_records(conn, ticker: str, records: list[dict]) -> int:
                 r["clgroup"],
             ))
 
-    with conn.cursor() as cur:
-        execute_values(
-            cur,
-            """INSERT INTO openinterest_moex
-               (symbol, time, buy_orders, sell_orders, buy_accounts, sell_accounts, clgroup)
-               VALUES %s
-               ON CONFLICT (symbol, time, clgroup)
-               DO UPDATE SET buy_orders = EXCLUDED.buy_orders,
-                             sell_orders = EXCLUDED.sell_orders,
-                             buy_accounts = EXCLUDED.buy_accounts,
-                             sell_accounts = EXCLUDED.sell_accounts""",
-            rows,
-        )
-        inserted = cur.rowcount
-    conn.commit()
-    return inserted
+    ch.insert(
+        "moex.openinterest",
+        rows,
+        column_names=["symbol", "time", "buy_orders", "sell_orders",
+                       "buy_accounts", "sell_accounts", "clgroup"],
+    )
+    return len(rows)
 
 
 # ── MOEX ISS API ──────────────────────────────────────────────────────────
@@ -259,13 +239,14 @@ def fetch_oi_day(ticker: str, day: date, cookie: Optional[str] = None) -> Option
 
 # ── Main logic ────────────────────────────────────────────────────────────
 
-def update_ticker(conn, ticker: str, days_back: int = DAYS_BACKFILL,
+
+def update_ticker(ch, ticker: str, days_back: int = DAYS_BACKFILL,
                   cookie: Optional[str] = None) -> tuple[int, int]:
     """
     Update OI data for a single ticker.
     Returns (days_checked, records_inserted).
     """
-    last_date = get_last_date(conn, ticker)
+    last_date = get_last_date(ch, ticker)
     if last_date:
         start = last_date
     else:
@@ -292,7 +273,7 @@ def update_ticker(conn, ticker: str, days_back: int = DAYS_BACKFILL,
         checked += 1
 
         if records:
-            n = save_oi_records(conn, ticker, records)
+            n = save_oi_records(ch, ticker, records)
             inserted += n
             if n > 0:
                 log.info("  %s %s: %d records (%d new)",
@@ -305,11 +286,11 @@ def update_ticker(conn, ticker: str, days_back: int = DAYS_BACKFILL,
 
 def update_all(days_back: int = DAYS_BACKFILL):
     """Update OI data for all configured tickers."""
-    conn = get_db()
+    ch = get_ch()
     total_checked = 0
     total_inserted = 0
 
-    log.info("=== MOEX OI Loader ===")
+    log.info("=== MOEX OI Loader (ClickHouse) ===")
     log.info("Tickers: %d, lookback: %d days", len(MOEX_OI_TICKERS), days_back)
 
     # Authenticate (if credentials set)
@@ -321,16 +302,14 @@ def update_all(days_back: int = DAYS_BACKFILL):
 
     for ticker in MOEX_OI_TICKERS:
         try:
-            c, ins = update_ticker(conn, ticker, days_back, cookie=cookie)
+            c, ins = update_ticker(ch, ticker, days_back, cookie=cookie)
             total_checked += c
             total_inserted += ins
             log.info("  %s: checked %d days, inserted %d records",
                      ticker, c, ins)
         except Exception as e:
             log.error("Failed to update %s: %s", ticker, e)
-            conn.rollback()
 
-    conn.close()
     log.info("=== Done: %d tickers, %d days checked, %d records inserted ===",
              len(MOEX_OI_TICKERS), total_checked, total_inserted)
     return total_inserted

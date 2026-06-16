@@ -31,11 +31,13 @@ class DailyPortfolio:
     """
 
     def __init__(self, margin_usage=0.10, stop_loss_pct=0.05,
-                 max_hold_days=10, initial_capital=100000.0):
+                 max_hold_days=10, initial_capital=100000.0,
+                 commission_per_contract=0.0):
         self.margin_usage = margin_usage
         self.stop_loss_pct = stop_loss_pct
         self.max_hold_days = max_hold_days
         self.initial_capital = initial_capital
+        self.commission_per_contract = commission_per_contract
 
     def run(self, daily_df, signals_df):
         capital = float(self.initial_capital)
@@ -68,13 +70,15 @@ class DailyPortfolio:
                 max_risk = capital * self.margin_usage
                 units = int(max_risk / cost_per_unit) if cost_per_unit > 0 else 0
                 if units > 0 and cost_per_unit * units <= capital:
-                    capital -= cost_per_unit * units
+                    commission_cost = self.commission_per_contract * units
+                    capital -= cost_per_unit * units + commission_cost
                     position = {
                         'entry_price': entry_price,
                         'entry_date': dates[i],
                         'bars_held': 0,
                         'highest': entry_price,
                         'units': units,
+                        'commission': commission_cost,
                     }
                 pending_entry = False
 
@@ -103,7 +107,10 @@ class DailyPortfolio:
 
                 if should_exit:
                     pnl = (exit_price - entry_price) * units
-                    capital += entry_price * units + pnl
+                    entry_commission = pos.get('commission', 0)
+                    exit_commission = self.commission_per_contract * units
+                    total_commission = entry_commission + exit_commission
+                    capital += entry_price * units + pnl - exit_commission
                     trades.append({
                         'entry_date': pos['entry_date'],
                         'exit_date': dates[i],
@@ -112,6 +119,7 @@ class DailyPortfolio:
                         'units': units,
                         'pnl': pnl,
                         'pnl_pct': pnl / (entry_price * units),
+                        'commission': total_commission,
                         'reason': exit_reason,
                         'bars_held': pos['bars_held'],
                     })
@@ -139,7 +147,10 @@ class DailyPortfolio:
             if dd > max_dd_lim:
                 if position is not None:
                     pnl = (cl - position['entry_price']) * position['units']
-                    capital += position['entry_price'] * position['units'] + pnl
+                    entry_commission = position.get('commission', 0)
+                    exit_commission = self.commission_per_contract * position['units']
+                    total_commission = entry_commission + exit_commission
+                    capital += position['entry_price'] * position['units'] + pnl - exit_commission
                     trades.append({
                         'entry_date': position['entry_date'],
                         'exit_date': dates[i],
@@ -148,6 +159,7 @@ class DailyPortfolio:
                         'units': position['units'],
                         'pnl': pnl,
                         'pnl_pct': pnl / (position['entry_price'] * position['units']),
+                        'commission': total_commission,
                         'reason': 'max_dd',
                         'bars_held': position['bars_held'],
                     })
@@ -158,7 +170,10 @@ class DailyPortfolio:
         # Close any remaining
         if position is not None:
             pnl = (cl - position['entry_price']) * position['units']
-            capital += position['entry_price'] * position['units'] + pnl
+            entry_commission = position.get('commission', 0)
+            exit_commission = self.commission_per_contract * position['units']
+            total_commission = entry_commission + exit_commission
+            capital += position['entry_price'] * position['units'] + pnl - exit_commission
             trades.append({
                 'entry_date': position['entry_date'],
                 'exit_date': dates[-1],
@@ -167,6 +182,7 @@ class DailyPortfolio:
                 'units': position['units'],
                 'pnl': pnl,
                 'pnl_pct': pnl / (position['entry_price'] * position['units']),
+                'commission': total_commission,
                 'reason': 'end_of_data',
                 'bars_held': position['bars_held'],
             })
@@ -176,6 +192,8 @@ class DailyPortfolio:
         mdd = _max_drawdown(equity_curve)
         calmar = total_return_pct / (mdd * 100) if mdd > 0 else 0.0
 
+        total_commission_paid = sum(t.get('commission', 0) for t in trades)
+
         return {
             'final_capital': round(final_capital, 2),
             'total_return_pct': round(total_return_pct, 4),
@@ -184,4 +202,5 @@ class DailyPortfolio:
             'trades': trades,
             'equity_curve': equity_curve,
             'n_trades': len(trades),
+            'total_commission': round(total_commission_paid, 2),
         }

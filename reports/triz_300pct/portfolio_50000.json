@@ -1,0 +1,65 @@
+{
+  "capital": 50000,
+  "params": {
+    "max_lot": 5,
+    "risk_pct": 0.02,
+    "max_leverage": 3.0
+  },
+  "result": {
+    "ret": 8.35,
+    "mdd": 3.17,
+    "wr": 33.3,
+    "pf": 3.64,
+    "trades": 3,
+    "wins": 1,
+    "net_pnl": 4177.0,
+    "comm": 44
+  },
+  "trades": [
+    {
+      "ticker": "SP",
+      "pattern": "fiz_extreme_vol_up",
+      "entry": "2024-04-25",
+      "exit": "2024-05-08",
+      "ep": 1012.0,
+      "xp": 1001.88,
+      "nc": 1,
+      "go": 101200.0,
+      "gp": -1012.0,
+      "cm": 4,
+      "npnl": -1016.0,
+      "pnl_pct": -2.03,
+      "stop": true
+    },
+    {
+      "ticker": "PT",
+      "pattern": "fiz_extreme_vol_up",
+      "entry": "2024-05-17",
+      "exit": "2024-05-24",
+      "ep": 1094.3,
+      "xp": 1083.36,
+      "nc": 5,
+      "go": 10943.0,
+      "gp": -547.0,
+      "cm": 20,
+      "npnl": -567.0,
+      "pnl_pct": -1.16,
+      "stop": true
+    },
+    {
+      "ticker": "CC",
+      "pattern": "smart_money",
+      "entry": "2024-12-10",
+      "exit": "2024-12-17",
+      "ep": 1027.0,
+      "xp": 1142.6,
+      "nc": 5,
+      "go": 10270.0,
+      "gp": 5780.0,
+      "cm": 20,
+      "npnl": 5760.0,
+      "pnl_pct": 11.9,
+      "stop": false
+    }
+  ]
+}

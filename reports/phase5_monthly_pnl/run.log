@@ -1,0 +1,34 @@
+=== Monthly PnL IS-portfolio OOS 2025-2026 ===
+Loading data...
+  SV... 106920 bars
+  SBERF... 66081 bars
+  AL... 85597 bars
+  GL... 99314 bars
+  NM... 80991 bars
+  PT... 97853 bars
+  HY... 51582 bars
+  GLDRUBF... 105176 bars
+  VB... 99267 bars
+  YD... 77357 bars
+  NG... 98956 bars
+  RN... 91303 bars
+  MM... 82909 bars
+  AF... 88356 bars
+Precomputing signals...
+  SV... done
+  SBERF... done
+  AL... done
+  GL... done
+  NM... done
+  PT... done
+  HY... done
+  GLDRUBF... done
+  VB... done
+  YD... done
+  NG... done
+  RN... done
+  MM... done
+  AF... done
+Bars in test period: 64442
+  0/64442 cash=100,000 pos=0
+  50000/64442 cash=76,835 pos=13

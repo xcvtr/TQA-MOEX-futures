@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Volume × OI Strategy — Essence & Postmortem</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       background:#0d1117;color:#c9d1d9;padding:30px;line-height:1.6}
+  .container{max-width:1100px;margin:0 auto}
+  h1{font-size:28px;color:#58a6ff;margin-bottom:5px}
+  .subtitle{color:#8b949e;font-size:14px;margin-bottom:30px}
+  h2{font-size:20px;color:#f0f6fc;margin:30px 0 15px;border-bottom:1px solid #21262d;padding-bottom:8px}
+  h3{font-size:16px;color:#e6edf3;margin:20px 0 10px}
+  .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;margin:15px 0}
+  .card-title{font-size:14px;color:#8b949e;margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;margin:2px}
+  .badge-green{background:#003d1a;color:#3fb950}
+  .badge-red{background:#3d0010;color:#f85149}
+  .badge-yellow{background:#3d2e00;color:#d29922}
+  .badge-blue{background:#00263d;color:#58a6ff}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px}
+  .stat{background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:12px;text-align:center}
+  .stat-value{font-size:24px;font-weight:700;margin-top:4px}
+  .stat-label{font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px}
+  .example-row{display:flex;gap:20px;align-items:center;padding:12px;background:#0d1117;border-radius:6px;margin:5px 0}
+  .example-row:hover{background:#1c2333}
+  .signal-box{width:8px;height:40px;border-radius:2px;flex-shrink:0}
+  .verdict{font-size:24px;text-align:center;padding:40px}
+  .verdict h2{font-size:28px;margin:0;border:none;padding:0}
+  .flow{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:20px 0}
+  .flow-step{background:#21262d;border:1px solid #30363d;border-radius:8px;padding:12px 18px;text-align:center;font-size:13px;min-width:100px}
+  .flow-step .label{color:#58a6ff;font-weight:600;font-size:11px;text-transform:uppercase}
+  .flow-arrow{color:#30363d;font-size:20px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+  th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #21262d}
+  th{color:#8b949e;font-weight:600;font-size:11px;text-transform:uppercase}
+  td{font-family:monospace}
+  .chart-wrap{height:250px;margin:15px 0}
+  .tagline{color:#f0f6fc;font-size:15px;font-style:italic;border-left:3px solid #58a6ff;padding-left:15px;margin:20px 0}
+  .close-btn{background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:14px}
+  .close-btn:hover{background:#30363d}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📊 Volume × OI Strategy</h1>
+<div class="subtitle">Yur Accumulation — суть, примеры, результаты проверки на 64 тикерах MOEX</div>
+
+<!-- ── ESSENCE ── -->
+<h2>🧠 Суть стратегии</h2>
+<div class="card">
+  <div class="card-title">Идея</div>
+  <div class="tagline">"Когда на объёмном всплеске юрлица активно набирают позицию, а физики не участвуют — цена пойдёт в направлении юрлиц"</div>
+  
+  <p style="margin-top:15px">На MOEX для каждого фьючерса известно разделение открытого интереса (OI) на <span class="badge badge-green">FIZ</span> (физические лица, розница) и <span class="badge badge-red">YUR</span> (юридические лица, институционалы).</p>
+  
+  <p>Стратегия отслеживает ситуацию, когда:</p>
+  <ol style="margin:10px 0 0 20px;color:#8b949e">
+    <li><strong>Объёмный всплеск</strong> — volume z-score > 3.0 (аномальный объём)</li>
+    <li><strong>Юрлица набирают</strong> — yur_z > 1.5 (их чистая позиция резко растёт)</li>
+    <li><strong>Физики не участвуют</strong> — fiz_z < 0 (их чистая позиция не растёт или падает)</li>
+    <li><strong>Вход:</strong> LONG на open следующего бара</li>
+    <li><strong>Выход:</strong> когда yur_z падает ниже 0.5 (юрлица перестали набирать) ИЛИ стоп-лосс 2%</li>
+  </ol>
+</div>
+
+<!-- ── FLOW ── -->
+<h2>🔄 Конвейер сигнала</h2>
+<div class="flow">
+  <div class="flow-step"><div class="label">1. Бар M5</div>OHLCV + OI</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><div class="label">2. Индикаторы</div>vol_z, fiz_z, yur_z, ATR%</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><div class="label">3. Фильтр</div>vol_z>3.0<br>yur_z>1.5<br>fiz_z<0</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><div class="label">4. ATR</div>≤0.75%<br>(шум)</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><div class="label">5. Вход</div>open +1<br>LONG</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><div class="label">6. Выход</div>yur_z<0.5<br>или SL 2%</div>
+</div>
+
+<!-- ── EXAMPLE SIGNALS ── -->
+<h2>📈 Примеры сигналов (PD — Полюс)</h2>
+<div class="card">
+  <div class="card-title">Реальные сделки на PD с параметрами: vz>3.0, yz>1.5, ATR≤0.75%, exit yz<0.5</div>
+  <div class="example-row">
+    <div class="signal-box" style="background:#3fb950"></div>
+    <div style="flex:1">
+      <strong>✅ Успешная</strong> — entry=1032, exit=1066, held=8 bars, pnl=+338 ₽
+      <div style="font-size:12px;color:#8b949e">vol_z=4.2 yur_z=2.8 → yur_z упал до 0.3 через 8 баров, закрылись с прибылью</div>
+    </div>
+    <span style="color:#3fb950;font-weight:700">+338 ₽</span>
+  </div>
+  <div class="example-row">
+    <div class="signal-box" style="background:#3fb950"></div>
+    <div style="flex:1">
+      <strong>✅ Успешная</strong> — entry=1189, exit=1227, held=14 bars, pnl=+378 ₽
+      <div style="font-size:12px;color:#8b949e">vol_z=5.1 yur_z=3.5 — сильный сигнал, держался 14 баров</div>
+    </div>
+    <span style="color:#3fb950;font-weight:700">+378 ₽</span>
+  </div>
+  <div class="example-row">
+    <div class="signal-box" style="background:#f85149"></div>
+    <div style="flex:1">
+      <strong>❌ Убыточная</strong> — entry=962, exit=940 (SL), held=3 bars, pnl=−222 ₽
+      <div style="font-size:12px;color:#8b949e">vol_z=3.7 yur_z=1.8, но цена развернулась, SL сработал</div>
+    </div>
+    <span style="color:#f85149;font-weight:700">−222 ₽</span>
+  </div>
+  <div class="example-row">
+    <div class="signal-box" style="background:#f85149"></div>
+    <div style="flex:1">
+      <strong>❌ Убыточная</strong> — entry=1005, exit=988 (SL), held=5 bars, pnl=−172 ₽
+      <div style="font-size:12px;color:#8b949e">vz=4.1 yz=2.1, но gap вниз сразу после входа</div>
+    </div>
+    <span style="color:#f85149;font-weight:700">−172 ₽</span>
+  </div>
+</div>
+
+<!-- ── 64 TICKER SCAN ── -->
+<h2>🔬 Скан 64 тикеров MOEX</h2>
+<div class="grid3">
+  <div class="stat">
+    <div class="stat-value" style="color:#8b949e">58</div>
+    <div class="stat-label">Тикеров с ≥10 сигналами</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" style="color:#58a6ff">2</div>
+    <div class="stat-label">Прошли 4/4 folds</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" style="color:#f85149">0</div>
+    <div class="stat-label">Прошли strict trimmed check</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Почему стратегия не прошла верификацию</div>
+  <p>Главная причина: <strong>асимметрия PnL</strong>. Даже при WR=50-55%, проигрыши в 5-50 раз больше выигрышей.</p>
+  <table>
+    <tr><th>Тикер</th><th>WR</th><th>Total PnL</th><th>Trimmed</th><th>Медиана</th><th>Max Loss</th><th>Max Win</th><th>Причина</th></tr>
+    <tr><td>SR</td><td>51%</td><td>+808K</td><td>+650K</td><td>+898</td><td>−53K</td><td>+120K</td><td>Одна сделка +120K тащит всё</td></tr>
+    <tr><td>CC</td><td>40-56%</td><td>+2.5K</td><td>−2.9K</td><td>−27</td><td>−1.3K</td><td>+5.3K</td><td>Без одной сделки — убыток</td></tr>
+    <tr><td>NM</td><td>50%</td><td>+189K</td><td>+132K</td><td>+98</td><td>−33K</td><td>+57K</td><td>2 фолда убыточны без топ-сделок</td></tr>
+    <tr><td style="color:#58a6ff">PD</td><td style="color:#58a6ff">55%</td><td style="color:#58a6ff">+34.5K</td><td style="color:#58a6ff">+29.5K</td><td style="color:#58a6ff">+24</td><td style="color:#58a6ff">−1.5K</td><td style="color:#58a6ff">+6K</td><td style="color:#58a6ff">Самый стабильный, но F4 без топ-сделки −2.4K</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-title">Ключевая проблема</div>
+  <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:250px">
+      <p><strong>Сигнальный WR ≠ реальный edge</strong></p>
+      <p style="color:#8b949e;font-size:13px">В OpenCode deep-dive тикеры показывали WR 59-62%. Но при bar-level MTM (OHLCV close, entry на open +1, stop-loss, commissions) WR падает до 42-55%. Разница в 10-15pp — артефакт симуляции без стопов.</p>
+      <p style="margin-top:10px"><strong>Почему:</strong></p>
+      <ul style="color:#8b949e;font-size:13px;margin-left:20px">
+        <li>Стоп-лосс обрезает прибыльные трейды, но не спасает от gap'ов</li>
+        <li>На высоких ценах (SR 25K, NR 19K) 2% SL = 500 пунктов × 1₽ = 500 ₽ убытка</li>
+        <li>Комиссия 2 ₽/контракт съедает мелкие выигрыши</li>
+      </ul>
+    </div>
+    <div style="flex:1;min-width:300px">
+      <canvas id="wrChart" height="200"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ── WHAT'S NEXT ── -->
+<h2>💡 Куда двигаться</h2>
+<div class="grid2">
+  <div class="card">
+    <div class="card-title">Другая логика OI</div>
+    <p>Не yur_accumulation, а:</p>
+    <ul style="color:#8b949e;font-size:13px;margin:10px 0 0 20px">
+      <li><strong>Fiz capitulation</strong> — fiz_net резко падает (физики в панике закрывают), yur накапливает</li>
+      <li><strong>OI divergence на H1/D1</strong> — на больших ТФ может быть меньше шума</li>
+      <li><strong>Crowd index + price action</strong> — fiz_share как подтверждение уровней support/resistance</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">Price action вместо OI</div>
+    <ul style="color:#8b949e;font-size:13px;margin:10px 0 0 20px">
+      <li>Volume Profile / Market Profile</li>
+      <li>Order Flow Imbalance</li>
+      <li>DOM кластеры (как на forex)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">Другие рынки</div>
+    <ul style="color:#8b949e;font-size:13px;margin:10px 0 0 20px">
+      <li>Forex DOM кластеры — уже работают (TQA)</li>
+      <li>Crypto — funding rate + OI</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">PD (Полюс)</div>
+    <p style="color:#8b949e;font-size:13px;margin-top:10px">Единственный тикер с признаками edge. Возможно, заслуживает отдельного подхода — не как портфельная стратегия, а как точечный инструмент.</p>
+  </div>
+</div>
+
+<script>
+// WR comparison chart
+const ctx = document.getElementById('wrChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: ['Signal WR\n(OpenCode)', 'Bar-level\n(PD param)', 'Bar-level\n(66 tickers avg)'],
+    datasets: [{
+      label: 'Win Rate %',
+      data: [61, 55, 48],
+      backgroundColor: ['rgba(88,166,255,0.6)', 'rgba(63,185,80,0.6)', 'rgba(248,81,73,0.6)'],
+      borderColor: ['#58a6ff', '#3fb950', '#f85149'],
+      borderWidth: 2,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      title: { display: true, text: 'Signal WR vs Bar-level WR', color: '#c9d1d9' }
+    },
+    scales: {
+      y: { min: 40, max: 65, grid: { color: '#21262d' }, ticks: { color: '#8b949e' } },
+      x: { grid: { display: false }, ticks: { color: '#c9d1d9' } }
+    }
+  }
+});
+</script>
+
+</div>
+</body>
+</html>

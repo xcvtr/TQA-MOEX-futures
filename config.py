@@ -8,7 +8,7 @@ Fetches from ISS API: https://iss.moex.com/iss/analyticalproducts/futoi/securiti
 import os
 from pathlib import Path
 
-# ── Database ──────────────────────────────────────────────────────────────
+# ── PostgreSQL (legacy, данные перенесены в ClickHouse) ─────────────────
 DB_HOST = os.getenv("MOEX_DB_HOST", "127.0.0.1")
 DB_PORT = int(os.getenv("MOEX_DB_PORT", "5432"))
 DB_NAME = os.getenv("MOEX_DB_NAME", "moex")
@@ -17,8 +17,13 @@ DB_PASSWORD = os.getenv("MOEX_DB_PASSWORD", "")
 
 DATABASE_URL = os.getenv(
     "MOEX_DATABASE_URL",
-    f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    f"postgresql://{DB_USER}:***@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 )
+
+# ── ClickHouse (основное хранилище) ─────────────────────────────────────
+CH_HOST = os.getenv("MOEX_CH_HOST", "127.0.0.1")
+CH_PORT = int(os.getenv("MOEX_CH_PORT", "8123"))
+CH_DB = os.getenv("MOEX_CH_DB", "moex")
 
 # ── MOEX Auth (optional for futoi, but included for reliability) ──────────
 MOEX_LOGIN = os.getenv("MOEX_LOGIN", "")

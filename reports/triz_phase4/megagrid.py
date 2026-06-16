@@ -277,7 +277,7 @@ for ticker in active:
                                          use_chandelier=True,atr_mult=am,
                                          cap_per_ticker=cap_pt)
                         if r2 and r2['trades']>=5 and r2['ret']>0:
-                            r2.update(dict(ticker=ticker,pattern=pname,hold=hold,sl=0,dv_thr=dv_thr,
+                            r2.update(dict(ticker=ticker,pattern=pname,hold=hold,sl=sl_pct,dv_thr=dv_thr,
                                            use_chandelier=True,atr_mult=am,use_partial_exit=False))
                             tr.append(r2)
                         

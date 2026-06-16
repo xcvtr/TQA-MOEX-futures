@@ -203,7 +203,7 @@ SPREAD_COMPONENT_TICKERS: dict = {
 }
 
 DB_CREDENTIALS = {
-    'host': '10.0.0.64',
+    'host': '127.0.0.1',
     'port': 5432,
     'dbname': 'moex',
     'user': 'postgres',

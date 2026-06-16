@@ -1,0 +1,12 @@
+dir,ticker,sig,params,trades,wr,total_ret_pct,max_dd_pct,calmar,annual_pct
+1-MM,BR,OI Div V1,W=40 T=2.0 hold=10,365,50.68,27.86,5.39,5.1704,27.86
+1-MM,IMOEXF,OI Div V1,W=20 T=2.0 hold=10,5150,49.36,17.88,9.45,1.8922,16.15
+1-MM,AF,OI Div V2,W=40 T=1.5 hold=5,4134,48.43,34.28,12.05,2.8445,34.28
+1-MM,SR,OI Div V1,W=40 T=1.5 hold=10,2659,51.11,11.23,8.94,1.256,22.09
+1-MM,Eu,OI Div V1,W=20 T=1.5 hold=10,9797,48.87,4.56,17.55,0.2598,2.34
+1-MM,CR,OI Div V1,W=40 T=1.5 hold=10,1582,47.66,5.8,8.1,0.7163,5.8
+2-NOMM,GD_EXCLUDE,SMA crossover,"SMA(10,40) hold=15",1735,49.39,-4.28,12.35,-0.3465,-2.17
+2-NOMM,PT_EXCLUDE,SMA crossover,"SMA(10,40) hold=15",1542,43.26,-89.22,90.09,-0.9904,-72.6
+2-NOMM,BR_PRE,SMA crossover,"SMA(10,40) hold=15",1648,49.45,-32.99,38.68,-0.8529,-18.9
+2-NOMM,AF_PRE,SMA crossover,"SMA(10,40) hold=15",1079,40.32,-87.04,87.83,-0.991,-83.23
+2-NOMM,SR_PRE,SMA crossover,"SMA(5,20) hold=5",679,48.6,6.48,5.84,1.111,6.48

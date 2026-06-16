@@ -3,7 +3,7 @@
 MOEX Price Snapshot Loader
 
 Fetches current marketdata for all futures from ISS API
-and saves prices (open, high, low, last, volume, OI) to PostgreSQL.
+and saves prices (open, high, low, last, volume, OI) to ClickHouse.
 
 API: https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.only=marketdata
 """
@@ -13,11 +13,10 @@ from datetime import datetime
 from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, MOEX_OI_TICKERS
+from config import MOEX_OI_TICKERS, CH_HOST, CH_PORT, CH_DB
 
 import requests
-import psycopg2
-from psycopg2.extras import execute_values
+import clickhouse_connect
 
 TICKER_SET = set(MOEX_OI_TICKERS)
 REQUEST_TIMEOUT = 30
@@ -25,103 +24,96 @@ RETRY_ATTEMPTS = 3
 RETRY_DELAY = 2
 
 
-def get_db():
-    conn = psycopg2.connect(
-        host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
-        user=DB_USER, password=DB_PASSWORD,
-    )
-    conn.autocommit = False
-    return conn
+def get_ch():
+    return clickhouse_connect.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
 
 
-def save_prices(conn, records: list[tuple]) -> int:
-    """Save price records to DB. Returns count."""
+def save_prices(ch, records: list[tuple]) -> int:
+    """Save price records to CH. Returns count."""
     if not records:
         return 0
 
-    with conn.cursor() as cur:
-        execute_values(
-            cur,
-            """INSERT INTO moex_prices (symbol, time, open, high, low, last, volume, open_interest, settle_price)
-               VALUES %s
-               ON CONFLICT (symbol, time) DO NOTHING""",
-            records,
-        )
-        inserted = cur.rowcount
-    conn.commit()
-    return inserted
+    ch.insert(
+        "moex.prices",
+        records,
+        column_names=["symbol", "time", "open", "high", "low",
+                       "last", "volume", "open_interest", "settle_price"],
+    )
+    return len(records)
 
 
-def fetch_all_marketdata() -> Optional[list[dict]]:
-    """Fetch marketdata for all futures from ISS."""
-    url = "https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.meta=off&iss.only=marketdata"
+def fetch_snapshot() -> list[tuple]:
+    """
+    Fetch current snapshot from MOEX ISS.
+    Returns list of tuples: (symbol, time, open, high, low, last, volume, OI, settle_price)
+    """
+    url = "https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.only=marketdata"
+    headers = {"User-Agent": "Mozilla/5.0"}
 
     for attempt in range(RETRY_ATTEMPTS):
         try:
-            resp = requests.get(
-                url,
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=REQUEST_TIMEOUT,
-            )
+            resp = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
             if resp.status_code != 200:
-                print(f"  HTTP {resp.status_code} (attempt {attempt + 1})")
-                if attempt < RETRY_ATTEMPTS - 1:
-                    time.sleep(RETRY_DELAY)
+                log.warning("HTTP %d (attempt %d/%d)",
+                            resp.status_code, attempt + 1, RETRY_ATTEMPTS)
+                time.sleep(RETRY_DELAY)
                 continue
 
             data = resp.json()
-            cols = data["marketdata"]["columns"]
-            rows = data["marketdata"]["data"]
-            return [dict(zip(cols, row)) for row in rows]
+            cols = data["marketdata"]["columns"]  # list of strings
+            now = datetime.now()
 
-        except Exception as e:
-            print(f"  Error: {e} (attempt {attempt + 1})")
-            if attempt < RETRY_ATTEMPTS - 1:
-                time.sleep(RETRY_DELAY)
+            records = []
+            for row in data["marketdata"]["data"]:
+                md = dict(zip(cols, row))
+                secid = md.get("SECID", "")
+                # Skip non-interesting and option-like codes
+                if secid in ("", None) or not secid.isascii():
+                    continue
+                if secid not in TICKER_SET:
+                    continue
 
-    return None
+                try:
+                    rec = (
+                        secid,
+                        now,
+                        float(md.get("OPEN", 0) or 0),
+                        float(md.get("HIGH", 0) or 0),
+                        float(md.get("LOW", 0) or 0),
+                        float(md.get("LAST", 0) or 0),
+                        int(md.get("VOLTODAY", 0) or 0),
+                        int(md.get("OPENPOSITION", 0) or 0),
+                        float(md.get("SETTLEPRICE", 0) or 0),
+                    )
+                    records.append(rec)
+                except (ValueError, TypeError):
+                    continue
+
+            return records
+
+        except (requests.RequestException, json.JSONDecodeError) as e:
+            log.warning("Fetch error (attempt %d/%d): %s",
+                        attempt + 1, RETRY_ATTEMPTS, e)
+            time.sleep(RETRY_DELAY)
+
+    return []
 
 
-def main():
-    print(f"=== MOEX Price Snapshot [{datetime.now():%Y-%m-%d %H:%M:%S}] ===")
+def update_snapshot():
+    """Fetch and save current snapshot."""
+    ch = get_ch()
+    records = fetch_snapshot()
+    if not records:
+        log.warning("No records fetched")
+        return 0
 
-    conn = get_db()
-    rows = fetch_all_marketdata()
-    if not rows:
-        print("No data received")
-        conn.close()
-        return
-
-    now = datetime.now()
-    records = []
-    matched = 0
-
-    for r in rows:
-        secid = r.get("SECID", "")
-        if secid not in TICKER_SET:
-            continue
-        matched += 1
-
-        try:
-            last = float(r["LAST"]) if r.get("LAST") not in (None, "", 0) else None
-            open_ = float(r["OPEN"]) if r.get("OPEN") not in (None, "", 0) else None
-            high = float(r["HIGH"]) if r.get("HIGH") not in (None, "", 0) else None
-            low = float(r["LOW"]) if r.get("LOW") not in (None, "", 0) else None
-            volume = int(r["VOLTODAY"]) if r.get("VOLTODAY") not in (None, "", 0) else None
-            oi = int(r["OPENPOSITION"]) if r.get("OPENPOSITION") not in (None, "", 0) else None
-            settle = float(r["SETTLEPRICE"]) if r.get("SETTLEPRICE") not in (None, "", 0) else None
-        except (ValueError, TypeError):
-            continue
-
-        records.append((
-            secid, now, open_, high, low, last, volume, oi, settle,
-        ))
-
-    inserted = save_prices(conn, records)
-    print(f"  Tickers matched: {matched}, records saved: {inserted}")
-    conn.close()
-    print(f"=== Done ===")
+    count = save_prices(ch, records)
+    log.info("Saved %d price snapshots to ClickHouse", count)
+    return count
 
 
 if __name__ == "__main__":
-    main()
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    log = logging.getLogger("moex_price")
+    update_snapshot()

@@ -1,0 +1,18 @@
+Load... 14 tickers
+Signals... 7 signal types
+Sim...
+Bars: 60213
+
+==================================================
+MONTHLY PnL
+==================================================
+
+0 months, 0 negative
+Worst:  (+0.0%)
+
+Return: +0.0% (+0.0%/год)
+WR: 0.0% (0/0)
+
+✅ PASS: worst month 0.0% > -30%
+
+Saved: reports/phase5_monthly_pnl/final_clean.json

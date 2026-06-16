@@ -1,0 +1,28 @@
+{
+  "capital": 200000,
+  "ret": 11.77,
+  "mdd": 75.02,
+  "calmar": 0.16,
+  "wr": 55.6,
+  "pf": 7.72,
+  "trades": 63,
+  "net_pnl": 188502.0,
+  "comm": 1004,
+  "by_ticker": {
+    "PT": {
+      "trades": 38,
+      "wins": 22,
+      "pnl": 94131.0
+    },
+    "SP": {
+      "trades": 16,
+      "wins": 8,
+      "pnl": 85153.0
+    },
+    "CC": {
+      "trades": 9,
+      "wins": 5,
+      "pnl": 9218.0
+    }
+  }
+}

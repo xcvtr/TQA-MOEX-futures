@@ -53,7 +53,7 @@ def load_price_data(symbol: str, days: int = 30) -> List[Dict]:
     import psycopg2
     from datetime import datetime, timedelta, timezone
 
-    DB = dict(host="10.0.0.64", port=5432, dbname="moex", user="postgres", password="***")
+    DB = dict(host="127.0.0.1", port=5432, dbname="moex", user="postgres", password="postgres")
     since = datetime.now(timezone.utc) - timedelta(days=days)
     conn = psycopg2.connect(**DB)
     cur = conn.cursor()

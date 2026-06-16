@@ -20,7 +20,7 @@ import os
 import sys
 
 # ── DB ──────────────────────────────────────────────────────────────────────
-DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
+DB = dict(host='127.0.0.1', port=5432, dbname='moex', user='postgres', password='postgres')
 ZSCORE_WINDOW = 20
 MEDIAN_WINDOW = 20
 
@@ -373,7 +373,7 @@ def detect_oi_divergence_signals(merged, config=None):
     3. If close < swing_low_close AND oi > swing_low_oi * bull_th → LONG
     """
     default = {'lookback': 20, 'horizon': 6, 'extreme_window': 10,
-               'bear_threshold': 0.95, 'bull_threshold': 1.05}
+               'bear_threshold': 0.85, 'bull_threshold': 1.15, 'min_gap_bars': 0}
     config = {**default, **(config or {})}
 
     n = len(merged)
@@ -389,9 +389,11 @@ def detect_oi_divergence_signals(merged, config=None):
     horizon = config['horizon']
     bear_th = config['bear_threshold']
     bull_th = config['bull_threshold']
+    min_gap = config['min_gap_bars']
 
     signals = []
     min_idx = lookback + 5
+    last_signal_bar = {}
 
     for i in range(min_idx, n):
         if i + 1 >= n:
@@ -421,6 +423,10 @@ def detect_oi_divergence_signals(merged, config=None):
         if direction is None:
             continue
 
+        ticker = merged[0].get('symbol', '?')
+        if i - last_signal_bar.get(ticker, -min_gap) < min_gap:
+            continue
+
         entry = merged[i+1]['open']
         if entry <= 0:
             continue
@@ -431,8 +437,10 @@ def detect_oi_divergence_signals(merged, config=None):
         else:
             ret = (entry - exit_price) / entry * 100
 
+        last_signal_bar[ticker] = i
+
         signals.append({
-            'ticker': merged[0].get('symbol', '?'), 'direction': direction,
+            'ticker': ticker, 'direction': direction,
             'entry': round(entry, 4), 'exit': round(exit_price, 4),
             'time': merged[i]['time'], 'return_pct': round(ret, 4),
             'strategy': 'oi_divergence', 'idx': i,

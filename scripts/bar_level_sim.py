@@ -154,11 +154,14 @@ class BarLevelPortfolio:
     def _load_shared_data(cls):
         if cls._signals_cache is not None:
             return
-        with open('.signals_cache.json') as f:
-            cls._signals_cache = json.load(f)
-        for s in cls._signals_cache:
-            s['_time_dt'] = pd.Timestamp(s['time'])
-        cls._signals_cache.sort(key=lambda x: x['_time_dt'])
+        try:
+            with open('.signals_cache.json') as f:
+                cls._signals_cache = json.load(f)
+            for s in cls._signals_cache:
+                s['_time_dt'] = pd.Timestamp(s['time'])
+            cls._signals_cache.sort(key=lambda x: x['_time_dt'])
+        except (FileNotFoundError, json.JSONDecodeError):
+            cls._signals_cache = []
 
         with open('.ohlcv_cache.pkl', 'rb') as f:
             raw = pickle.load(f)
@@ -183,7 +186,8 @@ class BarLevelPortfolio:
                  margin_usage=0.10, max_concurrent=5, total_margin_limit=0.15,
                  stop_loss_pct=0.01, use_score_sizing=True, use_score_eviction=True,
                  atr_stop_mult=2.0, use_score_decay=True, max_hold_bars=40,
-                 use_mtm=True, use_trailing=True, trailing_mult=3.0):
+                 use_mtm=True, use_trailing=True, trailing_mult=3.0,
+                 allow_rollover=True):
         self.initial_capital = initial_capital
         self.max_dd = max_dd
         self.margin_usage = margin_usage
@@ -198,6 +202,7 @@ class BarLevelPortfolio:
         self.use_mtm = use_mtm
         self.use_trailing = use_trailing
         self.trailing_mult = trailing_mult
+        self.allow_rollover = allow_rollover
         self._load_shared_data()
 
     def get_all_signals(self):
@@ -362,6 +367,8 @@ class BarLevelPortfolio:
                     current_price = sig.get('entry', 0)
 
                 if tk in active:
+                    if not self.allow_rollover:
+                        continue  # skip signal, keep existing position open
                     pos_data = active.pop(tk)
                     # Rollover at signal entry price (limit fill), not OHLCV close
                     roll_price = sig.get('entry', current_price)
@@ -693,6 +700,8 @@ class BarLevelPortfolio:
                     current_price = sig.get('entry', 0)
 
                 if tk in active:
+                    if not self.allow_rollover:
+                        continue  # skip signal, keep existing position open
                     pos_data = active.pop(tk)
                     # Rollover at signal entry price (limit fill), not OHLCV close
                     roll_price = sig.get('entry', current_price)

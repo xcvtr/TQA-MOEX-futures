@@ -35,7 +35,7 @@ def load_price_data(symbol: str, days: int = 30) -> List[Tuple]:
     """Load 5m OHLCV from DB."""
     import psycopg2
 
-    DB = dict(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='postgres')
+    DB = dict(host='127.0.0.1', port=5432, dbname='moex', user='postgres', password='postgres')
     since = datetime.now(timezone.utc) - timedelta(days=days)
     rows = []
     conn = psycopg2.connect(**DB)

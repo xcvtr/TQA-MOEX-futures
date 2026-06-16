@@ -3,6 +3,7 @@
 MOEX 5-Minute Price History Loader v2
 Fetches 5-minute candles for all MOEX futures via Alor OpenAPI V2.
 Generates historical contract names for expired contracts.
+Writes to ClickHouse (moex.prices_5m).
 
 Usage:
     python3 price_history_5m.py                    # default load (18 high-liquidity tickers)
@@ -18,11 +19,10 @@ from datetime import datetime, timedelta, timezone, date
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, MOEX_OI_TICKERS
+from config import MOEX_OI_TICKERS, CH_HOST, CH_PORT, CH_DB
 
 import requests
-import psycopg2
-from psycopg2.extras import execute_values
+import clickhouse_connect
 
 # ── Config ────────────────────────────────────────────────────────────────────
 ALOR_BASE = "https://api.alor.ru"
@@ -62,33 +62,22 @@ ASSET_TO_TICKER = {v: k for k, v in TICKER_TO_ASSET.items()}
 # Tickers that use direct Alor symbol (not quarterly contract names)
 DIRECT_SYMBOLS = {"CNYRUBF", "EURRUBF", "GLDRUBF", "USDRUBF", "SBERF", "GAZPF", "IMOEXF"}
 
-# (no OI-only tickers — all have tradeable contracts)
-
 # Tickers with extremely low liquidity (<60 real candles/day on front-month)
-# Loading them produces mostly noise — excluded from 5m table
 LOW_LIQUIDITY_TICKERS = {"CH", "VI", "AU", "FF"}
 
 # Core liquid tickers (≥178 real candles/day) — default full load
-# Includes all KEEP tickers from Volume Surge + Divergence scan
 HIGH_LIQUIDITY_TICKERS = {
     "CNYRUBF", "CC", "Si", "BR", "NG", "IMOEXF", "BM", "VB",
     "SV", "NA", "USDRUBF", "MC", "GD",
     "GLDRUBF", "SR", "SS", "GZ", "GL",
-    # KEEP tickers (Volume Surge + Divergence)
     "AF", "AL", "CE", "DX", "HS", "HY", "MG", "NM", "NR",
     "OJ", "PD", "SE", "SF", "SN", "SP", "TN", "TT", "W4", "YD",
-    # Restored tickers (were OI-only, now have tradeable contracts)
     "CR", "MN", "MY", "RB", "RL",
 }
 
 
-def get_db():
-    conn = psycopg2.connect(
-        host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
-        user=DB_USER, password=DB_PASSWORD,
-    )
-    conn.autocommit = True
-    return conn
+def get_ch():
+    return clickhouse_connect.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
 
 
 def get_current_contracts() -> dict[str, list]:
@@ -120,11 +109,7 @@ def get_current_contracts() -> dict[str, list]:
 def generate_historical_contracts(asset_code: str, earliest_listed: str,
                                     existing_symbols: set[str] | None = None,
                                     monthly: bool = False) -> list[dict]:
-    """
-    Generate historical quarterly or monthly contract names from DATA_START up to the earliest listed one.
-    Skips contracts that already exist in the current list.
-    monthly=True: use all 12 months (for Brent and other monthly futures).
-    """
+    """Generate historical quarterly or monthly contract names."""
     if existing_symbols is None:
         existing_symbols = set()
 
@@ -141,7 +126,6 @@ def generate_historical_contracts(asset_code: str, earliest_listed: str,
     month = DATA_START.month
 
     if monthly:
-        # All 12 months (for BR Brent)
         cycle = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     else:
         cycle = QUARTER_MONTHS
@@ -168,7 +152,6 @@ def generate_historical_contracts(asset_code: str, earliest_listed: str,
 
         alor_sym = f"{asset_code.upper()}-{month}.{str(year)[-2:]}"
 
-        # Skip if already in current contracts
         if alor_sym in existing_symbols:
             continue
 
@@ -224,25 +207,29 @@ def fetch_candles(symbol: str, from_ts: int, to_ts: int) -> list[dict]:
     return all_candles
 
 
-def save_batch(conn, records: list) -> int:
-    """Upsert batch of (symbol, time, open, high, low, close, volume, contract)."""
+def get_last_time(ch, ticker: str):
+    """Get last candle time for ticker from CH."""
+    row = ch.query(
+        "SELECT max(time) FROM moex.prices_5m WHERE symbol = {ticker:String}",
+        parameters={"ticker": ticker},
+    ).result_rows
+    return row[0][0] if row and row[0][0] else None
+
+
+def save_batch(ch, records: list) -> int:
+    """Insert batch of (symbol, time, open, high, low, close, volume, contract) into CH."""
     if not records:
         return 0
-    with conn.cursor() as cur:
-        execute_values(cur,
-            """INSERT INTO moex_prices_5m (symbol, time, open, high, low, close, volume, contract)
-               VALUES %s
-               ON CONFLICT (symbol, time) DO UPDATE SET
-                   open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low,
-                   close=EXCLUDED.close, volume=EXCLUDED.volume,
-                   contract=EXCLUDED.contract, updated_at=NOW()""",
-            records)
-        n = cur.rowcount
-    return n
+    ch.insert(
+        "moex.prices_5m",
+        records,
+        column_names=["symbol", "time", "open", "high", "low",
+                       "close", "volume", "contract"],
+    )
+    return len(records)
 
 
 def to_unixts(d: date, end_of_day: bool = False) -> int:
-    """Convert date to Unix timestamp."""
     if end_of_day:
         dt = datetime.combine(d, datetime.max.time(), tzinfo=timezone.utc)
     else:
@@ -253,10 +240,10 @@ def to_unixts(d: date, end_of_day: bool = False) -> int:
 def main():
     tickers_to_load = sys.argv[1:] if len(sys.argv) > 1 else sorted(HIGH_LIQUIDITY_TICKERS)
 
-    print(f"=== MOEX 5m Price [{datetime.now():%Y-%m-%d %H:%M:%S}] "
+    print(f"=== MOEX 5m Price [ClickHouse] [{datetime.now():%Y-%m-%d %H:%M:%S}] "
           f"({len(tickers_to_load)} tickers) ===")
 
-    conn = get_db()
+    ch = get_ch()
     contracts = get_current_contracts()
     total = 0
     today = date.today()
@@ -268,8 +255,6 @@ def main():
             continue
 
         clist = list(contracts.get(asset, []))
-
-        # Generate historical contracts if needed
         existing_symbols = {c["alor_symbol"] for c in clist}
 
         earliest = min((c["last_trade"] for c in clist), default=None)
@@ -278,8 +263,6 @@ def main():
             monthly = ticker in MONTHLY_TICKERS
             hist_contracts = generate_historical_contracts(asset, earliest, existing_symbols, monthly=monthly)
 
-        # Sort contracts: highest OI first (most liquid = de facto front-month),
-        # then by expiry for historicals
         all_c_list = sorted(hist_contracts + clist,
                             key=lambda x: (-x.get("open_interest", 0), x.get("last_trade", "")))
 
@@ -291,17 +274,11 @@ def main():
             alor_sym = ticker
             print(f"  (direct Alor symbol: {alor_sym})")
 
-            last_ts = None
-            with conn.cursor() as cur:
-                cur.execute("SELECT MAX(time) FROM moex_prices_5m WHERE symbol = %s", (ticker,))
-                row = cur.fetchone()
-                if row and row[0]:
-                    last_ts = int(row[0].replace(tzinfo=timezone.utc).timestamp())
-
+            last_time = get_last_time(ch, ticker)
             from_ts = to_unixts(DATA_START)
             to_ts = int(datetime.now(tz=timezone.utc).timestamp())
-            if last_ts and last_ts > from_ts:
-                from_ts = last_ts
+            if last_time:
+                from_ts = int(last_time.replace(tzinfo=timezone.utc).timestamp())
             if from_ts >= to_ts:
                 print(f"  → up to date")
                 continue
@@ -315,22 +292,16 @@ def main():
                     records.append((ticker, ts, c["open"], c["high"], c["low"],
                                     c["close"], int(c.get("volume", 0)), alor_sym))
                 records.sort(key=lambda r: r[1])
-                n = save_batch(conn, records)
-                print(f"  → {len(records)} records saved ({n} upserted)")
+                n = save_batch(ch, records)
+                print(f"  → {len(records)} records saved to CH")
             total += len(candles)
             continue
 
         # ── Contract mode ───────────────────────────────────────────────────
+        last_time = get_last_time(ch, ticker)
+        last_ts = int(last_time.replace(tzinfo=timezone.utc).timestamp()) if last_time else None
 
-        # Get last timestamp in DB for this ticker
-        last_ts = None
-        with conn.cursor() as cur:
-            cur.execute("SELECT MAX(time) FROM moex_prices_5m WHERE symbol = %s", (ticker,))
-            row = cur.fetchone()
-            if row and row[0]:
-                last_ts = int(row[0].replace(tzinfo=timezone.utc).timestamp())
-
-        seen = {}  # (symbol, time) → record (front-month contract wins)
+        seen = {}
         ticker_total = 0
 
         for c in all_c_list:
@@ -347,7 +318,6 @@ def main():
             except ValueError:
                 c_end = today
 
-            # Each contract actively trades for ~4 months, ending at expiry
             c_start = c_end - timedelta(days=120)
             if c_start < DATA_START:
                 c_start = DATA_START
@@ -355,7 +325,6 @@ def main():
             from_ts = to_unixts(c_start)
             to_ts = to_unixts(c_end, end_of_day=True)
 
-            # Skip if entirely loaded
             if last_ts and from_ts > last_ts:
                 continue
             if last_ts and to_ts < last_ts:
@@ -384,18 +353,16 @@ def main():
             print(f"  {alor_sym:18s}: {len(candles):>6d} candles  OI={oi:>9,}  "
                   f"({c_start} .. {c_end})")
 
-        # Save all deduplicated records sorted by time
         if seen:
             deduped = sorted(seen.values(), key=lambda r: r[1])
-            n = save_batch(conn, deduped)
-            print(f"  → {len(seen)} unique records saved ({n} upserted)")
+            n = save_batch(ch, deduped)
+            print(f"  → {len(seen)} unique records saved to CH")
         else:
             print(f"  → 0 records")
 
         total += ticker_total
 
     print(f"\n=== Done: {total} candles ===")
-    conn.close()
 
 
 if __name__ == "__main__":

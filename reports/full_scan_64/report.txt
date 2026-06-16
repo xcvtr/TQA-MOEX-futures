@@ -1,0 +1,6 @@
+Total tickers with ≥10 signals: 58
+Tickers with ALL 4 folds > 0: 2
+Strict pass (all folds trimmed>0): 0
+
+⚠️ NM: sigs=196 total=188992 trim=132194 WR=50
+⚠️ PD: sigs=270 total=34489 trim=29505 WR=55

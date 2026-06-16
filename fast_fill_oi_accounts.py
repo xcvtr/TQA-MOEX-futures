@@ -2,16 +2,16 @@
 """
 Fast fill OI accounts for specific tickers.
 Fetches futoi CSV year-by-year from MOEX ISS, bulk-upserts accounts columns.
+Writes to ClickHouse (moex.openinterest).
 """
 import sys, os, csv, io, time, logging
 from datetime import datetime, timedelta, date
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, REQUEST_TIMEOUT
+from config import CH_HOST, CH_PORT, CH_DB, REQUEST_TIMEOUT
 
 import requests
-import psycopg2
-from psycopg2.extras import execute_values
+import clickhouse_connect
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger("oi_fill")
@@ -21,16 +21,15 @@ TICKERS = sys.argv[1:] if len(sys.argv) > 1 else [
     "CNYRUBF", "USDRUBF", "EURRUBF", "GLDRUBF", "IMOEXF", "SBERF", "GAZPF",
 ]
 
-def get_db():
-    return psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
+
+def get_ch():
+    return clickhouse_connect.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+
 
 def fetch_year(ticker: str, yr: int) -> list[dict]:
-    """Fetch one full year of OI data."""
-    url = (
-        f"https://iss.moex.com/iss/analyticalproducts/futoi/securities/"
-        f"{ticker}.csv?iss.meta=off&iss.only=futoi"
-        f"&from={yr}-01-01&till={yr}-12-31&latest=0"
-    )
+    url = (f"https://iss.moex.com/iss/analyticalproducts/futoi/securities/"
+           f"{ticker}.csv?iss.meta=off&iss.only=futoi"
+           f"&from={yr}-01-01&till={yr}-12-31&latest=0")
     try:
         resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=REQUEST_TIMEOUT * 3)
         if resp.status_code != 200:
@@ -38,80 +37,58 @@ def fetch_year(ticker: str, yr: int) -> list[dict]:
         text = resp.text
         if "Invalid date" in text or "No data" in text or len(text) < 50:
             return []
-
         records = []
         for row in csv.reader(io.StringIO(text), delimiter=";"):
-            if len(row) < 11:
-                continue
-            if row[0].strip() in ("futoi", "") or row[0] == "sess_id":
-                continue
+            if len(row) < 11: continue
+            if row[0].strip() in ("futoi", "") or row[0] == "sess_id": continue
             clg = row[5].strip().upper()
-            if clg not in ("FIZ", "YUR"):
-                continue
+            if clg not in ("FIZ", "YUR"): continue
             try:
                 dt = datetime.strptime(f"{row[2].strip()} {row[3].strip()}", "%Y-%m-%d %H:%M:%S")
+                bo = int(row[7]) if row[7].strip() else 0
+                so = abs(int(row[8])) if row[8].strip() else 0
+                ba = int(row[9]) if len(row) > 9 and row[9].strip() else 0
+                sa = int(row[10]) if len(row) > 10 and row[10].strip() else 0
             except ValueError:
                 continue
-            try:
-                ba = int(row[9]) if row[9].strip() else 0
-                sa = int(row[10]) if row[10].strip() else 0
-            except (ValueError, IndexError):
-                continue
-            if ba == 0 and sa == 0:
-                continue
-            records.append((ticker, dt, ba, sa, 0 if clg == "FIZ" else 1))
+            records.append({
+                "time": dt, "buy_orders": bo, "sell_orders": so,
+                "buy_accounts": ba, "sell_accounts": sa,
+                "clgroup": 0 if clg == "FIZ" else 1,
+            })
         return records
-    except Exception as e:
-        log.warning(f"  {ticker} {yr} error: {e}")
+    except requests.RequestException:
         return []
 
-def upsert_batch(conn, rows: list) -> int:
-    """Bulk upsert accounts data."""
-    if not rows:
-        return 0
-    # Dedup
-    seen = set()
-    deduped = []
-    for r in rows:
-        key = (r[0], r[1], r[4])
-        if key not in seen:
-            seen.add(key)
-            deduped.append(r)
-    if not deduped:
-        return 0
 
-    with conn.cursor() as cur:
-        execute_values(cur,
-            """INSERT INTO openinterest_moex (symbol, time, buy_accounts, sell_accounts, clgroup)
-               VALUES %s
-               ON CONFLICT (symbol, time, clgroup)
-               DO UPDATE SET
-                   buy_accounts = GREATEST(EXCLUDED.buy_accounts, openinterest_moex.buy_accounts),
-                   sell_accounts = GREATEST(EXCLUDED.sell_accounts, openinterest_moex.sell_accounts)""",
-            deduped)
-        n = cur.rowcount
-    conn.commit()
-    return n
+def save_batch(ch, rows):
+    if not rows:
+        return
+    ch.insert(
+        "moex.openinterest",
+        rows,
+        column_names=["symbol", "time", "buy_orders", "sell_orders",
+                       "buy_accounts", "sell_accounts", "clgroup"],
+    )
+
 
 def main():
-    conn = get_db()
+    ch = get_ch()
     total = 0
     for ticker in TICKERS:
-        log.info(f"\n--- {ticker} ---")
-        ticker_total = 0
-        for yr in range(2021, 2027):
+        for yr in range(2021, 2026):
             records = fetch_year(ticker, yr)
-            if records:
-                n = upsert_batch(conn, records)
-                ticker_total += n
-                log.info(f"  {yr}: {len(records)} rows, {n} upserted")
-                time.sleep(0.2)
-            else:
-                log.info(f"  {yr}: 0 rows")
-        log.info(f"  {ticker}: {ticker_total} total upserted")
-        total += ticker_total
-    conn.close()
-    log.info(f"\nDone: {total} rows upserted for {len(TICKERS)} tickers")
+            if not records:
+                continue
+            rows = [(ticker, r["time"], r["buy_orders"], r["sell_orders"],
+                      r["buy_accounts"], r["sell_accounts"], r["clgroup"])
+                    for r in records]
+            save_batch(ch, rows)
+            total += len(rows)
+            log.info("%s %d: %d records loaded", ticker, yr, len(rows))
+            time.sleep(0.15)
+    log.info("Done: %d total records", total)
+
 
 if __name__ == "__main__":
     main()

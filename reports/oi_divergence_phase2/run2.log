@@ -1,0 +1,276 @@
+
+======================================================================
+  Режим A_full_market
+======================================================================
+
+  AF        : 23364 баров, recovery=2025-08
+    V1: best W=20 T=1.5 hold=5 -> return=26.39% DD=43.38% Calmar=0.608 WR=48.8% trades=3333  (openWR=49% midWR=49% closeWR=0%)
+    V2: best W=40 T=1.0 hold=10 -> return=94.18% DD=21.21% Calmar=4.440 WR=50.4% trades=2042  (openWR=50% midWR=50% closeWR=0%)
+    V3: best W=20 T=1.5 hold=5 -> return=26.39% DD=43.38% Calmar=0.608 WR=48.8% trades=3333  (openWR=49% midWR=49% closeWR=0%)
+
+  AL        : 91606 баров, recovery=2021-11
+    V1: best W=40 T=2.0 hold=5 -> return=-123.51% DD=212.40% Calmar=-0.582 WR=48.2% trades=10030  (openWR=48% midWR=51% closeWR=46%)
+    V2: best W=10 T=2.0 hold=20 -> return=-259.91% DD=390.30% Calmar=-0.666 WR=49.7% trades=4284  (openWR=50% midWR=46% closeWR=100%)
+    V3: best W=40 T=2.0 hold=5 -> return=-30.14% DD=121.12% Calmar=-0.249 WR=48.3% trades=9723  (openWR=48% midWR=50% closeWR=46%)
+
+  BR        : 4816 баров, recovery=2026-04
+    V1: best W=40 T=2.5 hold=20 -> return=43.55% DD=16.88% Calmar=2.580 WR=55.9% trades=177  (openWR=56% midWR=58% closeWR=0%)
+    V2: best W=40 T=2.0 hold=5 -> return=-8.06% DD=33.72% Calmar=-0.239 WR=50.0% trades=682  (openWR=51% midWR=40% closeWR=0%)
+    V3: best W=40 T=2.5 hold=20 -> return=43.55% DD=16.88% Calmar=2.580 WR=55.9% trades=177  (openWR=56% midWR=58% closeWR=0%)
+  CNYRUBF   : ⚠ нет данных, пропуск
+  CR        : ⚠ нет данных, пропуск
+
+  ED        : 111252 баров, recovery=2022-05
+    V1: best W=20 T=1.5 hold=20 -> return=12.11% DD=7.32% Calmar=1.655 WR=49.1% trades=5044  (openWR=49% midWR=52% closeWR=33%)
+    V2: best W=10 T=1.5 hold=20 -> return=1.51% DD=13.42% Calmar=0.113 WR=48.9% trades=5226  (openWR=49% midWR=47% closeWR=50%)
+    V3: best W=20 T=1.5 hold=20 -> return=12.11% DD=7.32% Calmar=1.655 WR=49.1% trades=5044  (openWR=49% midWR=52% closeWR=33%)
+
+  Eu        : 109792 баров, recovery=2022-10
+    V1: best W=10 T=1.0 hold=20 -> return=32.54% DD=23.36% Calmar=1.393 WR=50.1% trades=5155  (openWR=50% midWR=49% closeWR=100%)
+    V2: best W=20 T=1.5 hold=20 -> return=57.74% DD=13.47% Calmar=4.286 WR=51.1% trades=5111  (openWR=51% midWR=53% closeWR=100%)
+    V3: best W=10 T=1.0 hold=20 -> return=32.54% DD=23.36% Calmar=1.393 WR=50.1% trades=5155  (openWR=50% midWR=49% closeWR=100%)
+  GLDRUBF   : ⚠ нет данных, пропуск
+
+  GZ        : 102611 баров, recovery=2023-05
+    V1: best W=40 T=1.0 hold=10 -> return=83.02% DD=35.18% Calmar=2.360 WR=50.1% trades=8724  (openWR=50% midWR=50% closeWR=50%)
+    V2: best W=10 T=2.5 hold=5 -> return=-29.25% DD=96.09% Calmar=-0.304 WR=48.7% trades=15312  (openWR=48% midWR=52% closeWR=80%)
+    V3: best W=40 T=1.0 hold=10 -> return=83.02% DD=35.18% Calmar=2.360 WR=50.1% trades=8724  (openWR=50% midWR=50% closeWR=50%)
+
+  IMOEXF    : 62622 баров, recovery=2024-07
+    V1: best W=10 T=2.5 hold=20 -> return=60.38% DD=10.23% Calmar=5.900 WR=51.9% trades=2771  (openWR=52% midWR=57% closeWR=0%)
+    V2: best W=10 T=1.5 hold=10 -> return=5.03% DD=27.81% Calmar=0.181 WR=47.4% trades=5542  (openWR=47% midWR=51% closeWR=0%)
+    V3: best W=10 T=2.5 hold=20 -> return=60.38% DD=10.23% Calmar=5.900 WR=51.9% trades=2771  (openWR=52% midWR=57% closeWR=0%)
+
+  LK        : 104637 баров, recovery=2022-11
+    V1: best W=40 T=2.0 hold=5 -> return=-8.85% DD=79.71% Calmar=-0.111 WR=49.5% trades=11616  (openWR=49% midWR=51% closeWR=44%)
+    V2: best W=40 T=1.5 hold=5 -> return=-15.62% DD=71.84% Calmar=-0.217 WR=49.8% trades=15148  (openWR=50% midWR=49% closeWR=38%)
+    V3: best W=40 T=2.0 hold=5 -> return=11.56% DD=60.93% Calmar=0.190 WR=49.5% trades=11241  (openWR=49% midWR=51% closeWR=38%)
+
+  MX        : 76692 баров, recovery=2024-02
+    V1: best W=40 T=1.0 hold=20 -> return=40.28% DD=21.19% Calmar=1.901 WR=51.5% trades=3524  (openWR=51% midWR=53% closeWR=0%)
+    V2: best W=20 T=2.5 hold=20 -> return=56.36% DD=26.81% Calmar=2.102 WR=50.5% trades=3450  (openWR=50% midWR=52% closeWR=0%)
+    V3: best W=40 T=1.0 hold=20 -> return=39.89% DD=21.19% Calmar=1.883 WR=51.5% trades=3524  (openWR=51% midWR=53% closeWR=0%)
+
+  NG        : 107388 баров, recovery=2023-01
+    V1: best W=40 T=2.0 hold=20 -> return=-606.28% DD=834.32% Calmar=-0.727 WR=49.5% trades=4430  (openWR=49% midWR=49% closeWR=40%)
+    V2: best W=20 T=1.5 hold=10 -> return=-684.03% DD=918.37% Calmar=-0.745 WR=48.9% trades=9425  (openWR=48% midWR=54% closeWR=25%)
+    V3: best W=40 T=2.0 hold=20 -> return=-606.28% DD=834.32% Calmar=-0.727 WR=49.5% trades=4430  (openWR=49% midWR=49% closeWR=40%)
+
+  NM        : 76548 баров, recovery=2023-05
+    V1: best W=10 T=2.5 hold=10 -> return=-86.90% DD=266.61% Calmar=-0.326 WR=51.4% trades=5896  (openWR=51% midWR=52% closeWR=50%)
+    V2: best W=40 T=1.0 hold=10 -> return=-68.64% DD=193.16% Calmar=-0.355 WR=49.7% trades=6730  (openWR=50% midWR=50% closeWR=33%)
+    V3: best W=10 T=2.5 hold=10 -> return=-86.90% DD=266.61% Calmar=-0.326 WR=51.4% trades=5896  (openWR=51% midWR=52% closeWR=50%)
+
+  PD        : 95877 баров, recovery=2022-10
+    V1: best W=20 T=2.5 hold=5 -> return=23.60% DD=86.35% Calmar=0.273 WR=50.4% trades=9147  (openWR=50% midWR=49% closeWR=33%)
+    V2: best W=20 T=2.0 hold=5 -> return=-93.16% DD=187.51% Calmar=-0.497 WR=49.2% trades=12616  (openWR=49% midWR=52% closeWR=25%)
+    V3: best W=20 T=2.5 hold=5 -> return=23.60% DD=86.35% Calmar=0.273 WR=50.4% trades=9147  (openWR=50% midWR=49% closeWR=33%)
+
+  RI        : 105295 баров, recovery=2023-04
+    V1: best W=10 T=1.5 hold=20 -> return=-5.74% DD=50.74% Calmar=-0.113 WR=49.3% trades=4885  (openWR=49% midWR=51% closeWR=100%)
+    V2: best W=40 T=1.0 hold=5 -> return=63.48% DD=23.37% Calmar=2.717 WR=49.0% trades=16629  (openWR=49% midWR=50% closeWR=50%)
+    V3: best W=10 T=1.5 hold=20 -> return=-5.74% DD=50.74% Calmar=-0.113 WR=49.3% trades=4885  (openWR=49% midWR=51% closeWR=100%)
+
+  RN        : 95364 баров, recovery=2021-11
+    V1: best W=20 T=2.5 hold=5 -> return=56.51% DD=38.99% Calmar=1.449 WR=49.5% trades=10287  (openWR=49% midWR=56% closeWR=62%)
+    V2: best W=40 T=1.5 hold=5 -> return=20.72% DD=69.94% Calmar=0.296 WR=49.2% trades=14195  (openWR=49% midWR=49% closeWR=56%)
+    V3: best W=20 T=2.5 hold=5 -> return=56.51% DD=38.99% Calmar=1.449 WR=49.5% trades=10287  (openWR=49% midWR=56% closeWR=62%)
+
+  SN        : 76918 баров, recovery=2021-10
+    V1: best W=20 T=2.0 hold=5 -> return=-214.35% DD=318.94% Calmar=-0.672 WR=49.4% trades=9272  (openWR=49% midWR=53% closeWR=50%)
+    V2: best W=40 T=1.0 hold=5 -> return=-117.10% DD=209.46% Calmar=-0.559 WR=49.2% trades=11674  (openWR=49% midWR=46% closeWR=0%)
+    V3: best W=20 T=2.0 hold=5 -> return=-223.69% DD=327.43% Calmar=-0.683 WR=49.6% trades=8936  (openWR=49% midWR=54% closeWR=45%)
+
+  SR        : 30407 баров, recovery=2025-07
+    V1: best W=10 T=1.5 hold=10 -> return=93.68% DD=14.25% Calmar=6.575 WR=48.8% trades=2641  (openWR=49% midWR=50% closeWR=0%)
+    V2: best W=20 T=2.0 hold=20 -> return=35.41% DD=11.85% Calmar=2.990 WR=48.6% trades=1406  (openWR=48% midWR=51% closeWR=0%)
+    V3: best W=10 T=1.5 hold=10 -> return=93.70% DD=14.25% Calmar=6.577 WR=48.8% trades=2641  (openWR=49% midWR=50% closeWR=0%)
+
+  SV        : 76825 баров, recovery=2024-02
+    V1: best W=10 T=1.5 hold=10 -> return=147.45% DD=25.68% Calmar=5.742 WR=49.7% trades=6590  (openWR=49% midWR=53% closeWR=80%)
+    V2: best W=10 T=2.0 hold=5 -> return=72.87% DD=30.68% Calmar=2.375 WR=47.4% trades=11745  (openWR=47% midWR=52% closeWR=29%)
+    V3: best W=10 T=1.5 hold=10 -> return=147.45% DD=25.68% Calmar=5.742 WR=49.7% trades=6590  (openWR=49% midWR=53% closeWR=80%)
+  Si        : ⚠ нет данных, пропуск
+  USDRUBF   : ⚠ нет данных, пропуск
+
+  VB        : 59878 баров, recovery=2024-06
+    V1: best W=10 T=2.5 hold=5 -> return=126.68% DD=331.70% Calmar=0.382 WR=47.7% trades=7615  (openWR=48% midWR=47% closeWR=0%)
+    V2: best W=10 T=1.5 hold=5 -> return=-916.33% DD=998.40% Calmar=-0.918 WR=48.9% trades=9562  (openWR=49% midWR=46% closeWR=100%)
+    V3: best W=10 T=2.5 hold=5 -> return=126.58% DD=331.70% Calmar=0.382 WR=47.7% trades=7615  (openWR=48% midWR=47% closeWR=0%)
+
+  ✅ reports/oi_divergence_phase2/A_full_market.csv (1944 строк)
+
+======================================================================
+  Режим B_post_recovery
+======================================================================
+
+  AF        : 23364 баров, recovery=2025-08
+    V1: best W=20 T=1.5 hold=5 -> return=26.39% DD=43.38% Calmar=0.608 WR=48.8% trades=3333  (openWR=49% midWR=49% closeWR=0%)
+    V2: best W=40 T=1.0 hold=10 -> return=94.18% DD=21.21% Calmar=4.440 WR=50.4% trades=2042  (openWR=50% midWR=50% closeWR=0%)
+    V3: best W=20 T=1.5 hold=5 -> return=26.39% DD=43.38% Calmar=0.608 WR=48.8% trades=3333  (openWR=49% midWR=49% closeWR=0%)
+
+  AL        : 91606 баров, recovery=2021-11
+    V1: best W=40 T=2.0 hold=5 -> return=-123.51% DD=212.40% Calmar=-0.582 WR=48.2% trades=10030  (openWR=48% midWR=51% closeWR=46%)
+    V2: best W=10 T=2.0 hold=20 -> return=-259.91% DD=390.30% Calmar=-0.666 WR=49.7% trades=4284  (openWR=50% midWR=46% closeWR=100%)
+    V3: best W=40 T=2.0 hold=5 -> return=-30.14% DD=121.12% Calmar=-0.249 WR=48.3% trades=9723  (openWR=48% midWR=50% closeWR=46%)
+
+  BR        : 4816 баров, recovery=2026-04
+    V1: best W=40 T=2.5 hold=20 -> return=43.55% DD=16.88% Calmar=2.580 WR=55.9% trades=177  (openWR=56% midWR=58% closeWR=0%)
+    V2: best W=40 T=2.0 hold=5 -> return=-8.06% DD=33.72% Calmar=-0.239 WR=50.0% trades=682  (openWR=51% midWR=40% closeWR=0%)
+    V3: best W=40 T=2.5 hold=20 -> return=43.55% DD=16.88% Calmar=2.580 WR=55.9% trades=177  (openWR=56% midWR=58% closeWR=0%)
+
+  CNYRUBF   : 97412 баров, recovery=весь
+    V1: best W=10 T=1.0 hold=10 -> return=-37.80% DD=64.19% Calmar=-0.589 WR=46.3% trades=8622  (openWR=46% midWR=48% closeWR=0%)
+    V2: best W=10 T=2.5 hold=20 -> return=78.80% DD=10.55% Calmar=7.471 WR=50.2% trades=4475  (openWR=50% midWR=57% closeWR=0%)
+    V3: best W=10 T=1.0 hold=10 -> return=-37.80% DD=64.19% Calmar=-0.589 WR=46.3% trades=8622  (openWR=46% midWR=48% closeWR=0%)
+
+  CR        : 17998 баров, recovery=весь
+    V1: best W=40 T=1.0 hold=10 -> return=12.12% DD=9.28% Calmar=1.306 WR=49.2% trades=1548  (openWR=49% midWR=57% closeWR=0%)
+    V2: best W=10 T=1.5 hold=20 -> return=13.90% DD=10.65% Calmar=1.305 WR=49.9% trades=848  (openWR=50% midWR=42% closeWR=0%)
+    V3: best W=40 T=1.0 hold=10 -> return=12.12% DD=9.28% Calmar=1.306 WR=49.2% trades=1548  (openWR=49% midWR=57% closeWR=0%)
+
+  ED        : 111252 баров, recovery=2022-05
+    V1: best W=20 T=1.5 hold=20 -> return=12.11% DD=7.32% Calmar=1.655 WR=49.1% trades=5044  (openWR=49% midWR=52% closeWR=33%)
+    V2: best W=10 T=1.5 hold=20 -> return=1.51% DD=13.42% Calmar=0.113 WR=48.9% trades=5226  (openWR=49% midWR=47% closeWR=50%)
+    V3: best W=20 T=1.5 hold=20 -> return=12.11% DD=7.32% Calmar=1.655 WR=49.1% trades=5044  (openWR=49% midWR=52% closeWR=33%)
+
+  Eu        : 109792 баров, recovery=2022-10
+    V1: best W=10 T=1.0 hold=20 -> return=32.54% DD=23.36% Calmar=1.393 WR=50.1% trades=5155  (openWR=50% midWR=49% closeWR=100%)
+    V2: best W=20 T=1.5 hold=20 -> return=57.74% DD=13.47% Calmar=4.286 WR=51.1% trades=5111  (openWR=51% midWR=53% closeWR=100%)
+    V3: best W=10 T=1.0 hold=20 -> return=32.54% DD=23.36% Calmar=1.393 WR=50.1% trades=5155  (openWR=50% midWR=49% closeWR=100%)
+
+  GLDRUBF   : 91376 баров, recovery=весь
+    V1: best W=40 T=2.5 hold=20 -> return=12.03% DD=19.43% Calmar=0.619 WR=49.2% trades=3218  (openWR=49% midWR=47% closeWR=0%)
+    V2: best W=20 T=2.5 hold=10 -> return=44.27% DD=24.66% Calmar=1.795 WR=50.1% trades=7165  (openWR=50% midWR=54% closeWR=0%)
+    V3: best W=40 T=2.5 hold=20 -> return=12.03% DD=19.43% Calmar=0.619 WR=49.2% trades=3218  (openWR=49% midWR=47% closeWR=0%)
+
+  GZ        : 102611 баров, recovery=2023-05
+    V1: best W=40 T=1.0 hold=10 -> return=83.02% DD=35.18% Calmar=2.360 WR=50.1% trades=8724  (openWR=50% midWR=50% closeWR=50%)
+    V2: best W=10 T=2.5 hold=5 -> return=-29.25% DD=96.09% Calmar=-0.304 WR=48.7% trades=15312  (openWR=48% midWR=52% closeWR=80%)
+    V3: best W=40 T=1.0 hold=10 -> return=83.02% DD=35.18% Calmar=2.360 WR=50.1% trades=8724  (openWR=50% midWR=50% closeWR=50%)
+
+  IMOEXF    : 62622 баров, recovery=2024-07
+    V1: best W=10 T=2.5 hold=20 -> return=60.38% DD=10.23% Calmar=5.900 WR=51.9% trades=2771  (openWR=52% midWR=57% closeWR=0%)
+    V2: best W=10 T=1.5 hold=10 -> return=5.03% DD=27.81% Calmar=0.181 WR=47.4% trades=5542  (openWR=47% midWR=51% closeWR=0%)
+    V3: best W=10 T=2.5 hold=20 -> return=60.38% DD=10.23% Calmar=5.900 WR=51.9% trades=2771  (openWR=52% midWR=57% closeWR=0%)
+
+  LK        : 104637 баров, recovery=2022-11
+    V1: best W=40 T=2.0 hold=5 -> return=-8.85% DD=79.71% Calmar=-0.111 WR=49.5% trades=11616  (openWR=49% midWR=51% closeWR=44%)
+    V2: best W=40 T=1.5 hold=5 -> return=-15.62% DD=71.84% Calmar=-0.217 WR=49.8% trades=15148  (openWR=50% midWR=49% closeWR=38%)
+    V3: best W=40 T=2.0 hold=5 -> return=11.56% DD=60.93% Calmar=0.190 WR=49.5% trades=11241  (openWR=49% midWR=51% closeWR=38%)
+
+  MX        : 76692 баров, recovery=2024-02
+    V1: best W=40 T=1.0 hold=20 -> return=40.28% DD=21.19% Calmar=1.901 WR=51.5% trades=3524  (openWR=51% midWR=53% closeWR=0%)
+    V2: best W=20 T=2.5 hold=20 -> return=56.36% DD=26.81% Calmar=2.102 WR=50.5% trades=3450  (openWR=50% midWR=52% closeWR=0%)
+    V3: best W=40 T=1.0 hold=20 -> return=39.89% DD=21.19% Calmar=1.883 WR=51.5% trades=3524  (openWR=51% midWR=53% closeWR=0%)
+
+  NG        : 107388 баров, recovery=2023-01
+    V1: best W=40 T=2.0 hold=20 -> return=-606.28% DD=834.32% Calmar=-0.727 WR=49.5% trades=4430  (openWR=49% midWR=49% closeWR=40%)
+    V2: best W=20 T=1.5 hold=10 -> return=-684.03% DD=918.37% Calmar=-0.745 WR=48.9% trades=9425  (openWR=48% midWR=54% closeWR=25%)
+    V3: best W=40 T=2.0 hold=20 -> return=-606.28% DD=834.32% Calmar=-0.727 WR=49.5% trades=4430  (openWR=49% midWR=49% closeWR=40%)
+
+  NM        : 76548 баров, recovery=2023-05
+    V1: best W=10 T=2.5 hold=10 -> return=-86.90% DD=266.61% Calmar=-0.326 WR=51.4% trades=5896  (openWR=51% midWR=52% closeWR=50%)
+    V2: best W=40 T=1.0 hold=10 -> return=-68.64% DD=193.16% Calmar=-0.355 WR=49.7% trades=6730  (openWR=50% midWR=50% closeWR=33%)
+    V3: best W=10 T=2.5 hold=10 -> return=-86.90% DD=266.61% Calmar=-0.326 WR=51.4% trades=5896  (openWR=51% midWR=52% closeWR=50%)
+
+  PD        : 95877 баров, recovery=2022-10
+    V1: best W=20 T=2.5 hold=5 -> return=23.60% DD=86.35% Calmar=0.273 WR=50.4% trades=9147  (openWR=50% midWR=49% closeWR=33%)
+    V2: best W=20 T=2.0 hold=5 -> return=-93.16% DD=187.51% Calmar=-0.497 WR=49.2% trades=12616  (openWR=49% midWR=52% closeWR=25%)
+    V3: best W=20 T=2.5 hold=5 -> return=23.60% DD=86.35% Calmar=0.273 WR=50.4% trades=9147  (openWR=50% midWR=49% closeWR=33%)
+
+  RI        : 105295 баров, recovery=2023-04
+    V1: best W=10 T=1.5 hold=20 -> return=-5.74% DD=50.74% Calmar=-0.113 WR=49.3% trades=4885  (openWR=49% midWR=51% closeWR=100%)
+    V2: best W=40 T=1.0 hold=5 -> return=63.48% DD=23.37% Calmar=2.717 WR=49.0% trades=16629  (openWR=49% midWR=50% closeWR=50%)
+    V3: best W=10 T=1.5 hold=20 -> return=-5.74% DD=50.74% Calmar=-0.113 WR=49.3% trades=4885  (openWR=49% midWR=51% closeWR=100%)
+
+  RN        : 95364 баров, recovery=2021-11
+    V1: best W=20 T=2.5 hold=5 -> return=56.51% DD=38.99% Calmar=1.449 WR=49.5% trades=10287  (openWR=49% midWR=56% closeWR=62%)
+    V2: best W=40 T=1.5 hold=5 -> return=20.72% DD=69.94% Calmar=0.296 WR=49.2% trades=14195  (openWR=49% midWR=49% closeWR=56%)
+    V3: best W=20 T=2.5 hold=5 -> return=56.51% DD=38.99% Calmar=1.449 WR=49.5% trades=10287  (openWR=49% midWR=56% closeWR=62%)
+
+  SN        : 76918 баров, recovery=2021-10
+    V1: best W=20 T=2.0 hold=5 -> return=-214.35% DD=318.94% Calmar=-0.672 WR=49.4% trades=9272  (openWR=49% midWR=53% closeWR=50%)
+    V2: best W=40 T=1.0 hold=5 -> return=-117.10% DD=209.46% Calmar=-0.559 WR=49.2% trades=11674  (openWR=49% midWR=46% closeWR=0%)
+    V3: best W=20 T=2.0 hold=5 -> return=-223.69% DD=327.43% Calmar=-0.683 WR=49.6% trades=8936  (openWR=49% midWR=54% closeWR=45%)
+
+  SR        : 30407 баров, recovery=2025-07
+    V1: best W=10 T=1.5 hold=10 -> return=93.68% DD=14.25% Calmar=6.575 WR=48.8% trades=2641  (openWR=49% midWR=50% closeWR=0%)
+    V2: best W=20 T=2.0 hold=20 -> return=35.41% DD=11.85% Calmar=2.990 WR=48.6% trades=1406  (openWR=48% midWR=51% closeWR=0%)
+    V3: best W=10 T=1.5 hold=10 -> return=93.70% DD=14.25% Calmar=6.577 WR=48.8% trades=2641  (openWR=49% midWR=50% closeWR=0%)
+
+  SV        : 76825 баров, recovery=2024-02
+    V1: best W=10 T=1.5 hold=10 -> return=147.45% DD=25.68% Calmar=5.742 WR=49.7% trades=6590  (openWR=49% midWR=53% closeWR=80%)
+    V2: best W=10 T=2.0 hold=5 -> return=72.87% DD=30.68% Calmar=2.375 WR=47.4% trades=11745  (openWR=47% midWR=52% closeWR=29%)
+    V3: best W=10 T=1.5 hold=10 -> return=147.45% DD=25.68% Calmar=5.742 WR=49.7% trades=6590  (openWR=49% midWR=53% closeWR=80%)
+
+  Si        : 61422 баров, recovery=весь
+    V1: best W=40 T=2.0 hold=20 -> return=65.37% DD=10.37% Calmar=6.306 WR=49.7% trades=2457  (openWR=49% midWR=59% closeWR=67%)
+    V2: best W=20 T=1.0 hold=10 -> return=-2.88% DD=27.94% Calmar=-0.103 WR=49.0% trades=5463  (openWR=49% midWR=50% closeWR=50%)
+    V3: best W=40 T=2.0 hold=20 -> return=65.37% DD=10.37% Calmar=6.306 WR=49.7% trades=2457  (openWR=49% midWR=59% closeWR=67%)
+
+  USDRUBF   : 98645 баров, recovery=весь
+    V1: best W=40 T=1.5 hold=20 -> return=35.17% DD=17.85% Calmar=1.970 WR=49.7% trades=4326  (openWR=49% midWR=56% closeWR=0%)
+    V2: best W=10 T=2.0 hold=5 -> return=6.95% DD=14.80% Calmar=0.469 WR=47.6% trades=15206  (openWR=48% midWR=47% closeWR=0%)
+    V3: best W=40 T=1.5 hold=20 -> return=35.17% DD=17.85% Calmar=1.970 WR=49.7% trades=4326  (openWR=49% midWR=56% closeWR=0%)
+
+  VB        : 59878 баров, recovery=2024-06
+    V1: best W=10 T=2.5 hold=5 -> return=126.68% DD=331.70% Calmar=0.382 WR=47.7% trades=7615  (openWR=48% midWR=47% closeWR=0%)
+    V2: best W=10 T=1.5 hold=5 -> return=-916.33% DD=998.40% Calmar=-0.918 WR=48.9% trades=9562  (openWR=49% midWR=46% closeWR=100%)
+    V3: best W=10 T=2.5 hold=5 -> return=126.58% DD=331.70% Calmar=0.382 WR=47.7% trades=7615  (openWR=48% midWR=47% closeWR=0%)
+
+  ✅ reports/oi_divergence_phase2/B_post_recovery.csv (2484 строк)
+
+======================================================================
+  Сводный анализ
+======================================================================
+
+--- A_full_market ---
+
+  V1 Top-5 by Calmar (>=20 trades):
+    SR         W=10 T=1.5 hold=10 trades=2641 WR=48.8% ret=  93.68% DD= 14.25% Calmar=6.575 oWR=49% mWR=50% cWR=0%
+    IMOEXF     W=10 T=2.5 hold=20 trades=2771 WR=51.9% ret=  60.38% DD= 10.23% Calmar=5.900 oWR=52% mWR=57% cWR=0%
+    SV         W=10 T=1.5 hold=10 trades=6590 WR=49.7% ret= 147.45% DD= 25.68% Calmar=5.742 oWR=49% mWR=53% cWR=80%
+    SV         W=10 T=1.0 hold=10 trades=6772 WR=49.7% ret= 140.30% DD= 27.38% Calmar=5.125 oWR=49% mWR=52% cWR=67%
+    IMOEXF     W=10 T=1.5 hold=20 trades=2902 WR=51.5% ret=  55.56% DD= 13.64% Calmar=4.072 oWR=51% mWR=55% cWR=0%
+
+  V2 Top-5 by Calmar (>=20 trades):
+    AF         W=40 T=1.0 hold=10 trades=2042 WR=50.4% ret=  94.18% DD= 21.21% Calmar=4.440 oWR=50% mWR=50% cWR=0%
+    Eu         W=20 T=1.5 hold=20 trades=5111 WR=51.1% ret=  57.74% DD= 13.47% Calmar=4.286 oWR=51% mWR=53% cWR=100%
+    AF         W=20 T=1.0 hold=20 trades=1100 WR=52.4% ret=  88.68% DD= 27.93% Calmar=3.175 oWR=52% mWR=59% cWR=0%
+    SR         W=20 T=2.0 hold=20 trades=1406 WR=48.6% ret=  35.41% DD= 11.85% Calmar=2.990 oWR=48% mWR=51% cWR=0%
+    AF         W=20 T=1.0 hold= 5 trades=3748 WR=48.6% ret=  72.11% DD= 25.09% Calmar=2.874 oWR=48% mWR=53% cWR=0%
+
+  V3 Top-5 by Calmar (>=20 trades):
+    SR         W=10 T=1.5 hold=10 trades=2641 WR=48.8% ret=  93.70% DD= 14.25% Calmar=6.577 oWR=49% mWR=50% cWR=0%
+    IMOEXF     W=10 T=2.5 hold=20 trades=2771 WR=51.9% ret=  60.38% DD= 10.23% Calmar=5.900 oWR=52% mWR=57% cWR=0%
+    SV         W=10 T=1.5 hold=10 trades=6590 WR=49.7% ret= 147.45% DD= 25.68% Calmar=5.742 oWR=49% mWR=53% cWR=80%
+    SV         W=10 T=1.0 hold=10 trades=6772 WR=49.7% ret= 140.25% DD= 27.38% Calmar=5.123 oWR=49% mWR=52% cWR=67%
+    IMOEXF     W=10 T=1.5 hold=20 trades=2902 WR=51.5% ret=  55.56% DD= 13.64% Calmar=4.072 oWR=51% mWR=55% cWR=0%
+
+--- B_post_recovery ---
+
+  V1 Top-5 by Calmar (>=20 trades):
+    SR         W=10 T=1.5 hold=10 trades=2641 WR=48.8% ret=  93.68% DD= 14.25% Calmar=6.575 oWR=49% mWR=50% cWR=0%
+    Si         W=40 T=2.0 hold=20 trades=2457 WR=49.7% ret=  65.37% DD= 10.37% Calmar=6.306 oWR=49% mWR=59% cWR=67%
+    Si         W=40 T=1.0 hold=10 trades=5204 WR=48.8% ret=  64.72% DD= 10.79% Calmar=6.000 oWR=48% mWR=56% cWR=67%
+    IMOEXF     W=10 T=2.5 hold=20 trades=2771 WR=51.9% ret=  60.38% DD= 10.23% Calmar=5.900 oWR=52% mWR=57% cWR=0%
+    SV         W=10 T=1.5 hold=10 trades=6590 WR=49.7% ret= 147.45% DD= 25.68% Calmar=5.742 oWR=49% mWR=53% cWR=80%
+
+  V2 Top-5 by Calmar (>=20 trades):
+    CNYRUBF    W=10 T=2.5 hold=20 trades=4475 WR=50.2% ret=  78.80% DD= 10.55% Calmar=7.471 oWR=50% mWR=57% cWR=0%
+    CNYRUBF    W=20 T=2.0 hold=20 trades=4464 WR=51.2% ret=  73.40% DD= 15.63% Calmar=4.697 oWR=51% mWR=55% cWR=0%
+    CNYRUBF    W=20 T=2.5 hold=10 trades=7912 WR=49.1% ret=  63.85% DD= 13.89% Calmar=4.596 oWR=49% mWR=53% cWR=0%
+    CNYRUBF    W=10 T=1.0 hold=20 trades=4602 WR=49.9% ret=  66.64% DD= 14.56% Calmar=4.578 oWR=50% mWR=55% cWR=0%
+    AF         W=40 T=1.0 hold=10 trades=2042 WR=50.4% ret=  94.18% DD= 21.21% Calmar=4.440 oWR=50% mWR=50% cWR=0%
+
+  V3 Top-5 by Calmar (>=20 trades):
+    SR         W=10 T=1.5 hold=10 trades=2641 WR=48.8% ret=  93.70% DD= 14.25% Calmar=6.577 oWR=49% mWR=50% cWR=0%
+    Si         W=40 T=2.0 hold=20 trades=2457 WR=49.7% ret=  65.37% DD= 10.37% Calmar=6.306 oWR=49% mWR=59% cWR=67%
+    Si         W=40 T=1.0 hold=10 trades=5204 WR=48.8% ret=  64.72% DD= 10.79% Calmar=6.000 oWR=48% mWR=56% cWR=67%
+    IMOEXF     W=10 T=2.5 hold=20 trades=2771 WR=51.9% ret=  60.38% DD= 10.23% Calmar=5.900 oWR=52% mWR=57% cWR=0%
+    SV         W=10 T=1.5 hold=10 trades=6590 WR=49.7% ret= 147.45% DD= 25.68% Calmar=5.742 oWR=49% mWR=53% cWR=80%
+
+======================================================================
+  Done.
+======================================================================

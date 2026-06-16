@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-"""Backfill MOEX OI data for old years (2023-2025)."""
+"""Backfill MOEX OI data for old years (2023-2025) into ClickHouse."""
 
 import sys, os, csv, io, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
-import psycopg2
-from psycopg2.extras import execute_values
+from config import CH_HOST, CH_PORT, CH_DB
+import clickhouse_connect
 from datetime import datetime, timedelta, date
 import requests
 
-conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
-conn.autocommit = False
-cur = conn.cursor()
+ch = clickhouse_connect.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
 
 tickers = sys.argv[1:] if len(sys.argv) > 1 else []
 if not tickers:
@@ -21,20 +18,23 @@ if not tickers:
 
 total_ins = 0
 for ticker in tickers:
-    cur.execute("SELECT MIN(time)::date FROM openinterest_moex WHERE symbol = %s", (ticker,))
-    first = cur.fetchone()[0]
+    row = ch.query(
+        "SELECT min(time) FROM moex.openinterest WHERE symbol = {t:String}",
+        parameters={"t": ticker},
+    ).result_rows
+    first = row[0][0] if row and row[0][0] else None
     start = date(2023, 1, 1)
-    end = first - timedelta(days=1) if first else date(2025, 11, 11)
-    
+    end = first.date() - timedelta(days=1) if first else date(2025, 11, 11)
+
     if start >= end:
         print(f"{ticker}: already have data from {first}, skipping")
         continue
-    
+
     current = start
     ticker_ins = 0
     days = (end - start).days
     print(f"{ticker}: {days} days ({start} -> {end})")
-    
+
     while current <= end:
         if current.weekday() >= 5:
             current += timedelta(days=1)
@@ -62,19 +62,20 @@ for ticker in tickers:
                     unique = []
                     for r in rows:
                         k = (r[0], r[1], r[4])
-                        if k not in seen: seen.add(k); unique.append(r)
-                    execute_values(cur,
-                        "INSERT INTO openinterest_moex (symbol, time, buy_orders, sell_orders, clgroup) VALUES %s ON CONFLICT (symbol, time, clgroup) DO UPDATE SET buy_orders = EXCLUDED.buy_orders, sell_orders = EXCLUDED.sell_orders",
-                        unique)
-                    conn.commit()
-                    n = cur.rowcount
-                    ticker_ins += n
-                    total_ins += n
+                        if k not in seen:
+                            seen.add(k)
+                            unique.append(r)
+                    ch.insert(
+                        "moex.openinterest",
+                        unique,
+                        column_names=["symbol", "time", "buy_orders", "sell_orders", "clgroup"],
+                    )
+                    ticker_ins += len(unique)
+                    total_ins += len(unique)
         except Exception as e:
-            conn.rollback()
+            pass
         current += timedelta(days=1)
         time.sleep(0.1)
     print(f"{ticker}: {ticker_ins} records")
 
 print(f"Done: {total_ins} total records")
-conn.close()
