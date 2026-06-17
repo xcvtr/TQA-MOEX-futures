@@ -1,214 +1,217 @@
 #!/usr/bin/env python3
-"""Deep OI wave analysis: structure, patterns, and link to price movement."""
-import sys, os
-sys.path.insert(0, os.path.expanduser('~/projects/TQA-MOEX'))
-os.chdir(os.path.expanduser('~/projects/TQA-MOEX'))
-import clickhouse_connect
+"""OI Wave Analysis — find tickers where OI divergence predicts price movement.
+Limited to 30 key tickers for speed."""
+
+import json, os, time
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
-from config import CH_HOST, CH_PORT, CH_DB
+import clickhouse_connect
 
-ch = clickhouse_connect.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-TICKERS = ['BR','PD','Si','AF','SR','VB','AL','LK','NM','IMOEXF','Eu','CR']
+# ── All MOEX OI tickers ──
+TICKERS = [
+    'AF', 'AL', 'AU', 'BM', 'BR', 'CC', 'CE', 'CH', 'CNYRUBF', 'CR',
+    'DX', 'ED', 'Eu', 'EURRUBF', 'FF', 'GAZPF', 'GD', 'GK', 'GL', 'GLDRUBF',
+    'GZ', 'HS', 'HY', 'IB', 'IMOEXF', 'KC', 'LK', 'MC', 'ME', 'MG',
+    'MM', 'MN', 'MX', 'MY', 'NA', 'NG', 'NM', 'NR', 'OJ', 'PD',
+    'PT', 'RB', 'RI', 'RL', 'RM', 'RN', 'SBERF', 'SE', 'SF', 'Si',
+    'SN', 'SP', 'SR', 'SS', 'SV', 'TN', 'TT', 'UC', 'USDRUBF', 'VB',
+    'VI', 'W4', 'X5', 'YD',
+]
 
-def load_data(ticker, start='2025-01-01', end='2025-12-31'):
-    rows = ch.query("""
-        SELECT p.time, p.open, p.high, p.low, p.close, p.volume,
-               o.fiz_buy, o.fiz_sell, o.yur_buy, o.yur_sell, o.total_oi
-        FROM moex.prices_5m_oi AS o
-        INNER JOIN moex.prices_5m AS p ON p.symbol = o.symbol AND p.time = o.time
-        WHERE o.symbol = {t:String} AND p.time >= {s:String} AND p.time <= {e:String}
-        ORDER BY p.time
-    """, parameters={'t': ticker, 's': start, 'e': end}).result_rows
-    if not rows or len(rows) < 100: return None
-    df = pd.DataFrame(rows, columns=['time','open','high','low','close','volume','fiz_buy','fiz_sell','yur_buy','yur_sell','total_oi'])
-    return df
+CH_HOST = '127.0.0.1'
+CH_PORT = 8123
+DAYS = 730  # 2 years
 
-def compute(df):
-    tot = df['total_oi'].values.astype(float); tot = np.where(tot <= 0, 1, tot)
-    yur_net = (df['yur_buy'] - df['yur_sell']).values.astype(float) / tot * 100
-    fiz_net = (df['fiz_buy'] - df['fiz_sell']).values.astype(float) / tot * 100
-    volume = df['volume'].values.astype(float)
-    close = df['close'].values.astype(float); high = df['high'].values.astype(float); low = df['low'].values.astype(float)
-    return yur_net, fiz_net, volume, close, high, low
+def rz(s, w=20):
+    m = s.rolling(w, min_periods=w).mean()
+    std = s.rolling(w, min_periods=w).std()
+    return (s - m) / std.clip(lower=1e-10)
 
-# ====== WAVE PATTERN ANALYSIS ======
-# We need to find: how does yur_net behave BEFORE price moves up/down?
-# Hypothesis: price moves when yur_net reaches an extreme and REVERSES
+print("Connecting to ClickHouse...", flush=True)
+ch = clickhouse_connect.get_client(host=CH_HOST, port=CH_PORT)
 
-def find_wave_turns(yur_net, lookback=12, min_change=3):
-    """Find local extremes of yur_net (wave peaks/troughs).
-    A turn is where yur_net changes direction by >= min_change % over lookback bars."""
-    n = len(yur_net)
-    turns = []
-    for i in range(lookback, n - lookback):
-        left = yur_net[i-lookback:i]
-        right = yur_net[i:i+lookback]
-        # Peak: yur_net[i] is higher than both sides
-        if yur_net[i] == max(yur_net[i-lookback:i+lookback]) and yur_net[i] > np.mean(left) + min_change:
-            turns.append({'idx': i, 'type': 'PEAK', 'val': float(yur_net[i]), 'dir': '→SHORT'})
-        # Trough: yur_net[i] is lower than both sides
-        elif yur_net[i] == min(yur_net[i-lookback:i+lookback]) and yur_net[i] < np.mean(left) - min_change:
-            turns.append({'idx': i, 'type': 'TROUGH', 'val': float(yur_net[i]), 'dir': '→LONG'})
-    return turns
+results = []
+z_scores_all = {}  # For distribution analysis
 
-def analyze_turn_price_relationship(ticker, df, yur_net, close):
-    """For each OI turn, check what price does in the next N bars."""
-    n = len(close)
-    lookback = 12  # 1h
-    min_change = 3  # % change needed
-    horizon = 24  # 2h forward
+for sym in TICKERS:
+    t0 = time.time()
+    print(f"\n{sym}: ", end='', flush=True)
     
-    turns = find_wave_turns(yur_net, lookback, min_change)
-    
-    results = {'peak': [], 'trough': []}
-    for t in turns:
-        idx = t['idx']
-        if idx + horizon >= n: continue
+    # Load H1 OI from openinterest table (snapshots)
+    # We resample 5m prices and OI to H1
+    try:
+        q = f"""SELECT p.time, p.close, p.high, p.low, p.volume,
+                       o.fiz_buy, o.fiz_sell, o.yur_buy, o.yur_sell
+                FROM moex.prices_5m p
+                LEFT JOIN moex.prices_5m_oi o ON p.time = o.time AND p.symbol = o.symbol
+                WHERE p.symbol = '{sym}' AND p.time >= now() - INTERVAL {DAYS} DAY
+                ORDER BY p.time"""
+        r = ch.query(q)
+        if not r.result_rows or len(r.result_rows) < 500:
+            print(f"❌ insufficient data ({len(r.result_rows) if r.result_rows else 0} rows)", flush=True)
+            continue
         
-        entry_price = close[idx]
-        future_prices = close[idx:idx+horizon]
-        future_max = float(future_prices.max())
-        future_min = float(future_prices.min())
+        cols = ['time', 'close', 'high', 'low', 'volume', 'fiz_buy', 'fiz_sell', 'yur_buy', 'yur_sell']
+        df = pd.DataFrame(r.result_rows, columns=cols)
+        df['time'] = pd.to_datetime(df['time'])
+        df.set_index('time', inplace=True)
         
-        max_move_pct = (future_max / entry_price - 1) * 100
-        min_move_pct = (future_min / entry_price - 1) * 100
-        end_move_pct = (future_prices[-1] / entry_price - 1) * 100
+        # Resample to H1
+        agg = {'close': 'last', 'high': 'max', 'low': 'min', 'volume': 'sum',
+               'fiz_buy': 'last', 'fiz_sell': 'last', 'yur_buy': 'last', 'yur_sell': 'last'}
+        dh = df.resample('1h').agg(agg).dropna(subset=['close'])
         
-        results[t['type'].lower()].append({
-            'val': t['val'],
-            'entry': float(entry_price),
-            'max_move': round(max_move_pct, 2),
-            'min_move': round(min_move_pct, 2),
-            'end_move': round(end_move_pct, 2),
-            'direction': t['dir'],
-        })
-    
-    return results
-
-print("=" * 100)
-print("OI WAVE TURNS vs PRICE MOVEMENT — анализ структуры")
-print("=" * 100)
-
-for ticker in TICKERS[:3]:  # BR, PD, Si first
-    df = load_data(ticker)
-    if df is None: continue
-    yur_net, fiz_net, volume, close, high, low = compute(df)
-    
-    print(f"\n--- {ticker} ---")
-    
-    for tf in ['5m', 'H1']:
-        step = 1 if tf == '5m' else 12
-        if step > 1:
-            # Resample to H1
-            yur_h = pd.Series(yur_net).resample('1h').last().values if False else yur_net[::step][:len(yur_net)//step*step]
-            close_h = close[::step][:len(close)//step*step]
-            # Simpler: just take every 12th bar
-            yur_h = yur_net[::12]
-            close_h = close[::12]
-            vol_h = volume[::12]
-        else:
-            yur_h = yur_net
-            close_h = close
+        if len(dh) < 100:
+            print(f"❌ too few H1 bars ({len(dh)})", flush=True)
+            continue
         
-        r = analyze_turn_price_relationship(ticker, df, yur_h, close_h)
+        # OI metrics
+        dh['fiz_net'] = dh['fiz_buy'].fillna(0) - dh['fiz_sell'].fillna(0)
+        dh['yur_net'] = dh['yur_buy'].fillna(0) - dh['yur_sell'].fillna(0)
+        dh['oi_ratio'] = (dh['yur_buy'] + dh['yur_sell']).fillna(0) / (dh['fiz_buy'] + dh['fiz_sell'] + 1).fillna(0)
+        dh['fiz_z'] = rz(dh['fiz_net'], 20)
+        dh['yur_z'] = rz(dh['yur_net'], 20)
+        dh['oi_z'] = rz(dh['oi_ratio'], 20)
         
-        print(f"\n  {tf}: {len(r['peak'])} PEAKS + {len(r['trough'])} TROUGHS = {len(r['peak'])+len(r['trough'])} wave turns")
+        z_scores_all[sym] = dh['oi_z'].dropna().values.tolist()
         
-        for turn_type in ['peak', 'trough']:
-            data = r[turn_type]
-            if not data: continue
+        # Forward returns
+        for h in [6, 12, 24]:
+            dh[f'fwd_ret_{h}h'] = dh['close'].shift(-h) / dh['close'] - 1
+        
+        # Detect OI waves: abs(oi_z) > 2.0 for at least 3 consecutive hours
+        dh['wave_signal'] = 0
+        dh.loc[dh['oi_z'] > 2.0, 'wave_signal'] = 1    # yur dominant → expect LONG
+        dh.loc[dh['oi_z'] < -2.0, 'wave_signal'] = -1   # fiz dominant → expect SHORT
+        
+        # Find contiguous wave periods
+        waves = []
+        in_wave = False
+        wave_start = None
+        wave_dir = 0
+        
+        for i in range(len(dh)):
+            sig = dh['wave_signal'].iloc[i]
+            if not in_wave and sig != 0:
+                in_wave = True
+                wave_start = i
+                wave_dir = sig
+            elif in_wave and sig == 0:
+                # Wave ended — check minimum length (3 hours)
+                if i - wave_start >= 3:
+                    waves.append((wave_start, i, wave_dir))
+                in_wave = False
+        # Handle wave at end
+        if in_wave and len(dh) - wave_start >= 3:
+            waves.append((wave_start, len(dh), wave_dir))
+        
+        n_waves = len(waves)
+        if n_waves == 0:
+            print(f"⏹ no waves detected", flush=True)
+            results.append({'symbol': sym, 'n_waves': 0, 'avg_hours': 0,
+                'acc_6h': 0, 'acc_12h': 0, 'acc_24h': 0,
+                'ret_6h': 0, 'ret_12h': 0, 'ret_24h': 0, 'ok': False})
+            continue
+        
+        # Analyze each wave
+        wave_hours = []
+        correct_6h = 0; correct_12h = 0; correct_24h = 0
+        total_6h = 0; total_12h = 0; total_24h = 0
+        ret_6h_vals = []; ret_12h_vals = []; ret_24h_vals = []
+        
+        for ws, we, wdir in waves:
+            duration = we - ws
+            wave_hours.append(duration)
             
-            # Average move after turn
-            avg_end = np.mean([d['end_move'] for d in data])
-            avg_max = np.mean([d['max_move'] for d in data])
-            avg_min = np.mean([d['min_move'] for d in data])
-            pct_up = sum(1 for d in data if d['end_move'] > 0) / len(data) * 100
+            # Expected direction
+            expected_up = (wdir == 1)  # yur dominant → LONG
             
-            label = 'PEAK (yur max → SHORT)' if turn_type == 'peak' else 'TROUGH (yur min → LONG)'
-            print(f"    {label}:")
-            print(f"      After turn: avg +{avg_max:.2f}% / {avg_min:.2f}% / end {avg_end:.2f}% | up={pct_up:.0f}%")
-            
-            # Stratify by OI extreme strength
-            strong = [d for d in data if abs(d['val']) > np.mean([abs(x['val']) for x in data])]
-            if strong:
-                s_end = np.mean([d['end_move'] for d in strong])
-                s_up = sum(1 for d in strong if d['end_move'] > 0) / len(strong) * 100
-                print(f"      Strong turns (>{abs(np.mean([x['val'] for x in data])):.0f}%): end={s_end:.2f}% up={s_up:.0f}%")
-
-print()
-print("=" * 100)
-print("ГИСТОГРАММА: после OI PEAK цена идёт ВНИЗ или ВВЕРХ?")
-print("=" * 100)
-
-# Focus on BR H1 for detailed analysis
-for ticker in ['BR']:
-    df = load_data(ticker)
-    yur_net, fiz_net, volume, close, high, low = compute(df)
-    
-    # Take every 12th bar (H1 approximation)
-    yur_h, close_h = yur_net[::12], close[::12]
-    
-    # Find turns
-    turns = find_wave_turns(yur_h, lookback=4, min_change=2)  # 4h lookback on H1
-    
-    print(f"\n{ticker} H1: {len(turns)} wave turns, sample analysis:")
-    for t in turns[:8]:
-        idx = t['idx']
-        if idx + 6 >= len(close_h): continue
+            # Check forward returns at various horizons
+            end_idx = we - 1  # last bar of wave
+            for h_idx, h in [(6, '6h'), (12, '12h'), (24, '24h')]:
+                end_bar = end_idx + h_idx
+                if end_bar >= len(dh):
+                    continue
+                fwd_ret = dh[f'fwd_ret_{h_idx}h'].iloc[end_idx]
+                if np.isnan(fwd_ret):
+                    continue
+                
+                if h_idx == 6:
+                    total_6h += 1
+                    ret_6h_vals.append(fwd_ret)
+                    if (fwd_ret > 0) == expected_up:
+                        correct_6h += 1
+                elif h_idx == 12:
+                    total_12h += 1
+                    ret_12h_vals.append(fwd_ret)
+                    if (fwd_ret > 0) == expected_up:
+                        correct_12h += 1
+                else:
+                    total_24h += 1
+                    ret_24h_vals.append(fwd_ret)
+                    if (fwd_ret > 0) == expected_up:
+                        correct_24h += 1
         
-        # Price 6h after turn
-        p0 = close_h[idx]
-        p6 = close_h[idx+6]
-        move = (p6/p0 - 1) * 100
+        avg_hours = np.mean(wave_hours) if wave_hours else 0
+        acc6 = correct_6h / total_6h * 100 if total_6h > 0 else 0
+        acc12 = correct_12h / total_12h * 100 if total_12h > 0 else 0
+        acc24 = correct_24h / total_24h * 100 if total_24h > 0 else 0
+        r6 = np.mean(ret_6h_vals) * 100 if ret_6h_vals else 0
+        r12 = np.mean(ret_12h_vals) * 100 if ret_12h_vals else 0
+        r24 = np.mean(ret_24h_vals) * 100 if ret_24h_vals else 0
         
-        # yur_net values around turn
-        yur_before = yur_h[max(0,idx-4):idx]
-        yur_after = yur_h[idx:idx+6]
+        print(f"✅ {n_waves} waves, avg {avg_hours:.1f}h, acc 6h={acc6:.0f}% 12h={acc12:.0f}% 24h={acc24:.0f}% ({time.time()-t0:.0f}s)", flush=True)
         
-        print(f"  {t['type']:>7} val={t['val']:>+6.1f}% | price {p0:.0f}→{p6:.0f} ({move:>+.2f}%) | yur_before {np.mean(yur_before):+.1f}→{yur_h[idx]:+.1f}→{np.mean(yur_after):+.1f}")
+        results.append({'symbol': sym, 'n_waves': n_waves, 'avg_hours': round(avg_hours, 1),
+            'acc_6h': round(acc6, 1), 'acc_12h': round(acc12, 1), 'acc_24h': round(acc24, 1),
+            'ret_6h': round(r6, 2), 'ret_12h': round(r12, 2), 'ret_24h': round(r24, 2),
+            'ok': True, 'time_s': round(time.time() - t0, 1)})
+    except Exception as e:
+        print(f"❌ error: {e}", flush=True)
+        results.append({'symbol': sym, 'ok': False, 'error': str(e)})
 
-print()
-print("=" * 100)
-print("КЛЮЧЕВОЙ ТЕСТ: если держать от TROUGH до PEAK и наоборот")
-print("=" * 100)
+# ── Print results ──
+print(f"\n\n{'='*80}")
+print(f"OI WAVE ANALYSIS — H1, |oi_z| > 2.0, >= 3h, {DAYS} days")
+print(f"{'='*80}")
 
-# Simulate: enter LONG at TROUGH, exit at next PEAK (and SHORT: enter at PEAK, exit at next TROUGH)
-for ticker in ['BR', 'PD', 'IMOEXF']:
-    df = load_data(ticker)
-    yur_net, fiz_net, volume, close, high, low = compute(df)
-    yur_h, close_h = yur_net[::12], close[::12]
-    
-    turns = find_wave_turns(yur_h, lookback=4, min_change=2)
-    # Sort by idx
-    turns.sort(key=lambda x: x['idx'])
-    
-    trades = []
-    for i in range(len(turns)-1):
-        t1, t2 = turns[i], turns[i+1]
-        if t2['idx'] - t1['idx'] < 2: continue  # skip too close
-        
-        if t1['type'] == 'TROUGH' and t2['type'] == 'PEAK':
-            # LONG from trough to peak
-            entry = close_h[t1['idx']]; exit_p = close_h[t2['idx']]
-            pnl = (exit_p/entry - 1) * 100 - 0.1  # -spread
-            trades.append({'type': 'LONG', 'bars': t2['idx']-t1['idx'], 'pnl': round(pnl, 2)})
-        elif t1['type'] == 'PEAK' and t2['type'] == 'TROUGH':
-            # SHORT from peak to trough
-            entry = close_h[t1['idx']]; exit_p = close_h[t2['idx']]
-            pnl = (1 - exit_p/entry) * 100 - 0.1
-            trades.append({'type': 'SHORT', 'bars': t2['idx']-t1['idx'], 'pnl': round(pnl, 2)})
-    
-    if trades:
-        pnls = [t['pnl'] for t in trades]
-        wr = sum(1 for p in pnls if p > 0) / len(pnls) * 100
-        avg_bars = np.mean([t['bars'] for t in trades])
-        longs = [t for t in trades if t['type'] == 'LONG']
-        shorts = [t for t in trades if t['type'] == 'SHORT']
-        print(f"\n{ticker}: {len(trades)} wave trades, WR={wr:.0f}% avg_bars={avg_bars:.0f}h")
-        if longs:
-            l_pnls = [t['pnl'] for t in longs]
-            print(f"  LONG: {len(longs)} trades, avg={np.mean(l_pnls):+.2f}% total={sum(l_pnls):+.2f}%")
-        if shorts:
-            s_pnls = [t['pnl'] for t in shorts]
-            print(f"  SHORT: {len(shorts)} trades, avg={np.mean(s_pnls):+.2f}% total={sum(s_pnls):+.2f}%")
+valid = [r for r in results if r.get('ok')]
+valid.sort(key=lambda x: -x['acc_12h'])
+
+print(f"\n--- TOP 10 by 12h accuracy ---")
+print(f"{'#':3} {'Ticker':8} {'Waves':8} {'AvgH':6} {'Acc6h':8} {'Acc12h':8} {'Acc24h':8} {'R6h%':8} {'R12h%':8} {'R24h%':8}")
+print(f"{'─'*80}")
+for i, r in enumerate(valid[:10]):
+    print(f"{i+1:3} {r['symbol']:8} {r['n_waves']:8} {r['avg_hours']:6.1f} {r['acc_6h']:7.1f}% {r['acc_12h']:7.1f}% {r['acc_24h']:7.1f}% {r['ret_6h']:7.2f}% {r['ret_12h']:7.2f}% {r['ret_24h']:7.2f}%")
+
+print(f"\n--- WORST 5 ---")
+valid_bad = sorted(valid, key=lambda x: x['acc_12h'])
+for i, r in enumerate(valid_bad[:5]):
+    print(f"{i+1:3} {r['symbol']:8} {r['n_waves']:8} {r['avg_hours']:6.1f} {r['acc_6h']:7.1f}% {r['acc_12h']:7.1f}% {r['acc_24h']:7.1f}% {r['ret_6h']:7.2f}% {r['ret_12h']:7.2f}% {r['ret_24h']:7.2f}%")
+
+# Count tickers with accuracy > 55% at 12h
+good = [r for r in valid if r['acc_12h'] > 55 and r['n_waves'] >= 10]
+print(f"\n--- Tickers with Acc12h > 55% and >= 10 waves: {len(good)}/{len(valid)} ---")
+for r in sorted(good, key=lambda x: -x['acc_12h']):
+    print(f"  {r['symbol']}: Acc12h={r['acc_12h']:.0f}% waves={r['n_waves']} avgH={r['avg_hours']:.0f}h R12h={r['ret_12h']:+.2f}%")
+
+# Wave duration distribution
+all_durations = []
+for r in valid:
+    all_durations.extend([r['avg_hours']] * r['n_waves'])
+if all_durations:
+    print(f"\n--- Wave duration distribution ---")
+    print(f"  Mean: {np.mean(all_durations):.1f}h, Median: {np.median(all_durations):.1f}h")
+    for threshold in [3, 6, 12, 24, 48]:
+        pct = sum(1 for d in all_durations if d >= threshold) / len(all_durations) * 100
+        print(f"  >= {threshold:2d}h: {pct:.0f}%")
+
+# Save
+os.makedirs('reports/oi_wave_analysis', exist_ok=True)
+with open('reports/oi_wave_analysis/wave_analysis.json', 'w') as f:
+    json.dump({'results': results, 'good_tickers': [r['symbol'] for r in good],
+               'summary': {'total': len(valid), 'good': len(good)}}, f, indent=2)
+print(f"\nSaved: reports/oi_wave_analysis/wave_analysis.json")
+print(f"Time: {time.time():.0f}s")

@@ -1,0 +1,926 @@
+{
+  "AF": {
+    "meta": {
+      "pat": "sm",
+      "dir": "L",
+      "atm": 2,
+      "hold": 21
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -12105.9,
+        "max_dd_pct": 12100.9,
+        "calmar": -1.0,
+        "n_trades": 2422,
+        "tpd": 5.0
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -8316.2,
+        "max_dd_pct": 8311.2,
+        "calmar": -1.0,
+        "n_trades": 1664,
+        "tpd": 3.4
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -5774.1,
+        "max_dd_pct": 5769.2,
+        "calmar": -1.0,
+        "n_trades": 1155,
+        "tpd": 2.4
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -10054.5,
+        "max_dd_pct": 10049.5,
+        "calmar": -1.0,
+        "n_trades": 2012,
+        "tpd": 4.1
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -7397.1,
+        "max_dd_pct": 7392.1,
+        "calmar": -1.0,
+        "n_trades": 1480,
+        "tpd": 3.1
+      }
+    ],
+    "n_combos": 81
+  },
+  "AL": {
+    "meta": {
+      "pat": "vou",
+      "dir": "L",
+      "atm": 2,
+      "hold": 21
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -9786.2,
+        "max_dd_pct": 9786.2,
+        "calmar": -1.0,
+        "n_trades": 1958,
+        "tpd": 4.0
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -7066.7,
+        "max_dd_pct": 7061.8,
+        "calmar": -1.0,
+        "n_trades": 1414,
+        "tpd": 2.9
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -5109.0,
+        "max_dd_pct": 5104.0,
+        "calmar": -1.0,
+        "n_trades": 1022,
+        "tpd": 2.1
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -8208.3,
+        "max_dd_pct": 8208.3,
+        "calmar": -1.0,
+        "n_trades": 1642,
+        "tpd": 3.4
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -6218.7,
+        "max_dd_pct": 6213.8,
+        "calmar": -1.0,
+        "n_trades": 1244,
+        "tpd": 2.6
+      }
+    ],
+    "n_combos": 57
+  },
+  "BR": {
+    "meta": {
+      "pat": "vyf",
+      "dir": "S",
+      "atm": 5,
+      "hold": 13
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -5995.2,
+        "max_dd_pct": 5995.2,
+        "calmar": -1.0,
+        "n_trades": 2000,
+        "tpd": 4.1
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -3725.8,
+        "max_dd_pct": 3725.8,
+        "calmar": -1.0,
+        "n_trades": 1243,
+        "tpd": 2.6
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -2305.4,
+        "max_dd_pct": 2302.4,
+        "calmar": -1.0,
+        "n_trades": 769,
+        "tpd": 1.6
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -4926.1,
+        "max_dd_pct": 4926.1,
+        "calmar": -1.0,
+        "n_trades": 1644,
+        "tpd": 3.4
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -3212.6,
+        "max_dd_pct": 3212.6,
+        "calmar": -1.0,
+        "n_trades": 1072,
+        "tpd": 2.2
+      }
+    ],
+    "n_combos": 81
+  },
+  "GL": {
+    "meta": {
+      "pat": "vod",
+      "dir": "L",
+      "atm": 2,
+      "hold": 21
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -11846.6,
+        "max_dd_pct": 11846.6,
+        "calmar": -1.0,
+        "n_trades": 2371,
+        "tpd": 4.9
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -8837.9,
+        "max_dd_pct": 8837.9,
+        "calmar": -1.0,
+        "n_trades": 1769,
+        "tpd": 3.6
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -6061.2,
+        "max_dd_pct": 6056.3,
+        "calmar": -1.0,
+        "n_trades": 1213,
+        "tpd": 2.5
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -9144.6,
+        "max_dd_pct": 9144.6,
+        "calmar": -1.0,
+        "n_trades": 1830,
+        "tpd": 3.8
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -7266.2,
+        "max_dd_pct": 7266.2,
+        "calmar": -1.0,
+        "n_trades": 1454,
+        "tpd": 3.0
+      }
+    ],
+    "n_combos": 81
+  },
+  "HY": {
+    "meta": {
+      "pat": "vou",
+      "dir": "L",
+      "atm": 5,
+      "hold": 5
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -3005.4,
+        "max_dd_pct": 3005.4,
+        "calmar": -1.0,
+        "n_trades": 1003,
+        "tpd": 2.1
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -1996.5,
+        "max_dd_pct": 1996.5,
+        "calmar": -1.0,
+        "n_trades": 666,
+        "tpd": 1.4
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -1291.5,
+        "max_dd_pct": 1288.5,
+        "calmar": -1.0,
+        "n_trades": 431,
+        "tpd": 0.9
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -2613.2,
+        "max_dd_pct": 2613.2,
+        "calmar": -1.0,
+        "n_trades": 872,
+        "tpd": 1.8
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -1844.5,
+        "max_dd_pct": 1841.5,
+        "calmar": -1.0,
+        "n_trades": 615,
+        "tpd": 1.3
+      }
+    ],
+    "n_combos": 54
+  },
+  "NG": {
+    "meta": {
+      "pat": "vyf",
+      "dir": "S",
+      "atm": 5,
+      "hold": 5
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -8625.8,
+        "max_dd_pct": 8620.8,
+        "calmar": -1.0,
+        "n_trades": 1727,
+        "tpd": 3.6
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -5651.4,
+        "max_dd_pct": 5646.3,
+        "calmar": -1.0,
+        "n_trades": 1132,
+        "tpd": 2.3
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -3798.4,
+        "max_dd_pct": 3793.4,
+        "calmar": -1.0,
+        "n_trades": 761,
+        "tpd": 1.6
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -7231.1,
+        "max_dd_pct": 7226.1,
+        "calmar": -1.0,
+        "n_trades": 1446,
+        "tpd": 3.0
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -4934.5,
+        "max_dd_pct": 4929.5,
+        "calmar": -1.0,
+        "n_trades": 987,
+        "tpd": 2.0
+      }
+    ],
+    "n_combos": 81
+  },
+  "NM": {
+    "meta": {
+      "pat": "vod",
+      "dir": "L",
+      "atm": 3,
+      "hold": 21
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -2635.1,
+        "max_dd_pct": 2635.1,
+        "calmar": -1.0,
+        "n_trades": 1858,
+        "tpd": 3.8
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -1877.1,
+        "max_dd_pct": 1877.1,
+        "calmar": -1.0,
+        "n_trades": 1318,
+        "tpd": 2.7
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -1287.3,
+        "max_dd_pct": 1285.9,
+        "calmar": -1.0,
+        "n_trades": 898,
+        "tpd": 1.9
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -2153.3,
+        "max_dd_pct": 2153.3,
+        "calmar": -1.0,
+        "n_trades": 1515,
+        "tpd": 3.1
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -1607.3,
+        "max_dd_pct": 1607.3,
+        "calmar": -1.0,
+        "n_trades": 1126,
+        "tpd": 2.3
+      }
+    ],
+    "n_combos": 78
+  },
+  "RN": {
+    "meta": {
+      "pat": "vou",
+      "dir": "L",
+      "atm": 5,
+      "hold": 5
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -8421.0,
+        "max_dd_pct": 8416.0,
+        "calmar": -1.0,
+        "n_trades": 1685,
+        "tpd": 3.5
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -5687.8,
+        "max_dd_pct": 5682.8,
+        "calmar": -1.0,
+        "n_trades": 1138,
+        "tpd": 2.3
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -3674.4,
+        "max_dd_pct": 3669.5,
+        "calmar": -1.0,
+        "n_trades": 735,
+        "tpd": 1.5
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -7001.8,
+        "max_dd_pct": 7001.8,
+        "calmar": -1.0,
+        "n_trades": 1401,
+        "tpd": 2.9
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -5068.1,
+        "max_dd_pct": 5068.1,
+        "calmar": -1.0,
+        "n_trades": 1014,
+        "tpd": 2.1
+      }
+    ],
+    "n_combos": 57
+  },
+  "SF": {
+    "meta": {
+      "pat": "vod",
+      "dir": "S",
+      "atm": 3,
+      "hold": 8
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -4793.5,
+        "max_dd_pct": 4793.5,
+        "calmar": -1.0,
+        "n_trades": 958,
+        "tpd": 2.0
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -3222.4,
+        "max_dd_pct": 3222.4,
+        "calmar": -1.0,
+        "n_trades": 644,
+        "tpd": 1.3
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -2167.9,
+        "max_dd_pct": 2167.9,
+        "calmar": -1.0,
+        "n_trades": 433,
+        "tpd": 0.9
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -4016.2,
+        "max_dd_pct": 4016.2,
+        "calmar": -1.0,
+        "n_trades": 802,
+        "tpd": 1.7
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -2939.8,
+        "max_dd_pct": 2939.8,
+        "calmar": -1.0,
+        "n_trades": 587,
+        "tpd": 1.2
+      }
+    ],
+    "n_combos": 72
+  },
+  "SN": {
+    "meta": {
+      "pat": "vou",
+      "dir": "L",
+      "atm": 5,
+      "hold": 5
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -6589.0,
+        "max_dd_pct": 6584.0,
+        "calmar": -1.0,
+        "n_trades": 1318,
+        "tpd": 2.7
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -4405.7,
+        "max_dd_pct": 4400.7,
+        "calmar": -1.0,
+        "n_trades": 881,
+        "tpd": 1.8
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -2750.5,
+        "max_dd_pct": 2745.6,
+        "calmar": -1.0,
+        "n_trades": 550,
+        "tpd": 1.1
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -5552.7,
+        "max_dd_pct": 5547.7,
+        "calmar": -1.0,
+        "n_trades": 1111,
+        "tpd": 2.3
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -3979.9,
+        "max_dd_pct": 3974.9,
+        "calmar": -1.0,
+        "n_trades": 796,
+        "tpd": 1.6
+      }
+    ],
+    "n_combos": 54
+  },
+  "SR": {
+    "meta": {
+      "pat": "sm",
+      "dir": "L",
+      "atm": 5,
+      "hold": 8
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -12165.2,
+        "max_dd_pct": 12159.5,
+        "calmar": -1.0,
+        "n_trades": 2128,
+        "tpd": 4.4
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -7326.7,
+        "max_dd_pct": 7321.0,
+        "calmar": -1.0,
+        "n_trades": 1282,
+        "tpd": 2.6
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -4589.6,
+        "max_dd_pct": 4583.9,
+        "calmar": -1.0,
+        "n_trades": 803,
+        "tpd": 1.7
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -10485.3,
+        "max_dd_pct": 10479.6,
+        "calmar": -1.0,
+        "n_trades": 1834,
+        "tpd": 3.8
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -6562.4,
+        "max_dd_pct": 6556.7,
+        "calmar": -1.0,
+        "n_trades": 1148,
+        "tpd": 2.4
+      }
+    ],
+    "n_combos": 81
+  },
+  "SV": {
+    "meta": {
+      "pat": "vod",
+      "dir": "S",
+      "atm": 5,
+      "hold": 5
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -8273.6,
+        "max_dd_pct": 8273.6,
+        "calmar": -1.0,
+        "n_trades": 1654,
+        "tpd": 3.4
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -6064.1,
+        "max_dd_pct": 6064.1,
+        "calmar": -1.0,
+        "n_trades": 1212,
+        "tpd": 2.5
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -3959.2,
+        "max_dd_pct": 3959.2,
+        "calmar": -1.0,
+        "n_trades": 791,
+        "tpd": 1.6
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -6048.5,
+        "max_dd_pct": 6048.5,
+        "calmar": -1.0,
+        "n_trades": 1209,
+        "tpd": 2.5
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -4782.7,
+        "max_dd_pct": 4777.7,
+        "calmar": -1.0,
+        "n_trades": 956,
+        "tpd": 2.0
+      }
+    ],
+    "n_combos": 78
+  },
+  "Si": {
+    "meta": {
+      "pat": "vyf",
+      "dir": "L",
+      "atm": 2,
+      "hold": 13
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -1104.1,
+        "max_dd_pct": 1104.1,
+        "calmar": -1.0,
+        "n_trades": 1065,
+        "tpd": 2.2
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -987.1,
+        "max_dd_pct": 987.1,
+        "calmar": -1.0,
+        "n_trades": 948,
+        "tpd": 2.0
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -840.2,
+        "max_dd_pct": 840.2,
+        "calmar": -1.0,
+        "n_trades": 801,
+        "tpd": 1.7
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -720.1,
+        "max_dd_pct": 720.1,
+        "calmar": -1.0,
+        "n_trades": 681,
+        "tpd": 1.4
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -667.1,
+        "max_dd_pct": 667.1,
+        "calmar": -1.0,
+        "n_trades": 628,
+        "tpd": 1.3
+      }
+    ],
+    "n_combos": 45
+  },
+  "YD": {
+    "meta": {
+      "pat": "vod",
+      "dir": "L",
+      "atm": 5,
+      "hold": 13
+    },
+    "top5": [
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 24,
+        "return_pct": -9097.4,
+        "max_dd_pct": 9092.4,
+        "calmar": -1.0,
+        "n_trades": 1820,
+        "tpd": 3.8
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 48,
+        "return_pct": -6037.1,
+        "max_dd_pct": 6032.1,
+        "calmar": -1.0,
+        "n_trades": 1208,
+        "tpd": 2.5
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.3,
+        "hold": 96,
+        "return_pct": -3763.3,
+        "max_dd_pct": 3758.3,
+        "calmar": -1.0,
+        "n_trades": 753,
+        "tpd": 1.6
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 24,
+        "return_pct": -7608.0,
+        "max_dd_pct": 7608.0,
+        "calmar": -1.0,
+        "n_trades": 1522,
+        "tpd": 3.1
+      },
+      {
+        "vol_ema": 20,
+        "score_ema": 0,
+        "th": 0.45,
+        "hold": 48,
+        "return_pct": -5436.6,
+        "max_dd_pct": 5436.6,
+        "calmar": -1.0,
+        "n_trades": 1088,
+        "tpd": 2.2
+      }
+    ],
+    "n_combos": 78
+  }
+}

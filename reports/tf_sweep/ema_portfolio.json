@@ -1,0 +1,127 @@
+{
+  "config": {
+    "volume_ema": 40,
+    "score_ema": 12,
+    "entry_threshold_long": 0.5,
+    "entry_threshold_short": 0.45,
+    "slippage": 0.0001,
+    "kelly_min": 0.4,
+    "kelly_max": 1.5,
+    "fade_exit": false,
+    "reentry_delay_bars": 24,
+    "test_start": "2025-01-01",
+    "test_end": "2026-04-30",
+    "market_hours": "7:00-23:00"
+  },
+  "results": {
+    "capital": 95085.42254989104,
+    "return_pct": -4.914577450108962,
+    "annual_return": -3.7544407552414616,
+    "max_dd_pct": 12.59637910030168,
+    "calmar": -0.29805714208391393,
+    "wr": 39.360172537742635,
+    "n_trades": 2782,
+    "trades_per_day": 5.8,
+    "total_slippage_cost": 4238.0,
+    "days": 481,
+    "time_s": 186.1
+  },
+  "per_symbol": {
+    "AF": {
+      "pnl_rub": 3119.3016338572033,
+      "trades": 449,
+      "wins": 126,
+      "wr_pct": 28.1,
+      "avg_pnl": 7.0
+    },
+    "BR": {
+      "pnl_rub": 2420.5751182121803,
+      "trades": 319,
+      "wins": 144,
+      "wr_pct": 45.1,
+      "avg_pnl": 8.0
+    },
+    "YD": {
+      "pnl_rub": 2338.5925960040217,
+      "trades": 210,
+      "wins": 101,
+      "wr_pct": 48.1,
+      "avg_pnl": 11.0
+    },
+    "SF": {
+      "pnl_rub": 1227.4025932325203,
+      "trades": 134,
+      "wins": 54,
+      "wr_pct": 40.3,
+      "avg_pnl": 9.0
+    },
+    "HY": {
+      "pnl_rub": 494.1808663174916,
+      "trades": 40,
+      "wins": 20,
+      "wr_pct": 50.0,
+      "avg_pnl": 12.0
+    },
+    "SR": {
+      "pnl_rub": -383.5353147795505,
+      "trades": 575,
+      "wins": 256,
+      "wr_pct": 44.5,
+      "avg_pnl": -1.0
+    },
+    "SN": {
+      "pnl_rub": -1081.9648382837993,
+      "trades": 32,
+      "wins": 11,
+      "wr_pct": 34.4,
+      "avg_pnl": -34.0
+    },
+    "NM": {
+      "pnl_rub": -1162.85524184641,
+      "trades": 154,
+      "wins": 62,
+      "wr_pct": 40.3,
+      "avg_pnl": -8.0
+    },
+    "AL": {
+      "pnl_rub": -1585.7188557271957,
+      "trades": 41,
+      "wins": 8,
+      "wr_pct": 19.5,
+      "avg_pnl": -39.0
+    },
+    "GL": {
+      "pnl_rub": -1714.9920074788324,
+      "trades": 270,
+      "wins": 90,
+      "wr_pct": 33.3,
+      "avg_pnl": -6.0
+    },
+    "RN": {
+      "pnl_rub": -1827.2862513505872,
+      "trades": 42,
+      "wins": 15,
+      "wr_pct": 35.7,
+      "avg_pnl": -44.0
+    },
+    "SV": {
+      "pnl_rub": -2038.2636300467311,
+      "trades": 163,
+      "wins": 68,
+      "wr_pct": 41.7,
+      "avg_pnl": -13.0
+    },
+    "NG": {
+      "pnl_rub": -4720.0141182192665,
+      "trades": 353,
+      "wins": 140,
+      "wr_pct": 39.7,
+      "avg_pnl": -13.0
+    }
+  },
+  "exit_reasons": {
+    "stop": 1069,
+    "time": 1712,
+    "eod": 1
+  }
+}

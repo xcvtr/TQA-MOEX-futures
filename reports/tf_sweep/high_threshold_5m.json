@@ -1,0 +1,17 @@
+[
+  {
+    "slippage": 0.0001,
+    "slippage_label": "0.01%",
+    "capital": 310575.1693949351,
+    "return_pct": 210.57516939493505,
+    "annual_return": 136.44466458449585,
+    "max_dd_pct": 16.556458799078662,
+    "calmar": 8.241174410562284,
+    "wr": 42.63408573203562,
+    "n_trades": 24145,
+    "trades_per_day": 50.2,
+    "total_slippage_cost": 63826.0,
+    "days": 481,
+    "time_s": 215.9
+  }
+]
