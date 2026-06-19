@@ -94,6 +94,18 @@
   3. Force push занял секунды
 - **Следствие**: история переписана (коммиты до этого потеряли связь с origin). Те, кто клонировал по HTTPS, должны `git pull --force`.
 
+## Апдейт 2 — orderstats (19.06.2026)
+- **Проверка доступных endpoint'ов**: eq + fx (futures/derivatives недоступны)
+- **Загружается** `orderstats` (eq) — заявки до сделок (put/cancel), ~2.1K дней
+- **Создана таблица** `moex_algopack_v2.orderstats_local` + Distributed (MergeTree, PARTITION BY toYYYYMM, ORDER BY (secid, tradedate, tradetime))
+- **Скрипт**: `scripts/orderstats_load.py` (аналог algopack_load_v2.py)
+- **Roadmap**: сохранён в Obsidian `Trading/2026-06-19_2155_moex_algopack_roadmap.md`
+
+## Следующий шаг
+1. Дождаться загрузки orderstats (~80 мин)
+2. Настроить ежедневную догрузку всех 3 датасетов (tradestats, obstats, orderstats)
+3. По желанию: загрузить FX наборы (валютный рынок с L2-стаканом)
+
 ## Ссылки
 - Предыдущий чекпоинт: `067-phase5-final-audit-algopack.md`
 - Проект: `~/projects/TQA-MOEX/`
