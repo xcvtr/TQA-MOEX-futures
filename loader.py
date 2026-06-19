@@ -35,7 +35,7 @@ from config import (MOEX_OI_TICKERS, START_DATE, DAYS_BACKFILL,
                     DB_USER, DB_PASSWORD)
 
 # Override DB_HOST for writes — point to PG primary (10.0.0.63)
-PG_HOST = os.getenv("MOEX_PG_HOST", "10.0.0.63")
+PG_HOST = os.getenv("MOEX_PG_HOST", "127.0.0.1")
 PG_PORT = int(os.getenv("MOEX_PG_PORT", "5432"))
 
 logging.basicConfig(
@@ -53,7 +53,7 @@ except ImportError:
 
 # ── ClickHouse connection ───────────────────────────────────────────────────
 
-CH_HOST = os.getenv("CH_HOST", "127.0.0.1")
+CH_HOST = os.getenv("CH_HOST", "10.0.0.64")
 CH_PORT = int(os.getenv("CH_PORT", "8123"))
 CH_DB = "moex"
 CH_TABLE = "openinterest"

@@ -21,7 +21,7 @@ DATABASE_URL = os.getenv(
 )
 
 # ── ClickHouse (основное хранилище) ─────────────────────────────────────
-CH_HOST = os.getenv("MOEX_CH_HOST", "127.0.0.1")
+CH_HOST = os.getenv("MOEX_CH_HOST", "10.0.0.64")
 CH_PORT = int(os.getenv("MOEX_CH_PORT", "8123"))
 CH_DB = os.getenv("MOEX_CH_DB", "moex")
 
