@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 # ── PostgreSQL (legacy, данные перенесены в ClickHouse) ─────────────────
-DB_HOST = os.getenv("MOEX_DB_HOST", "127.0.0.1")
+DB_HOST = os.getenv("MOEX_DB_HOST", "10.0.0.64")
 DB_PORT = int(os.getenv("MOEX_DB_PORT", "5432"))
 DB_NAME = os.getenv("MOEX_DB_NAME", "moex")
 DB_USER = os.getenv("MOEX_DB_USER", "postgres")
@@ -104,3 +104,22 @@ RETRY_DELAY = 2                 # seconds between retries
 # ── Paths ─────────────────────────────────────────────────────────────────
 PROJECT_DIR = Path(__file__).resolve().parent.parent.parent
 SCRIPTS_DIR = Path.home() / ".hermes" / "scripts"
+
+# ── BASE v2 Strategy Config (найдена grid search 2026-06-15) ──────────────
+# Параметры дают Calmar=81.9 на GL (vs 13.2 у BASE old),
+# улучшают все 7/7 тикеров портфеля.
+# OOS-валидация пройдена (2024: 7/7 побед).
+BASE_V2_SCORE_THRESH = 0.10
+BASE_V2_BARS_LEFT = 8
+BASE_V2_STOP_ATR = 1.0
+BASE_V2_LEVERAGE = 0.50
+
+# Kelly sizing (не используется — проигрывает фиксированному lev=0.50)
+BASE_V2_KELLY_WINDOW = 200
+BASE_V2_KELLY_FRACTIONAL = 0.5
+BASE_V2_KELLY_FLOOR = 0.05
+BASE_V2_KELLY_CAP = 0.60
+
+# DX исключён из портфеля — не даёт профита ни в одной конфигурации
+CORRELATION_GROUPS_FOR_SWEEP = ['gold', 'aluminum', 'copper', 'nickel',
+                                  'rts', 'imoex', 'equity']
