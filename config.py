@@ -106,20 +106,20 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent.parent
 SCRIPTS_DIR = Path.home() / ".hermes" / "scripts"
 
 # ── BASE v2 Strategy Config (найдена grid search 2026-06-15) ──────────────
-# Параметры дают Calmar=81.9 на GL (vs 13.2 у BASE old),
-# улучшают все 7/7 тикеров портфеля.
-# OOS-валидация пройдена (2024: 7/7 побед).
-# Размер лота увеличен до 100% капитала на сделку (leverage_sweep 2026-06-15).
+# LONG+SHORT production config.
+# score_sym = tanh(vz/3)*0.3 + clip((oima - oi_r)/oima, -1, 1)*0.7
+# |score_sym| > 0.10 → вход. Направление по знаку.
+# Сборка тестов: checkpoint/031-037
+BASE_V2_USE_SHORT = True
 BASE_V2_SCORE_THRESH = 0.10
 BASE_V2_BARS_LEFT = 8
 BASE_V2_STOP_ATR = 1.0
-BASE_V2_LOT_PCT = 1.00  # 100% капитала на 1 контракт
+BASE_V2_LOT_PCT = 0.25
+BASE_V2_SCORE_WEIGHT_VS = 0.3
+BASE_V2_SCORE_WEIGHT_OS = 0.7
 
-# HY и AF — повышенный риск, ограничены 75%
-BASE_V2_LOT_PCT_REDUCED = 0.75
-
-# Тикеры с пониженным лотом
-BASE_V2_REDUCED_TICKERS = ['HY', 'AF']
+# HY/AF — пониженный лот (не используется при LOT=0.25, но на будущее)
+BASE_V2_LOT_PCT_REDUCED = 0.20
 
 # Kelly sizing (не используется — проигрывает фиксированному lev=0.50)
 BASE_V2_KELLY_WINDOW = 200
