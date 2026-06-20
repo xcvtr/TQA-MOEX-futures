@@ -115,8 +115,11 @@ BASE_V2_BARS_LEFT = 8
 BASE_V2_STOP_ATR = 1.0
 BASE_V2_LOT_PCT = 1.00  # 100% капитала на 1 контракт
 
-# HY и AF — повышенный риск, можно ограничить отдельно
-BASE_V2_LOT_PCT_REDUCED = 0.75  # для HY/AF если нужно
+# HY и AF — повышенный риск, ограничены 75%
+BASE_V2_LOT_PCT_REDUCED = 0.75
+
+# Тикеры с пониженным лотом
+BASE_V2_REDUCED_TICKERS = ['HY', 'AF']
 
 # Kelly sizing (не используется — проигрывает фиксированному lev=0.50)
 BASE_V2_KELLY_WINDOW = 200
