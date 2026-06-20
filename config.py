@@ -109,10 +109,14 @@ SCRIPTS_DIR = Path.home() / ".hermes" / "scripts"
 # Параметры дают Calmar=81.9 на GL (vs 13.2 у BASE old),
 # улучшают все 7/7 тикеров портфеля.
 # OOS-валидация пройдена (2024: 7/7 побед).
+# Размер лота увеличен до 100% капитала на сделку (leverage_sweep 2026-06-15).
 BASE_V2_SCORE_THRESH = 0.10
 BASE_V2_BARS_LEFT = 8
 BASE_V2_STOP_ATR = 1.0
-BASE_V2_LEVERAGE = 0.50
+BASE_V2_LOT_PCT = 1.00  # 100% капитала на 1 контракт
+
+# HY и AF — повышенный риск, можно ограничить отдельно
+BASE_V2_LOT_PCT_REDUCED = 0.75  # для HY/AF если нужно
 
 # Kelly sizing (не используется — проигрывает фиксированному lev=0.50)
 BASE_V2_KELLY_WINDOW = 200
