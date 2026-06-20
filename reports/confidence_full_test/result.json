@@ -1,0 +1,22 @@
+[
+  {
+    "name": "BASE",
+    "capital": 377237.64,
+    "return_pct": 277.24,
+    "cagr_pct": 174.07,
+    "max_dd_pct": 3.45,
+    "calmar": 80.25,
+    "wr_pct": 45.27,
+    "trades": 45250
+  },
+  {
+    "name": "+CONFIDENCE",
+    "capital": 423315.39,
+    "return_pct": 323.32,
+    "cagr_pct": 199.13,
+    "max_dd_pct": 3.1,
+    "calmar": 104.36,
+    "wr_pct": 45.36,
+    "trades": 46386
+  }
+]
