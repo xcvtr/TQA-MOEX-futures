@@ -2,37 +2,37 @@
   "Si": {
     "ticker": "Si",
     "status": "ok",
-    "n_rows": 461328,
+    "n_rows": 503892,
     "corr_1m": {
       "disb_to_return": {
         "label": "disb_lag → next_return",
-        "n": 456712,
-        "pearson": -0.00151,
-        "spearman": -0.0026,
-        "p_pearson": 0.307012,
-        "p_spearman": 0.078753
+        "n": 498850,
+        "pearson": -0.00212,
+        "spearman": -0.00371,
+        "p_pearson": 0.133936,
+        "p_spearman": 0.00876
       },
       "oi_diff_to_return": {
         "label": "oi_diff_lag → next_return",
-        "n": 456712,
-        "pearson": 0.00882,
-        "spearman": 0.01274,
+        "n": 498850,
+        "pearson": 0.00917,
+        "spearman": 0.01362,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       },
       "oi_pct_to_return": {
         "label": "oi_pct_lag → next_return",
-        "n": 452182,
-        "pearson": 0.00749,
-        "spearman": 0.01582,
+        "n": 493910,
+        "pearson": 0.00818,
+        "spearman": 0.01716,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       },
       "disb_to_oi_diff": {
         "label": "disb_lag → oi_diff_lag",
-        "n": 461327,
-        "pearson": -0.008,
-        "spearman": -0.02423,
+        "n": 503891,
+        "pearson": -0.0176,
+        "spearman": -0.03697,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       }
@@ -40,106 +40,106 @@
     "corr_5m": {
       "disb_mean_to_return": {
         "label": "disb_mean(5m) → next_return(5m)",
-        "n": 153276,
-        "pearson": 0.00501,
-        "spearman": -3e-05,
-        "p_pearson": 0.049918,
-        "p_spearman": 0.991657
+        "n": 167219,
+        "pearson": 0.00565,
+        "spearman": 0.00171,
+        "p_pearson": 0.020837,
+        "p_spearman": 0.483242
       },
       "disb_sum_to_return": {
         "label": "disb_sum(5m) → next_return(5m)",
-        "n": 153282,
-        "pearson": 0.00903,
-        "spearman": 0.00244,
-        "p_pearson": 0.000407,
-        "p_spearman": 0.339061
+        "n": 167234,
+        "pearson": 0.01031,
+        "spearman": 0.00494,
+        "p_pearson": 2.5e-05,
+        "p_spearman": 0.043255
       },
       "disb_last_to_return": {
         "label": "disb_last(5m) → next_return(5m)",
-        "n": 154793,
-        "pearson": 0.01002,
-        "spearman": 0.00208,
-        "p_pearson": 8.1e-05,
-        "p_spearman": 0.412545
+        "n": 168885,
+        "pearson": 0.01459,
+        "spearman": 0.00934,
+        "p_pearson": 0.0,
+        "p_spearman": 0.000125
       }
     },
     "strategy": [
       {
         "ticker": "Si",
         "threshold": 0.3,
-        "n_trades": 276661,
-        "total_return_pct": 825195.2,
-        "sharpe": 0.392,
-        "win_rate": 0.4983,
+        "n_trades": 302143,
+        "total_return_pct": 823492.26,
+        "sharpe": 0.374,
+        "win_rate": 0.4978,
         "max_dd_pct": 827300010344.17,
-        "avg_return": 1.7887,
-        "std_return": 1432.1902
+        "avg_return": 1.6343,
+        "std_return": 1370.3671
       },
       {
         "ticker": "Si",
         "threshold": 0.4,
-        "n_trades": 236731,
-        "total_return_pct": -198459.45,
-        "sharpe": -0.11,
-        "win_rate": 0.4979,
+        "n_trades": 258082,
+        "total_return_pct": -200069.88,
+        "sharpe": -0.106,
+        "win_rate": 0.4974,
         "max_dd_pct": 5.871945854535854e+21,
-        "avg_return": -0.4302,
-        "std_return": 1224.8083
+        "avg_return": -0.3971,
+        "std_return": 1171.9371
       },
       {
         "ticker": "Si",
         "threshold": 0.5,
-        "n_trades": 207147,
-        "total_return_pct": -406740.4,
-        "sharpe": -0.254,
-        "win_rate": 0.4979,
+        "n_trades": 225390,
+        "total_return_pct": -407803.42,
+        "sharpe": -0.244,
+        "win_rate": 0.4976,
         "max_dd_pct": 2612437512967.28,
-        "avg_return": -0.8817,
-        "std_return": 1088.5572
+        "avg_return": -0.8093,
+        "std_return": 1041.5676
       },
       {
         "ticker": "Si",
         "threshold": 0.6,
-        "n_trades": 185260,
-        "total_return_pct": -411697.25,
-        "sharpe": -0.273,
-        "win_rate": 0.4979,
+        "n_trades": 201207,
+        "total_return_pct": -412419.62,
+        "sharpe": -0.262,
+        "win_rate": 0.4977,
         "max_dd_pct": 1452824373.57,
-        "avg_return": -0.8924,
-        "std_return": 1023.5446
+        "avg_return": -0.8185,
+        "std_return": 979.3614
       },
       {
         "ticker": "Si",
         "threshold": 0.7,
-        "n_trades": 167012,
-        "total_return_pct": -307769.51,
-        "sharpe": -0.207,
-        "win_rate": 0.4979,
+        "n_trades": 181161,
+        "total_return_pct": -308454.26,
+        "sharpe": -0.198,
+        "win_rate": 0.4978,
         "max_dd_pct": 476555581.52,
-        "avg_return": -0.6671,
-        "std_return": 1012.3157
+        "avg_return": -0.6121,
+        "std_return": 968.6172
       },
       {
         "ticker": "Si",
         "threshold": 0.8,
-        "n_trades": 149270,
-        "total_return_pct": -407512.71,
-        "sharpe": -0.283,
+        "n_trades": 161688,
+        "total_return_pct": -407824.41,
+        "sharpe": -0.271,
         "win_rate": 0.498,
         "max_dd_pct": 104448189.26,
-        "avg_return": -0.8834,
-        "std_return": 978.9164
+        "avg_return": -0.8094,
+        "std_return": 936.6596
       },
       {
         "ticker": "Si",
         "threshold": 0.9,
-        "n_trades": 132444,
-        "total_return_pct": -196285.86,
-        "sharpe": -0.156,
-        "win_rate": 0.4986,
+        "n_trades": 143247,
+        "total_return_pct": -196746.12,
+        "sharpe": -0.149,
+        "win_rate": 0.4984,
         "max_dd_pct": 113720026108.35,
-        "avg_return": -0.4255,
-        "std_return": 857.5309
+        "avg_return": -0.3905,
+        "std_return": 820.514
       }
     ],
     "comparison": [
@@ -147,60 +147,60 @@
         "ticker": "Si",
         "label": "oi_diff_only",
         "threshold": 0.3,
-        "n_trades": 355371,
-        "total_return_pct": 1237444.6,
-        "sharpe": 0.397,
-        "win_rate": 0.5106,
+        "n_trades": 389947,
+        "total_return_pct": 1241524.42,
+        "sharpe": 0.381,
+        "win_rate": 0.5115,
         "max_dd_pct": 1230915268655740.0
       },
       {
         "ticker": "Si",
         "label": "disb_only",
         "threshold": 0.3,
-        "n_trades": 276661,
-        "total_return_pct": 825195.2,
-        "sharpe": 0.392,
-        "win_rate": 0.4983,
+        "n_trades": 302143,
+        "total_return_pct": 823492.26,
+        "sharpe": 0.374,
+        "win_rate": 0.4978,
         "max_dd_pct": 827300010344.17
       },
       {
         "ticker": "Si",
         "label": "disb*0.5+oi*0.5",
         "threshold": 0.6,
-        "n_trades": 346824,
-        "total_return_pct": 1337674.11,
-        "sharpe": 0.431,
-        "win_rate": 0.5106,
+        "n_trades": 380538,
+        "total_return_pct": 1341821.38,
+        "sharpe": 0.413,
+        "win_rate": 0.5116,
         "max_dd_pct": Infinity
       },
       {
         "ticker": "Si",
         "label": "disb*0.7+oi*0.3",
         "threshold": 0.8,
-        "n_trades": 331637,
-        "total_return_pct": 1238638.31,
-        "sharpe": 0.404,
-        "win_rate": 0.5113,
+        "n_trades": 363823,
+        "total_return_pct": 1242791.58,
+        "sharpe": 0.388,
+        "win_rate": 0.5123,
         "max_dd_pct": Infinity
       },
       {
         "ticker": "Si",
         "label": "disb*0.3+oi*0.7",
         "threshold": 0.3,
-        "n_trades": 355371,
-        "total_return_pct": 1237444.6,
-        "sharpe": 0.397,
-        "win_rate": 0.5106,
+        "n_trades": 389947,
+        "total_return_pct": 1241524.42,
+        "sharpe": 0.381,
+        "win_rate": 0.5115,
         "max_dd_pct": 1230915268655740.0
       },
       {
         "ticker": "Si",
         "label": "disb*0.9+oi*0.1",
         "threshold": 0.4,
-        "n_trades": 415938,
-        "total_return_pct": 1453011.74,
-        "sharpe": 0.45,
-        "win_rate": 0.5086,
+        "n_trades": 454010,
+        "total_return_pct": 1456675.02,
+        "sharpe": 0.432,
+        "win_rate": 0.5094,
         "max_dd_pct": Infinity
       }
     ]
@@ -208,37 +208,37 @@
   "Eu": {
     "ticker": "Eu",
     "status": "ok",
-    "n_rows": 281481,
+    "n_rows": 308298,
     "corr_1m": {
       "disb_to_return": {
         "label": "disb_lag → next_return",
-        "n": 278663,
-        "pearson": 0.0039,
-        "spearman": 0.01004,
-        "p_pearson": 0.039731,
-        "p_spearman": 0.0
+        "n": 305212,
+        "pearson": -0.00129,
+        "spearman": 0.00247,
+        "p_pearson": 0.47658,
+        "p_spearman": 0.17184
       },
       "oi_diff_to_return": {
         "label": "oi_diff_lag → next_return",
-        "n": 278663,
-        "pearson": 0.04458,
-        "spearman": 0.06424,
+        "n": 305212,
+        "pearson": 0.05647,
+        "spearman": 0.08271,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       },
       "oi_pct_to_return": {
         "label": "oi_pct_lag → next_return",
-        "n": 275946,
-        "pearson": 0.03916,
-        "spearman": 0.06727,
+        "n": 302223,
+        "pearson": 0.04478,
+        "spearman": 0.08436,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       },
       "disb_to_oi_diff": {
         "label": "disb_lag → oi_diff_lag",
-        "n": 281480,
-        "pearson": -0.01487,
-        "spearman": -0.02896,
+        "n": 308297,
+        "pearson": -0.03405,
+        "spearman": -0.04615,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       }
@@ -246,106 +246,106 @@
     "corr_5m": {
       "disb_mean_to_return": {
         "label": "disb_mean(5m) → next_return(5m)",
-        "n": 153433,
-        "pearson": 0.00228,
-        "spearman": -0.00438,
-        "p_pearson": 0.371665,
-        "p_spearman": 0.086419
+        "n": 167061,
+        "pearson": 0.00393,
+        "spearman": -0.00287,
+        "p_pearson": 0.10833,
+        "p_spearman": 0.240891
       },
       "disb_sum_to_return": {
         "label": "disb_sum(5m) → next_return(5m)",
-        "n": 153427,
-        "pearson": 0.0016,
-        "spearman": -0.00405,
-        "p_pearson": 0.531636,
-        "p_spearman": 0.112684
+        "n": 167063,
+        "pearson": 0.00492,
+        "spearman": -0.00147,
+        "p_pearson": 0.044151,
+        "p_spearman": 0.547945
       },
       "disb_last_to_return": {
         "label": "disb_last(5m) → next_return(5m)",
-        "n": 154876,
-        "pearson": -0.00174,
-        "spearman": -0.01472,
-        "p_pearson": 0.494422,
-        "p_spearman": 0.0
+        "n": 168645,
+        "pearson": 0.0067,
+        "spearman": -0.00711,
+        "p_pearson": 0.005917,
+        "p_spearman": 0.003486
       }
     },
     "strategy": [
       {
         "ticker": "Eu",
         "threshold": 0.3,
-        "n_trades": 175497,
-        "total_return_pct": 103342.98,
-        "sharpe": 0.597,
-        "win_rate": 0.5038,
+        "n_trades": 193190,
+        "total_return_pct": 100244.18,
+        "sharpe": 0.553,
+        "win_rate": 0.4997,
         "max_dd_pct": 100.0,
-        "avg_return": 0.3671,
-        "std_return": 192.8191
+        "avg_return": 0.3252,
+        "std_return": 184.2431
       },
       {
         "ticker": "Eu",
         "threshold": 0.4,
-        "n_trades": 147330,
-        "total_return_pct": 103352.09,
-        "sharpe": 0.597,
-        "win_rate": 0.5041,
+        "n_trades": 162493,
+        "total_return_pct": 100464.23,
+        "sharpe": 0.554,
+        "win_rate": 0.4995,
         "max_dd_pct": 100.0,
-        "avg_return": 0.3672,
-        "std_return": 192.8175
+        "avg_return": 0.3259,
+        "std_return": 184.2414
       },
       {
         "ticker": "Eu",
         "threshold": 0.5,
-        "n_trades": 123763,
-        "total_return_pct": 103149.2,
-        "sharpe": 0.596,
-        "win_rate": 0.5048,
+        "n_trades": 136697,
+        "total_return_pct": 100800.05,
+        "sharpe": 0.556,
+        "win_rate": 0.5002,
         "max_dd_pct": 100.0,
-        "avg_return": 0.3665,
-        "std_return": 192.816
+        "avg_return": 0.327,
+        "std_return": 184.2399
       },
       {
         "ticker": "Eu",
         "threshold": 0.6,
-        "n_trades": 105149,
-        "total_return_pct": 102980.02,
-        "sharpe": 0.595,
-        "win_rate": 0.5051,
+        "n_trades": 116166,
+        "total_return_pct": 101138.19,
+        "sharpe": 0.558,
+        "win_rate": 0.5008,
         "max_dd_pct": 100.0,
-        "avg_return": 0.3659,
-        "std_return": 192.8149
+        "avg_return": 0.3281,
+        "std_return": 184.2388
       },
       {
         "ticker": "Eu",
         "threshold": 0.7,
-        "n_trades": 90147,
-        "total_return_pct": 103324.73,
-        "sharpe": 0.597,
-        "win_rate": 0.5062,
+        "n_trades": 99483,
+        "total_return_pct": 101818.6,
+        "sharpe": 0.562,
+        "win_rate": 0.5019,
         "max_dd_pct": 100.0,
-        "avg_return": 0.3671,
-        "std_return": 192.814
+        "avg_return": 0.3303,
+        "std_return": 184.2378
       },
       {
         "ticker": "Eu",
         "threshold": 0.8,
-        "n_trades": 77564,
-        "total_return_pct": 103537.73,
-        "sharpe": 0.598,
-        "win_rate": 0.5065,
+        "n_trades": 85287,
+        "total_return_pct": 102465.86,
+        "sharpe": 0.566,
+        "win_rate": 0.5029,
         "max_dd_pct": 100.0,
-        "avg_return": 0.3678,
-        "std_return": 192.8131
+        "avg_return": 0.3324,
+        "std_return": 184.2369
       },
       {
         "ticker": "Eu",
         "threshold": 0.9,
-        "n_trades": 66598,
-        "total_return_pct": 103637.74,
-        "sharpe": 0.599,
-        "win_rate": 0.5069,
+        "n_trades": 72926,
+        "total_return_pct": 102910.11,
+        "sharpe": 0.568,
+        "win_rate": 0.5041,
         "max_dd_pct": 100.0,
-        "avg_return": 0.3682,
-        "std_return": 192.8124
+        "avg_return": 0.3338,
+        "std_return": 184.2361
       }
     ],
     "comparison": [
@@ -353,125 +353,125 @@
         "ticker": "Eu",
         "label": "oi_diff_only",
         "threshold": 0.3,
-        "n_trades": 232228,
-        "total_return_pct": -67784.8,
-        "sharpe": -0.227,
-        "win_rate": 0.5253,
+        "n_trades": 255466,
+        "total_return_pct": -56553.1,
+        "sharpe": -0.181,
+        "win_rate": 0.5334,
         "max_dd_pct": 198283.73
       },
       {
         "ticker": "Eu",
         "label": "disb_only",
         "threshold": 0.9,
-        "n_trades": 66598,
-        "total_return_pct": 103637.74,
-        "sharpe": 0.599,
-        "win_rate": 0.5069,
+        "n_trades": 72926,
+        "total_return_pct": 102910.11,
+        "sharpe": 0.568,
+        "win_rate": 0.5041,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "Eu",
         "label": "disb*0.5+oi*0.5",
         "threshold": 0.3,
-        "n_trades": 268803,
-        "total_return_pct": 35312.11,
-        "sharpe": 0.102,
-        "win_rate": 0.5223,
+        "n_trades": 294692,
+        "total_return_pct": 46326.88,
+        "sharpe": 0.128,
+        "win_rate": 0.5293,
         "max_dd_pct": 205964.7
       },
       {
         "ticker": "Eu",
         "label": "disb*0.7+oi*0.3",
         "threshold": 0.3,
-        "n_trades": 266647,
-        "total_return_pct": 35384.15,
-        "sharpe": 0.102,
-        "win_rate": 0.5223,
+        "n_trades": 292253,
+        "total_return_pct": 46272.32,
+        "sharpe": 0.128,
+        "win_rate": 0.5292,
         "max_dd_pct": 202756.99
       },
       {
         "ticker": "Eu",
         "label": "disb*0.3+oi*0.7",
         "threshold": 0.3,
-        "n_trades": 232228,
-        "total_return_pct": -67784.8,
-        "sharpe": -0.227,
-        "win_rate": 0.5253,
+        "n_trades": 255466,
+        "total_return_pct": -56553.1,
+        "sharpe": -0.181,
+        "win_rate": 0.5334,
         "max_dd_pct": 198283.73
       },
       {
         "ticker": "Eu",
         "label": "disb*0.9+oi*0.1",
-        "threshold": 0.5,
-        "n_trades": 251108,
-        "total_return_pct": 33751.39,
-        "sharpe": 0.098,
-        "win_rate": 0.5228,
-        "max_dd_pct": 236433.65
+        "threshold": 0.3,
+        "n_trades": 287451,
+        "total_return_pct": 44021.04,
+        "sharpe": 0.122,
+        "win_rate": 0.5284,
+        "max_dd_pct": 245112.67
       }
     ]
   },
   "BR": {
     "ticker": "BR",
     "status": "ok",
-    "n_rows": 513972,
+    "n_rows": 578986,
     "corr_1m": {
       "disb_to_return": {
         "label": "disb_lag → next_return",
-        "n": 508830,
-        "pearson": 0.00072,
-        "spearman": 0.00173,
-        "p_pearson": 0.609556,
-        "p_spearman": 0.216305
+        "n": 573194,
+        "pearson": -0.00019,
+        "spearman": 0.00059,
+        "p_pearson": 0.885756,
+        "p_spearman": 0.654685
       },
       "oi_diff_to_return": {
         "label": "oi_diff_lag → next_return",
-        "n": 508830,
-        "pearson": 0.00104,
-        "spearman": 0.00135,
-        "p_pearson": 0.457228,
-        "p_spearman": 0.335615
+        "n": 573194,
+        "pearson": 8e-05,
+        "spearman": 0.00062,
+        "p_pearson": 0.953161,
+        "p_spearman": 0.637758
       },
       "oi_pct_to_return": {
         "label": "oi_pct_lag → next_return",
-        "n": 503789,
-        "pearson": -0.00074,
-        "spearman": 0.00016,
-        "p_pearson": 0.601195,
-        "p_spearman": 0.9108
+        "n": 567504,
+        "pearson": -0.00119,
+        "spearman": -0.0003,
+        "p_pearson": 0.37052,
+        "p_spearman": 0.820263
       },
       "disb_to_oi_diff": {
         "label": "disb_lag → oi_diff_lag",
-        "n": 513971,
-        "pearson": -0.0053,
-        "spearman": -0.03067,
-        "p_pearson": 0.000145,
+        "n": 578985,
+        "pearson": -0.00548,
+        "spearman": -0.03229,
+        "p_pearson": 3.1e-05,
         "p_spearman": 0.0
       }
     },
     "corr_5m": {
       "disb_mean_to_return": {
         "label": "disb_mean(5m) → next_return(5m)",
-        "n": 153839,
-        "pearson": -0.00396,
-        "spearman": -0.01043,
-        "p_pearson": 0.120419,
-        "p_spearman": 4.3e-05
+        "n": 167485,
+        "pearson": -0.00277,
+        "spearman": -0.00961,
+        "p_pearson": 0.256343,
+        "p_spearman": 8.4e-05
       },
       "disb_sum_to_return": {
         "label": "disb_sum(5m) → next_return(5m)",
-        "n": 153869,
-        "pearson": -0.00218,
-        "spearman": -0.00909,
-        "p_pearson": 0.392272,
-        "p_spearman": 0.000365
+        "n": 167515,
+        "pearson": -0.00154,
+        "spearman": -0.00851,
+        "p_pearson": 0.527388,
+        "p_spearman": 0.000496
       },
       "disb_last_to_return": {
         "label": "disb_last(5m) → next_return(5m)",
-        "n": 155397,
-        "pearson": -0.00926,
-        "spearman": -0.01718,
-        "p_pearson": 0.00026,
+        "n": 169178,
+        "pearson": -0.00947,
+        "spearman": -0.01764,
+        "p_pearson": 9.8e-05,
         "p_spearman": 0.0
       }
     },
@@ -479,79 +479,79 @@
       {
         "ticker": "BR",
         "threshold": 0.3,
-        "n_trades": 321842,
-        "total_return_pct": -1882776.08,
-        "sharpe": -256.418,
-        "win_rate": 0.4968,
+        "n_trades": 362868,
+        "total_return_pct": -2087768.95,
+        "sharpe": -247.915,
+        "win_rate": 0.4965,
         "max_dd_pct": 100.0,
-        "avg_return": -3.6632,
-        "std_return": 4.4786
+        "avg_return": -3.6059,
+        "std_return": 4.5598
       },
       {
         "ticker": "BR",
         "threshold": 0.4,
-        "n_trades": 273257,
-        "total_return_pct": -1601415.59,
-        "sharpe": -223.875,
-        "win_rate": 0.4971,
+        "n_trades": 307825,
+        "total_return_pct": -1774384.17,
+        "sharpe": -217.156,
+        "win_rate": 0.4968,
         "max_dd_pct": 100.0,
-        "avg_return": -3.1158,
-        "std_return": 4.3631
+        "avg_return": -3.0647,
+        "std_return": 4.4243
       },
       {
         "ticker": "BR",
         "threshold": 0.5,
-        "n_trades": 236202,
-        "total_return_pct": -1390826.92,
-        "sharpe": -199.822,
-        "win_rate": 0.4971,
+        "n_trades": 265898,
+        "total_return_pct": -1539702.37,
+        "sharpe": -194.4,
+        "win_rate": 0.4969,
         "max_dd_pct": 100.0,
-        "avg_return": -2.706,
-        "std_return": 4.2455
+        "avg_return": -2.6593,
+        "std_return": 4.2885
       },
       {
         "ticker": "BR",
         "threshold": 0.6,
-        "n_trades": 208778,
-        "total_return_pct": -1234744.31,
-        "sharpe": -182.573,
-        "win_rate": 0.4971,
+        "n_trades": 235051,
+        "total_return_pct": -1366485.86,
+        "sharpe": -177.921,
+        "win_rate": 0.4967,
         "max_dd_pct": 100.0,
-        "avg_return": -2.4024,
-        "std_return": 4.1251
+        "avg_return": -2.3601,
+        "std_return": 4.1586
       },
       {
         "ticker": "BR",
         "threshold": 0.7,
-        "n_trades": 187847,
-        "total_return_pct": -1115793.71,
-        "sharpe": -169.516,
-        "win_rate": 0.4969,
+        "n_trades": 211645,
+        "total_return_pct": -1235226.53,
+        "sharpe": -165.434,
+        "win_rate": 0.4964,
         "max_dd_pct": 100.0,
-        "avg_return": -2.1709,
-        "std_return": 4.0148
+        "avg_return": -2.1334,
+        "std_return": 4.0428
       },
       {
         "ticker": "BR",
         "threshold": 0.8,
-        "n_trades": 169408,
-        "total_return_pct": -1010488.17,
-        "sharpe": -158.603,
-        "win_rate": 0.4969,
+        "n_trades": 190933,
+        "total_return_pct": -1118417.71,
+        "sharpe": -154.846,
+        "win_rate": 0.4965,
         "max_dd_pct": 100.0,
-        "avg_return": -1.966,
-        "std_return": 3.8861
+        "avg_return": -1.9317,
+        "std_return": 3.9108
       },
       {
         "ticker": "BR",
         "threshold": 0.9,
-        "n_trades": 154826,
-        "total_return_pct": -925893.64,
-        "sharpe": -149.855,
-        "win_rate": 0.4968,
+        "n_trades": 174716,
+        "total_return_pct": -1025133.68,
+        "sharpe": -146.404,
+        "win_rate": 0.4964,
         "max_dd_pct": 100.0,
-        "avg_return": -1.8015,
-        "std_return": 3.7686
+        "avg_return": -1.7706,
+        "std_return": 3.7913
       }
     ],
     "comparison": [
@@ -559,60 +559,60 @@
         "ticker": "BR",
         "label": "oi_diff_only",
         "threshold": 0.3,
-        "n_trades": 380733,
-        "total_return_pct": -2251913.85,
-        "sharpe": -303.795,
-        "win_rate": 0.496,
+        "n_trades": 428319,
+        "total_return_pct": -2486036.06,
+        "sharpe": -291.325,
+        "win_rate": 0.4964,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "BR",
         "label": "disb_only",
         "threshold": 0.9,
-        "n_trades": 154826,
-        "total_return_pct": -925893.64,
-        "sharpe": -149.855,
-        "win_rate": 0.4968,
+        "n_trades": 174716,
+        "total_return_pct": -1025133.68,
+        "sharpe": -146.404,
+        "win_rate": 0.4964,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "BR",
         "label": "disb*0.5+oi*0.5",
         "threshold": 0.9,
-        "n_trades": 363459,
-        "total_return_pct": -2151010.06,
-        "sharpe": -290.74,
-        "win_rate": 0.4961,
+        "n_trades": 407778,
+        "total_return_pct": -2369669.98,
+        "sharpe": -279.048,
+        "win_rate": 0.4964,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "BR",
         "label": "disb*0.7+oi*0.3",
         "threshold": 0.9,
-        "n_trades": 346790,
-        "total_return_pct": -2055056.45,
-        "sharpe": -278.858,
-        "win_rate": 0.4963,
+        "n_trades": 387500,
+        "total_return_pct": -2256365.4,
+        "sharpe": -267.571,
+        "win_rate": 0.4966,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "BR",
         "label": "disb*0.3+oi*0.7",
         "threshold": 0.3,
-        "n_trades": 380733,
-        "total_return_pct": -2251913.85,
-        "sharpe": -303.795,
-        "win_rate": 0.496,
+        "n_trades": 428319,
+        "total_return_pct": -2486036.06,
+        "sharpe": -291.325,
+        "win_rate": 0.4964,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "BR",
         "label": "disb*0.9+oi*0.1",
         "threshold": 0.9,
-        "n_trades": 309441,
-        "total_return_pct": -1839601.14,
-        "sharpe": -253.381,
-        "win_rate": 0.4966,
+        "n_trades": 343243,
+        "total_return_pct": -2007942.87,
+        "sharpe": -243.524,
+        "win_rate": 0.4968,
         "max_dd_pct": 100.0
       }
     ]
@@ -672,144 +672,144 @@
   "GL": {
     "ticker": "GL",
     "status": "ok",
-    "n_rows": 111949,
+    "n_rows": 145980,
     "corr_1m": {
       "disb_to_return": {
         "label": "disb_lag → next_return",
-        "n": 110827,
-        "pearson": -0.00305,
-        "spearman": -0.00163,
-        "p_pearson": 0.310106,
-        "p_spearman": 0.588346
+        "n": 144518,
+        "pearson": -0.00435,
+        "spearman": -0.00281,
+        "p_pearson": 0.097941,
+        "p_spearman": 0.284625
       },
       "oi_diff_to_return": {
         "label": "oi_diff_lag → next_return",
-        "n": 110827,
-        "pearson": 0.01509,
-        "spearman": 0.03268,
-        "p_pearson": 1e-06,
+        "n": 144518,
+        "pearson": 0.01789,
+        "spearman": 0.0323,
+        "p_pearson": 0.0,
         "p_spearman": 0.0
       },
       "oi_pct_to_return": {
         "label": "oi_pct_lag → next_return",
-        "n": 109718,
-        "pearson": 0.02839,
-        "spearman": 0.03787,
+        "n": 143078,
+        "pearson": 0.02693,
+        "spearman": 0.03598,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       },
       "disb_to_oi_diff": {
         "label": "disb_lag → oi_diff_lag",
-        "n": 111948,
-        "pearson": 0.0088,
-        "spearman": 0.01542,
-        "p_pearson": 0.003233,
-        "p_spearman": 0.0
+        "n": 145979,
+        "pearson": -0.01304,
+        "spearman": 0.00036,
+        "p_pearson": 1e-06,
+        "p_spearman": 0.891556
       }
     },
     "corr_5m": {
       "disb_mean_to_return": {
         "label": "disb_mean(5m) → next_return(5m)",
-        "n": 62946,
-        "pearson": 0.00322,
-        "spearman": -0.00049,
-        "p_pearson": 0.41964,
-        "p_spearman": 0.903059
+        "n": 76202,
+        "pearson": 0.00125,
+        "spearman": 0.00032,
+        "p_pearson": 0.729483,
+        "p_spearman": 0.929155
       },
       "disb_sum_to_return": {
         "label": "disb_sum(5m) → next_return(5m)",
-        "n": 62330,
-        "pearson": 0.00126,
-        "spearman": 0.00065,
-        "p_pearson": 0.75237,
-        "p_spearman": 0.871299
+        "n": 75466,
+        "pearson": 0.00025,
+        "spearman": 0.00118,
+        "p_pearson": 0.944519,
+        "p_spearman": 0.746097
       },
       "disb_last_to_return": {
         "label": "disb_last(5m) → next_return(5m)",
-        "n": 62946,
-        "pearson": 0.00241,
-        "spearman": -0.00821,
-        "p_pearson": 0.546046,
-        "p_spearman": 0.039419
+        "n": 76202,
+        "pearson": -2e-05,
+        "spearman": -0.007,
+        "p_pearson": 0.995008,
+        "p_spearman": 0.05348
       }
     },
     "strategy": [
       {
         "ticker": "GL",
         "threshold": 0.3,
-        "n_trades": 87714,
-        "total_return_pct": -4911.88,
-        "sharpe": -3.464,
-        "win_rate": 0.4938,
+        "n_trades": 113218,
+        "total_return_pct": -6996.51,
+        "sharpe": -3.673,
+        "win_rate": 0.4941,
         "max_dd_pct": 100.0,
-        "avg_return": -0.0439,
-        "std_return": 3.9712
+        "avg_return": -0.0479,
+        "std_return": 4.0907
       },
       {
         "ticker": "GL",
         "threshold": 0.4,
-        "n_trades": 79530,
-        "total_return_pct": -5361.9,
-        "sharpe": -3.979,
-        "win_rate": 0.4927,
+        "n_trades": 102238,
+        "total_return_pct": -7284.06,
+        "sharpe": -4.033,
+        "win_rate": 0.493,
         "max_dd_pct": 100.0,
-        "avg_return": -0.0479,
-        "std_return": 3.7735
+        "avg_return": -0.0499,
+        "std_return": 3.879
       },
       {
         "ticker": "GL",
         "threshold": 0.5,
-        "n_trades": 71889,
-        "total_return_pct": -5387.16,
-        "sharpe": -4.209,
-        "win_rate": 0.4923,
+        "n_trades": 92012,
+        "total_return_pct": -7032.96,
+        "sharpe": -4.103,
+        "win_rate": 0.4927,
         "max_dd_pct": 100.0,
-        "avg_return": -0.0481,
-        "std_return": 3.5845
+        "avg_return": -0.0482,
+        "std_return": 3.6809
       },
       {
         "ticker": "GL",
         "threshold": 0.6,
-        "n_trades": 64814,
-        "total_return_pct": -4974.81,
-        "sharpe": -4.096,
-        "win_rate": 0.4915,
+        "n_trades": 82617,
+        "total_return_pct": -6594.71,
+        "sharpe": -4.063,
+        "win_rate": 0.4922,
         "max_dd_pct": 100.0,
-        "avg_return": -0.0444,
-        "std_return": 3.4012
+        "avg_return": -0.0452,
+        "std_return": 3.4861
       },
       {
         "ticker": "GL",
         "threshold": 0.7,
-        "n_trades": 58382,
-        "total_return_pct": -4900.43,
-        "sharpe": -4.256,
-        "win_rate": 0.4905,
+        "n_trades": 74110,
+        "total_return_pct": -6413.31,
+        "sharpe": -4.176,
+        "win_rate": 0.4914,
         "max_dd_pct": 100.0,
-        "avg_return": -0.0438,
-        "std_return": 3.2247
+        "avg_return": -0.0439,
+        "std_return": 3.2983
       },
       {
         "ticker": "GL",
         "threshold": 0.8,
-        "n_trades": 51696,
-        "total_return_pct": -4407.02,
-        "sharpe": -4.069,
-        "win_rate": 0.4903,
+        "n_trades": 65191,
+        "total_return_pct": -5929.27,
+        "sharpe": -4.122,
+        "win_rate": 0.4908,
         "max_dd_pct": 100.0,
-        "avg_return": -0.0394,
-        "std_return": 3.033
+        "avg_return": -0.0406,
+        "std_return": 3.0891
       },
       {
         "ticker": "GL",
         "threshold": 0.9,
-        "n_trades": 44708,
-        "total_return_pct": -3859.92,
-        "sharpe": -3.838,
-        "win_rate": 0.4907,
+        "n_trades": 56174,
+        "total_return_pct": -5030.46,
+        "sharpe": -3.781,
+        "win_rate": 0.4908,
         "max_dd_pct": 100.0,
         "avg_return": -0.0345,
-        "std_return": 2.8163
+        "std_return": 2.8569
       }
     ],
     "comparison": [
@@ -817,60 +817,60 @@
         "ticker": "GL",
         "label": "oi_diff_only",
         "threshold": 0.3,
-        "n_trades": 82973,
-        "total_return_pct": 10001.29,
-        "sharpe": 7.163,
-        "win_rate": 0.5132,
+        "n_trades": 109074,
+        "total_return_pct": 13597.85,
+        "sharpe": 7.196,
+        "win_rate": 0.5141,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "GL",
         "label": "disb_only",
         "threshold": 0.3,
-        "n_trades": 87714,
-        "total_return_pct": -4911.88,
-        "sharpe": -3.464,
-        "win_rate": 0.4938,
+        "n_trades": 113218,
+        "total_return_pct": -6996.51,
+        "sharpe": -3.673,
+        "win_rate": 0.4941,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "GL",
         "label": "disb*0.5+oi*0.5",
         "threshold": 0.9,
-        "n_trades": 79280,
-        "total_return_pct": 9764.82,
-        "sharpe": 7.161,
-        "win_rate": 0.5138,
+        "n_trades": 104272,
+        "total_return_pct": 13434.01,
+        "sharpe": 7.281,
+        "win_rate": 0.5149,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "GL",
         "label": "disb*0.7+oi*0.3",
-        "threshold": 0.9,
-        "n_trades": 75907,
-        "total_return_pct": 9802.8,
-        "sharpe": 7.349,
-        "win_rate": 0.5149,
+        "threshold": 0.8,
+        "n_trades": 100533,
+        "total_return_pct": 13569.99,
+        "sharpe": 7.496,
+        "win_rate": 0.5158,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "GL",
         "label": "disb*0.3+oi*0.7",
         "threshold": 0.3,
-        "n_trades": 82973,
-        "total_return_pct": 10001.29,
-        "sharpe": 7.163,
-        "win_rate": 0.5132,
+        "n_trades": 109074,
+        "total_return_pct": 13597.85,
+        "sharpe": 7.196,
+        "win_rate": 0.5141,
         "max_dd_pct": 100.0
       },
       {
         "ticker": "GL",
         "label": "disb*0.9+oi*0.1",
         "threshold": 0.9,
-        "n_trades": 67280,
-        "total_return_pct": 8946.16,
-        "sharpe": 7.146,
-        "win_rate": 0.5154,
+        "n_trades": 88430,
+        "total_return_pct": 12883.97,
+        "sharpe": 7.634,
+        "win_rate": 0.5172,
         "max_dd_pct": 100.0
       }
     ]
@@ -898,37 +898,37 @@
   "ED": {
     "ticker": "ED",
     "status": "ok",
-    "n_rows": 252783,
+    "n_rows": 275101,
     "corr_1m": {
       "disb_to_return": {
         "label": "disb_lag → next_return",
-        "n": 250253,
-        "pearson": -0.00707,
-        "spearman": -0.00728,
-        "p_pearson": 0.000404,
-        "p_spearman": 0.000272
+        "n": 272348,
+        "pearson": -0.00478,
+        "spearman": -0.00379,
+        "p_pearson": 0.012649,
+        "p_spearman": 0.047778
       },
       "oi_diff_to_return": {
         "label": "oi_diff_lag → next_return",
-        "n": 250253,
-        "pearson": -0.07186,
-        "spearman": -0.07037,
+        "n": 272348,
+        "pearson": -0.07121,
+        "spearman": -0.06931,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       },
       "oi_pct_to_return": {
         "label": "oi_pct_lag → next_return",
-        "n": 247770,
-        "pearson": -0.0412,
-        "spearman": -0.06808,
+        "n": 269646,
+        "pearson": -0.04035,
+        "spearman": -0.06603,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       },
       "disb_to_oi_diff": {
         "label": "disb_lag → oi_diff_lag",
-        "n": 252782,
-        "pearson": -0.01032,
-        "spearman": -0.02638,
+        "n": 275100,
+        "pearson": -0.01665,
+        "spearman": -0.02879,
         "p_pearson": 0.0,
         "p_spearman": 0.0
       }
@@ -936,26 +936,26 @@
     "corr_5m": {
       "disb_mean_to_return": {
         "label": "disb_mean(5m) → next_return(5m)",
-        "n": 155751,
-        "pearson": -0.00367,
-        "spearman": -0.01076,
-        "p_pearson": 0.147462,
-        "p_spearman": 2.2e-05
+        "n": 168664,
+        "pearson": -0.00308,
+        "spearman": -0.01039,
+        "p_pearson": 0.205654,
+        "p_spearman": 2e-05
       },
       "disb_sum_to_return": {
         "label": "disb_sum(5m) → next_return(5m)",
-        "n": 154392,
-        "pearson": -0.00275,
-        "spearman": -0.01018,
-        "p_pearson": 0.279879,
-        "p_spearman": 6.4e-05
+        "n": 167161,
+        "pearson": -0.00217,
+        "spearman": -0.00984,
+        "p_pearson": 0.375923,
+        "p_spearman": 5.7e-05
       },
       "disb_last_to_return": {
         "label": "disb_last(5m) → next_return(5m)",
-        "n": 155751,
-        "pearson": -0.00516,
-        "spearman": -0.01617,
-        "p_pearson": 0.041679,
+        "n": 168664,
+        "pearson": -0.00561,
+        "spearman": -0.01653,
+        "p_pearson": 0.021213,
         "p_spearman": 0.0
       }
     },
@@ -963,79 +963,79 @@
       {
         "ticker": "ED",
         "threshold": 0.3,
-        "n_trades": 179349,
-        "total_return_pct": -65343273.27,
-        "sharpe": -487.553,
-        "win_rate": 0.4722,
+        "n_trades": 196368,
+        "total_return_pct": -71173033.66,
+        "sharpe": -492.593,
+        "win_rate": 0.4739,
         "max_dd_pct": 359.63,
-        "avg_return": -258.4976,
-        "std_return": 166.2138
+        "avg_return": -258.7179,
+        "std_return": 164.6533
       },
       {
         "ticker": "ED",
         "threshold": 0.4,
-        "n_trades": 156528,
-        "total_return_pct": -57068464.74,
-        "sharpe": -398.318,
-        "win_rate": 0.4718,
+        "n_trades": 171787,
+        "total_return_pct": -62295333.65,
+        "sharpe": -402.706,
+        "win_rate": 0.4734,
         "max_dd_pct": Infinity,
-        "avg_return": -225.7625,
-        "std_return": 177.6863
+        "avg_return": -226.447,
+        "std_return": 176.283
       },
       {
         "ticker": "ED",
         "threshold": 0.5,
-        "n_trades": 135269,
-        "total_return_pct": -49340230.28,
-        "sharpe": -335.362,
-        "win_rate": 0.4707,
+        "n_trades": 148816,
+        "total_return_pct": -53980645.1,
+        "sharpe": -339.27,
+        "win_rate": 0.4724,
         "max_dd_pct": Infinity,
-        "avg_return": -195.1896,
-        "std_return": 182.4631
+        "avg_return": -196.2226,
+        "std_return": 181.3158
       },
       {
         "ticker": "ED",
         "threshold": 0.6,
-        "n_trades": 116005,
-        "total_return_pct": -42325509.44,
-        "sharpe": -288.0,
-        "win_rate": 0.4698,
+        "n_trades": 127881,
+        "total_return_pct": -46393034.0,
+        "sharpe": -291.425,
+        "win_rate": 0.4713,
         "max_dd_pct": Infinity,
-        "avg_return": -167.4394,
-        "std_return": 182.2624
+        "avg_return": -168.6412,
+        "std_return": 181.4137
       },
       {
         "ticker": "ED",
         "threshold": 0.7,
-        "n_trades": 98514,
-        "total_return_pct": -35947876.49,
-        "sharpe": -249.984,
-        "win_rate": 0.4676,
+        "n_trades": 108749,
+        "total_return_pct": -39452983.22,
+        "sharpe": -252.901,
+        "win_rate": 0.4693,
         "max_dd_pct": Infinity,
-        "avg_return": -142.2096,
-        "std_return": 178.3403
+        "avg_return": -143.4138,
+        "std_return": 177.776
       },
       {
         "ticker": "ED",
         "threshold": 0.8,
-        "n_trades": 82118,
-        "total_return_pct": -29953024.21,
-        "sharpe": -217.044,
-        "win_rate": 0.4654,
+        "n_trades": 90852,
+        "total_return_pct": -32943919.77,
+        "sharpe": -219.695,
+        "win_rate": 0.467,
         "max_dd_pct": Infinity,
-        "avg_return": -118.494,
-        "std_return": 171.1517
+        "avg_return": -119.753,
+        "std_return": 170.8829
       },
       {
         "ticker": "ED",
         "threshold": 0.9,
-        "n_trades": 67374,
-        "total_return_pct": -24552845.65,
-        "sharpe": -188.643,
-        "win_rate": 0.4631,
+        "n_trades": 74532,
+        "total_return_pct": -27003657.32,
+        "sharpe": -190.749,
+        "win_rate": 0.4648,
         "max_dd_pct": Infinity,
-        "avg_return": -97.1309,
-        "std_return": 161.4168
+        "avg_return": -98.1598,
+        "std_return": 161.3256
       }
     ],
     "comparison": [
@@ -1043,60 +1043,60 @@
         "ticker": "ED",
         "label": "oi_diff_only",
         "threshold": 0.3,
-        "n_trades": 210057,
-        "total_return_pct": -76364908.56,
-        "sharpe": -689.16,
-        "win_rate": 0.4494,
+        "n_trades": 228788,
+        "total_return_pct": -82782664.12,
+        "sharpe": -690.7,
+        "win_rate": 0.4501,
         "max_dd_pct": 359.8
       },
       {
         "ticker": "ED",
         "label": "disb_only",
         "threshold": 0.9,
-        "n_trades": 67374,
-        "total_return_pct": -24552845.65,
-        "sharpe": -188.643,
-        "win_rate": 0.4631,
+        "n_trades": 74532,
+        "total_return_pct": -27003657.32,
+        "sharpe": -190.749,
+        "win_rate": 0.4648,
         "max_dd_pct": Infinity
       },
       {
         "ticker": "ED",
         "label": "disb*0.5+oi*0.5",
         "threshold": 0.9,
-        "n_trades": 203941,
-        "total_return_pct": -74112706.96,
-        "sharpe": -635.786,
-        "win_rate": 0.4487,
+        "n_trades": 222163,
+        "total_return_pct": -80356196.21,
+        "sharpe": -637.305,
+        "win_rate": 0.4495,
         "max_dd_pct": 359.8
       },
       {
         "ticker": "ED",
         "label": "disb*0.7+oi*0.3",
         "threshold": 0.9,
-        "n_trades": 197814,
-        "total_return_pct": -71862892.06,
-        "sharpe": -590.724,
-        "win_rate": 0.4479,
+        "n_trades": 215542,
+        "total_return_pct": -77937449.99,
+        "sharpe": -592.32,
+        "win_rate": 0.4489,
         "max_dd_pct": 359.66
       },
       {
         "ticker": "ED",
         "label": "disb*0.3+oi*0.7",
         "threshold": 0.3,
-        "n_trades": 210057,
-        "total_return_pct": -76364908.56,
-        "sharpe": -689.16,
-        "win_rate": 0.4494,
+        "n_trades": 228788,
+        "total_return_pct": -82782664.12,
+        "sharpe": -690.7,
+        "win_rate": 0.4501,
         "max_dd_pct": 359.8
       },
       {
         "ticker": "ED",
         "label": "disb*0.9+oi*0.1",
         "threshold": 0.9,
-        "n_trades": 181439,
-        "total_return_pct": -65844095.37,
-        "sharpe": -497.353,
-        "win_rate": 0.4469,
+        "n_trades": 197793,
+        "total_return_pct": -71447976.83,
+        "sharpe": -498.815,
+        "win_rate": 0.448,
         "max_dd_pct": 359.55
       }
     ]
@@ -1112,64 +1112,64 @@
   "NG": {
     "ticker": "NG",
     "status": "ok",
-    "n_rows": 483806,
+    "n_rows": 533830,
     "corr_1m": {
       "disb_to_return": {
         "label": "disb_lag → next_return",
-        "n": 478964,
-        "pearson": 0.0011,
-        "spearman": 0.00065,
-        "p_pearson": 0.445849,
-        "p_spearman": 0.650529
+        "n": 528488,
+        "pearson": 0.00165,
+        "spearman": 0.00146,
+        "p_pearson": 0.230747,
+        "p_spearman": 0.288401
       },
       "oi_diff_to_return": {
         "label": "oi_diff_lag → next_return",
-        "n": 478964,
-        "pearson": 0.00183,
-        "spearman": 0.00075,
-        "p_pearson": 0.205298,
-        "p_spearman": 0.60146
+        "n": 528488,
+        "pearson": 0.00247,
+        "spearman": 0.00113,
+        "p_pearson": 0.072441,
+        "p_spearman": 0.40999
       },
       "oi_pct_to_return": {
         "label": "oi_pct_lag → next_return",
-        "n": 474169,
-        "pearson": 0.00214,
-        "spearman": 0.0014,
-        "p_pearson": 0.140576,
-        "p_spearman": 0.334462
+        "n": 523196,
+        "pearson": 0.00242,
+        "spearman": 0.00149,
+        "p_pearson": 0.079518,
+        "p_spearman": 0.279898
       },
       "disb_to_oi_diff": {
         "label": "disb_lag → oi_diff_lag",
-        "n": 483805,
-        "pearson": 0.00218,
-        "spearman": 0.01706,
-        "p_pearson": 0.128965,
+        "n": 533829,
+        "pearson": 0.00136,
+        "spearman": 0.01445,
+        "p_pearson": 0.320828,
         "p_spearman": 0.0
       }
     },
     "corr_5m": {
       "disb_mean_to_return": {
         "label": "disb_mean(5m) → next_return(5m)",
-        "n": 151307,
-        "pearson": -0.00351,
-        "spearman": -0.01727,
-        "p_pearson": 0.172444,
+        "n": 164050,
+        "pearson": -0.00425,
+        "spearman": -0.0167,
+        "p_pearson": 0.085499,
         "p_spearman": 0.0
       },
       "disb_sum_to_return": {
         "label": "disb_sum(5m) → next_return(5m)",
-        "n": 149839,
-        "pearson": -0.00346,
-        "spearman": -0.01499,
-        "p_pearson": 0.18081,
+        "n": 162446,
+        "pearson": -0.00474,
+        "spearman": -0.01504,
+        "p_pearson": 0.056122,
         "p_spearman": 0.0
       },
       "disb_last_to_return": {
         "label": "disb_last(5m) → next_return(5m)",
-        "n": 151307,
-        "pearson": -0.00607,
-        "spearman": -0.02617,
-        "p_pearson": 0.018157,
+        "n": 164050,
+        "pearson": -0.00535,
+        "spearman": -0.02456,
+        "p_pearson": 0.030371,
         "p_spearman": 0.0
       }
     },
@@ -1177,79 +1177,79 @@
       {
         "ticker": "NG",
         "threshold": 0.3,
-        "n_trades": 326027,
-        "total_return_pct": -41005195.56,
-        "sharpe": -381.759,
-        "win_rate": 0.4958,
+        "n_trades": 356212,
+        "total_return_pct": -44731726.14,
+        "sharpe": -380.616,
+        "win_rate": 0.4968,
         "max_dd_pct": Infinity,
-        "avg_return": -84.7558,
-        "std_return": 69.6006
+        "avg_return": -83.7943,
+        "std_return": 69.0176
       },
       {
         "ticker": "NG",
         "threshold": 0.4,
-        "n_trades": 278589,
-        "total_return_pct": -35310536.59,
-        "sharpe": -320.042,
-        "win_rate": 0.4954,
+        "n_trades": 303391,
+        "total_return_pct": -38376831.87,
+        "sharpe": -318.08,
+        "win_rate": 0.4963,
         "max_dd_pct": Infinity,
-        "avg_return": -72.9852,
-        "std_return": 71.4926
+        "avg_return": -71.8899,
+        "std_return": 70.854
       },
       {
         "ticker": "NG",
         "threshold": 0.5,
-        "n_trades": 240103,
-        "total_return_pct": -30651692.64,
-        "sharpe": -277.784,
-        "win_rate": 0.4949,
+        "n_trades": 260727,
+        "total_return_pct": -33200922.17,
+        "sharpe": -275.501,
+        "win_rate": 0.4961,
         "max_dd_pct": Infinity,
-        "avg_return": -63.3556,
-        "std_return": 71.5006
+        "avg_return": -62.194,
+        "std_return": 70.7715
       },
       {
         "ticker": "NG",
         "threshold": 0.6,
-        "n_trades": 210320,
-        "total_return_pct": -26995907.48,
-        "sharpe": -248.075,
-        "win_rate": 0.4949,
+        "n_trades": 228092,
+        "total_return_pct": -29195319.22,
+        "sharpe": -245.935,
+        "win_rate": 0.4959,
         "max_dd_pct": Infinity,
-        "avg_return": -55.7993,
-        "std_return": 70.5145
+        "avg_return": -54.6905,
+        "std_return": 69.7145
       },
       {
         "ticker": "NG",
         "threshold": 0.7,
-        "n_trades": 186606,
-        "total_return_pct": -24032282.44,
-        "sharpe": -225.687,
-        "win_rate": 0.4949,
+        "n_trades": 202237,
+        "total_return_pct": -25965721.98,
+        "sharpe": -223.742,
+        "win_rate": 0.496,
         "max_dd_pct": Infinity,
-        "avg_return": -49.6736,
-        "std_return": 69.0004
+        "avg_return": -48.6406,
+        "std_return": 68.1528
       },
       {
         "ticker": "NG",
         "threshold": 0.8,
-        "n_trades": 164997,
-        "total_return_pct": -21283244.68,
-        "sharpe": -205.903,
-        "win_rate": 0.4943,
+        "n_trades": 178748,
+        "total_return_pct": -22984820.66,
+        "sharpe": -204.178,
+        "win_rate": 0.4954,
         "max_dd_pct": Infinity,
-        "avg_return": -43.9915,
-        "std_return": 66.9789
+        "avg_return": -43.0566,
+        "std_return": 66.1094
       },
       {
         "ticker": "NG",
         "threshold": 0.9,
-        "n_trades": 146460,
-        "total_return_pct": -18835737.79,
-        "sharpe": -189.17,
-        "win_rate": 0.4953,
+        "n_trades": 158899,
+        "total_return_pct": -20374604.24,
+        "sharpe": -187.886,
+        "win_rate": 0.4964,
         "max_dd_pct": Infinity,
-        "avg_return": -38.9326,
-        "std_return": 64.5198
+        "avg_return": -38.167,
+        "std_return": 63.6833
       }
     ],
     "comparison": [
@@ -1257,60 +1257,60 @@
         "ticker": "NG",
         "label": "oi_diff_only",
         "threshold": 0.3,
-        "n_trades": 363808,
-        "total_return_pct": -44556213.87,
-        "sharpe": -449.016,
-        "win_rate": 0.4978,
+        "n_trades": 403362,
+        "total_return_pct": -49427073.03,
+        "sharpe": -458.383,
+        "win_rate": 0.498,
         "max_dd_pct": Infinity
       },
       {
         "ticker": "NG",
         "label": "disb_only",
         "threshold": 0.9,
-        "n_trades": 146460,
-        "total_return_pct": -18835737.79,
-        "sharpe": -189.17,
-        "win_rate": 0.4953,
+        "n_trades": 158899,
+        "total_return_pct": -20374604.24,
+        "sharpe": -187.886,
+        "win_rate": 0.4964,
         "max_dd_pct": Infinity
       },
       {
         "ticker": "NG",
         "label": "disb*0.5+oi*0.5",
         "threshold": 0.9,
-        "n_trades": 347467,
-        "total_return_pct": -42554978.95,
-        "sharpe": -420.356,
-        "win_rate": 0.4979,
+        "n_trades": 385293,
+        "total_return_pct": -47213950.11,
+        "sharpe": -428.421,
+        "win_rate": 0.498,
         "max_dd_pct": Infinity
       },
       {
         "ticker": "NG",
         "label": "disb*0.7+oi*0.3",
         "threshold": 0.9,
-        "n_trades": 330656,
-        "total_return_pct": -40526129.78,
-        "sharpe": -393.902,
-        "win_rate": 0.498,
+        "n_trades": 366690,
+        "total_return_pct": -44964918.88,
+        "sharpe": -400.854,
+        "win_rate": 0.4981,
         "max_dd_pct": Infinity
       },
       {
         "ticker": "NG",
         "label": "disb*0.3+oi*0.7",
         "threshold": 0.3,
-        "n_trades": 363808,
-        "total_return_pct": -44556213.87,
-        "sharpe": -449.016,
-        "win_rate": 0.4978,
+        "n_trades": 403362,
+        "total_return_pct": -49427073.03,
+        "sharpe": -458.383,
+        "win_rate": 0.498,
         "max_dd_pct": Infinity
       },
       {
         "ticker": "NG",
         "label": "disb*0.9+oi*0.1",
         "threshold": 0.9,
-        "n_trades": 290307,
-        "total_return_pct": -35676041.39,
-        "sharpe": -339.012,
-        "win_rate": 0.4982,
+        "n_trades": 322356,
+        "total_return_pct": -39622351.08,
+        "sharpe": -344.441,
+        "win_rate": 0.4985,
         "max_dd_pct": Infinity
       }
     ]
