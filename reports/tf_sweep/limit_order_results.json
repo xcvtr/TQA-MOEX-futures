@@ -1,0 +1,15 @@
+[
+  {
+    "return_pct": -99.8,
+    "annual_return": -99.1,
+    "max_dd_pct": 99.8,
+    "calmar": -0.99,
+    "wr": 0.0,
+    "n_trades": 22,
+    "trades_per_day": 0.0,
+    "total_slip_cost": 10.0,
+    "total_comm": 0.0,
+    "label": "limit+fallback",
+    "time_s": 195.9
+  }
+]

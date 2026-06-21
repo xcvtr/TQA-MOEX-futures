@@ -143,6 +143,7 @@ def main():
     max_dd = 0.0
     total_trades = 0
     total_wins = 0
+    total_commission = 0.0
     equity_records = []
 
     for ts in unique_times:
@@ -170,10 +171,12 @@ def main():
                 dm = 1 if pos['dir'] == 'L' else -1
                 pp = dm * (ep - pos['entry']) / pos['entry']
                 pr = pp * pos['go'] * pos['contracts']
-                cash += pr + pos['go'] * pos['contracts']
+                commission = pos['contracts'] * 4  # round-trip: 2 руб × 2
+                cash += pr + pos['go'] * pos['contracts'] - commission
                 total_trades += 1
-                if pr > 0:
+                if pr > commission:
                     total_wins += 1
+                total_commission += commission
                 del positions[sym]
 
         # === 2. Новые сигналы ===
@@ -226,10 +229,12 @@ def main():
         dm = 1 if pos['dir'] == 'L' else -1
         pp = dm * (float(last_bar['close']) - pos['entry']) / pos['entry']
         pr = pp * pos['go'] * pos['contracts']
-        cash += pr + pos['go'] * pos['contracts']
+        commission = pos['contracts'] * 4
+        cash += pr + pos['go'] * pos['contracts'] - commission
         total_trades += 1
-        if pr > 0:
+        if pr > commission:
             total_wins += 1
+        total_commission += commission
 
     # === Итог ===
     final_equity = cash
@@ -253,6 +258,8 @@ def main():
     print(f"  Calmar:            {port_calmar:>10.1f}")
     print(f"  Сделок:            {total_trades:>10}")
     print(f"  WR:                {wr:>10.1f}%")
+    print(f"  Комиссий всего:    {total_commission:>10,.0f} ₽")
+    print(f"  Средняя комиссия:  {total_commission/total_trades:>10.1f} ₽/сд" if total_trades>0 else "")
     print(f"  Период:            {str(unique_times[0])[:10]} — {str(unique_times[-1])[:10]} ({days:.0f} дн)")
 
     # Сохраняем equity

@@ -17,6 +17,7 @@ from config import CH_HOST, CH_PORT, CH_DB
 from datetime import datetime
 
 INITIAL = 100_000
+COMMISSION = 4
 SYMBOLS = ['GL', 'HS', 'HY', 'RN', 'NM', 'AF']
 START, END = datetime(2025,1,1), datetime(2026,5,1)
 
@@ -38,11 +39,11 @@ def load_data(sym):
 def precompute(d):
     d['volume']=d['volume'].astype(float)
     d['vma20']=d['volume'].rolling(20).mean().fillna(d['volume'])
-    d['vr']=d['volume']/d['vma20'].clip(lower=1); d['vz']=rz(d['volume'],20)
+    d['vr']=d['volume']/d['vma20'].clip(lower=1); d['vz']=rz(d['volume'],20).shift(1)
     d['fiz_net']=d['fiz_buy'].fillna(0)-d['fiz_sell'].fillna(0); d['yur_net']=d['yur_buy'].fillna(0)-d['yur_sell'].fillna(0)
     d['oi_r']=(d['yur_buy']+d['yur_sell']).fillna(0)/(d['fiz_buy']+d['fiz_sell']+1).fillna(0)
-    d['oima']=d['oi_r'].rolling(20).mean()
-    d['atr14']=calc_atr(d); d['atr_pct']=d['atr14']/d['close'].clip(lower=1)*100
+    d['oima']=d['oi_r'].rolling(20).mean().shift(1)
+    d['atr14']=calc_atr(d).shift(1); d['atr_pct']=d['atr14']/d['close'].clip(lower=1)*100
     vs=np.clip((d['vr']-1.5)/3.0,0,1); os_=np.clip((d['oima']-d['oi_r'])/d['oima'].clip(lower=0.1),0,1)
     raw=vs*0.6+os_*0.4; af=np.clip(1-(d['atr_pct']-0.3)/3.0,0,1)
     d['score']=np.clip(raw*af*np.clip(1+d['vz']/5,0.5,1.5),0,1)
@@ -65,7 +66,8 @@ def sim_long(d, sym):
             elif pos['bars_left']<=0: hit=True
             if hit:
                 dm=1 if pos['dir']=='L' else -1; pp=dm*(ep-pos['entry'])/pos['entry']*pos['go']*pos['contracts']
-                cash+=pp; trades+=1; wins+=1 if pp>0 else 0; pos=None
+                comm = pos['contracts'] * COMMISSION
+                cash+=pp - comm; trades+=1; wins+=1 if pp>0 else 0; pos=None
         if pos:
             dm=1 if pos['dir']=='L' else -1
             mtm=dm*(bar['close']-pos['entry'])/pos['entry']*pos['go']*pos['contracts']
@@ -83,7 +85,8 @@ def sim_long(d, sym):
     if pos:
         lb=dd.iloc[-1]; dm=1 if pos['dir']=='L' else -1
         pp=dm*(lb['close']-pos['entry'])/pos['entry']*pos['go']*pos['contracts']
-        cash+=pp; trades+=1; wins+=1 if pp>0 else 0
+        comm = pos['contracts'] * COMMISSION
+        cash+=pp - comm; trades+=1; wins+=1 if pp>0 else 0
     tr=(cash-INITIAL)/INITIAL*100; days=(END-START).days; yrs=max(days/365.25,0.1)
     cagr=((cash/INITIAL)**(1/max(yrs,0.1))-1)*100 if cash>0 else -100
     calmar=tr/100/max(max_dd,0.001) if max_dd>0 else tr*10
@@ -103,7 +106,8 @@ def sim_ls(d, sym):
             elif pos['bars_left']<=0: hit=True
             if hit:
                 dm=1 if pos['dir']=='L' else -1; pp=dm*(ep-pos['entry'])/pos['entry']*pos['go']*pos['contracts']
-                cash+=pp; trades+=1; wins+=1 if pp>0 else 0; pos=None
+                comm = pos['contracts'] * COMMISSION
+                cash+=pp - comm; trades+=1; wins+=1 if pp>0 else 0; pos=None
         if pos:
             dm=1 if pos['dir']=='L' else -1
             mtm=dm*(bar['close']-pos['entry'])/pos['entry']*pos['go']*pos['contracts']
@@ -123,7 +127,8 @@ def sim_ls(d, sym):
     if pos:
         lb=dd.iloc[-1]; dm=1 if pos['dir']=='L' else -1
         pp=dm*(lb['close']-pos['entry'])/pos['entry']*pos['go']*pos['contracts']
-        cash+=pp; trades+=1; wins+=1 if pp>0 else 0
+        comm = pos['contracts'] * COMMISSION
+        cash+=pp - comm; trades+=1; wins+=1 if pp>0 else 0
     tr=(cash-INITIAL)/INITIAL*100; days=(END-START).days; yrs=max(days/365.25,0.1)
     cagr=((cash/INITIAL)**(1/max(yrs,0.1))-1)*100 if cash>0 else -100
     calmar=tr/100/max(max_dd,0.001) if max_dd>0 else tr*10
