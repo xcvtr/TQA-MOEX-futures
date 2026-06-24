@@ -2,7 +2,16 @@
 
 Перед началом работы — загрузить skill `checkpoint` и проверить последний чекпойнт в `checkpoint/`.
 
-**ВАЖНО:** последние результаты (checkpoint 095):
+**⚠️ 2026-06-14: force push — очищена история от больших файлов (signals JSON 500MB+, reports/oi_divergence_scan 1.9GB).**
+Если на этой машине (Hermes-dev .63) `git pull` не работает — выполнить:
+```
+git fetch --force && git reset --hard origin/main
+```
+
+**ВАЖНО:** последние результаты (checkpoint 096):
+- **CVD divergence walk-forward** — 4 фьючерса (BR, Si, NG, MXI), train 180→test 60
+  - 32,629 сделок, 82.4% WR, 69/70 мес в плюс
+  - PnL в тиках, конвертация в рубли + комиссии: TBD
 - **BR 3-red exhaustion + TRIZ smart exit** — стратегия подтверждена на OOS
   - 15m, лимитка min4, комбинированный выход (vol_decay + smacross + proskok)
   - Лучший: zv=3.0 tg=2.0 sl=1.5 → OOS WR 56.4%, PnL +4,861 за 8 мес
