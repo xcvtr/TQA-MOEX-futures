@@ -10,3 +10,9 @@ build/
 *.pkl
 *.signals_*.json
 .signals_*.json
+*.parquet
+reports/oi_divergence_scan/
+data/
+*.csv
+*.h5
+*.hdf5
