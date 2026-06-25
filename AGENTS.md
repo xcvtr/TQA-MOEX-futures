@@ -8,13 +8,17 @@
 git fetch --force && git reset --hard origin/main
 ```
 
-**ВАЖНО:** последние результаты (checkpoint 096):
-- **CVD divergence walk-forward** — 4 фьючерса (BR, Si, NG, MXI), train 180→test 60
-  - 32,629 сделок, 82.4% WR, 69/70 мес в плюс
-  - **Корреляция:** 84% сигналов на 1 символе ✅
-  - **Рубли:** ~+177M (предварительно)
-  - **Комиссии:** <0.5% от gross, некритично
-  - Следующий шаг: paper trader + bar-level backtest
+**ВАЖНО:** последние результаты (checkpoint 097):
+- **CVD divergence v4 (лимитки, комиссия 0)** — 4 фьючерса (NG, BR, Si, MXI), портфельный WFO
+  - M5 lk=20 hold=1 q=0.6 — 66,961 сделок, **WR 66.2%**, Net PnL +73.2M RUB
+  - Все 3 ТФ (M5/M15/H1) положительны
+  - Long/Short симметрия ✅, все 4 символа в плюс
+  - **Ключевые исправления:**
+    - Entry timing look-ahead исправлен (сигнал N → вход N+1 по close)
+    - DD trade-level (а не daily aggregate) — реальная MDD 301% (шум старта)
+    - Margin locking per-symbol (не max(GO))
+  - **70/70 месяцев положительных**, равномерное распределение
+  - Следующий шаг: реалистичный тестер с тейкерскими комиссиями
 - **BR 3-red exhaustion + TRIZ smart exit** — стратегия подтверждена на OOS
   - 15m, лимитка min4, комбинированный выход (vol_decay + smacross + proskok)
   - Лучший: zv=3.0 tg=2.0 sl=1.5 → OOS WR 56.4%, PnL +4,861 за 8 мес
