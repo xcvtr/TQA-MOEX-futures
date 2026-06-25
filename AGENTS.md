@@ -11,7 +11,10 @@ git fetch --force && git reset --hard origin/main
 **ВАЖНО:** последние результаты (checkpoint 096):
 - **CVD divergence walk-forward** — 4 фьючерса (BR, Si, NG, MXI), train 180→test 60
   - 32,629 сделок, 82.4% WR, 69/70 мес в плюс
-  - PnL в тиках, конвертация в рубли + комиссии: TBD
+  - **Корреляция:** 84% сигналов на 1 символе ✅
+  - **Рубли:** ~+177M (предварительно)
+  - **Комиссии:** <0.5% от gross, некритично
+  - Следующий шаг: paper trader + bar-level backtest
 - **BR 3-red exhaustion + TRIZ smart exit** — стратегия подтверждена на OOS
   - 15m, лимитка min4, комбинированный выход (vol_decay + smacross + proskok)
   - Лучший: zv=3.0 tg=2.0 sl=1.5 → OOS WR 56.4%, PnL +4,861 за 8 мес

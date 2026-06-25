@@ -1,0 +1,62 @@
+{
+  "NG": {
+    "trades": 22804,
+    "wr": 87.3,
+    "total_ticks": 19887118,
+    "total_rub": 73880643.37,
+    "tick_cost": 3.715,
+    "params": {
+      "lk": 10,
+      "hold": 3,
+      "q": 0.8
+    },
+    "pos_months": 64,
+    "total_months": 64
+  },
+  "BR": {
+    "trades": 16215,
+    "wr": 72.3,
+    "total_ticks": 33647940,
+    "total_rub": 25000419.42,
+    "tick_cost": 0.743,
+    "params": {
+      "lk": 20,
+      "hold": 1,
+      "q": 0.8
+    },
+    "pos_months": 60,
+    "total_months": 61
+  },
+  "Si": {
+    "trades": 21234,
+    "wr": 75.0,
+    "total_ticks": 21531361809,
+    "total_rub": 53828404.59,
+    "tick_cost": 0.0025,
+    "params": {
+      "lk": 10,
+      "hold": 5,
+      "q": 0.7
+    },
+    "pos_months": 70,
+    "total_months": 70
+  },
+  "MXI": {
+    "trades": 28157,
+    "wr": 80.8,
+    "total_ticks": 246636290,
+    "total_rub": 24663629.0,
+    "tick_cost": 0.1,
+    "params": {
+      "lk": 20,
+      "hold": 1,
+      "q": 0.6
+    },
+    "pos_months": 70,
+    "total_months": 70
+  },
+  "_pool": {
+    "trades": 88410,
+    "total_rub": 177373096.38
+  }
+}
