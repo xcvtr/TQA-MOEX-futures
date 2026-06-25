@@ -8,7 +8,12 @@
 git fetch --force && git reset --hard origin/main
 ```
 
-**ВАЖНО:** последние результаты (checkpoint 097):
+**ВАЖНО:** последние результаты (checkpoint 098):
+- **CVD divergence paper trader** — live M5 через AlgoPack API
+  - Скрипт: `scripts/cvd_divergence_paper_trader.py`
+  - Данные: AlgoPack fo tradestats (не CH)
+  - Хранение: CH `strategy_paper_trades`, `strategy_portfolio_state`
+  - Cron: `cvd_divergence_scanner.sh` каждые 5 мин будни
 - **CVD divergence v4 (лимитки, комиссия 0)** — 4 фьючерса (NG, BR, Si, MXI), портфельный WFO
   - M5 lk=20 hold=1 q=0.6 — 66,961 сделок, **WR 66.2%**, Net PnL +73.2M RUB
   - Все 3 ТФ (M5/M15/H1) положительны
