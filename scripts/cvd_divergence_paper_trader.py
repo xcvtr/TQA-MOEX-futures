@@ -3,22 +3,34 @@
 CVD divergence paper trader — live on M5 MOEX futures via AlgoPack API.
 
 Логика (как в честном бэктесте v4):
-  1. Данные через AlgoPack REST API (fo/tradestats), не через CH
-  2. Ресемпл 1м → 5м: open='first', close='last', vol_b='sum', vol_s='sum'
-  3. CVD = vol_b - vol_s, CVD_cum = cumsum
-  4. Walk-forward: train 180d / test 60d для порогов p_thr, c_thr (quantile q=0.6)
-  5. Сигнал: (close.diff(lk) > p_thr AND cvd_cum.diff(lk) > c_thr)
-  6. Entry: лимитка по close сигнального бара, hold=1 (выход на след. 5м баре по close)
-  7. Комиссия 0 (мейкер), slippage 0.5 тика
+  1. Данные через AlgoPack REST API (fo/tradestats), с SQLite-кешем
+  2. Ресемпл 1м → 5м через lib_cvd_divergence.resample_to_5m()
+  3. Сигналы через lib_cvd_divergence.detect_signals()
+  4. Вход: лимитный ордер с touch-check (проверка high/low сигнального бара)
+  5. Выход: по close следующего 5м бара (рыночный)
+  6. Slippage: 0.5 тика на вход + 1.0 тик на выход = 1.5 тика round-trip
+  7. Адаптивный сдвиг лимитки: 30% от ATR(14), мин 5 тиков, макс 20 тиков
 
 Запуск: каждые 5 мин в будни 09:00-23:50 IRKT (MSK+5)
 """
 
-import os, sys, json, time, requests
+import os, sys, json, time, requests, sqlite3, concurrent.futures
 from datetime import datetime, timedelta, date
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import clickhouse_connect
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib_cvd_divergence import (
+    TICK, TICK_COST, GO, SYMBOLS, N_SYMS,
+    LK, HOLD_BARS, Q, INITIAL_CAPITAL,
+    SLIPPAGE_IN_TICKS, SLIPPAGE_OUT_TICKS, ROUND_TRIP_TICKS,
+    MIN_SLIPPAGE_TICKS, MAX_SLIPPAGE_TICKS, FIXED_SLIPPAGE_TICKS,
+    resample_to_5m, calc_thresholds, detect_signals,
+    calc_entry_price, check_touch, calc_pnl_rub,
+    calc_slippage_ticks, simulate_trade,
+)
 
 # ── Пути ──────────────────────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,20 +39,11 @@ DATA_DIR = os.path.join(os.path.expanduser("~"), ".hermes", "data", "cvd_paper")
 os.makedirs(DATA_DIR, exist_ok=True)
 LOG_FILE = os.path.join(DATA_DIR, "trades.log")
 
-# ── Параметры стратегии ────────────────────────────────────────────────────
-INITIAL_CAPITAL = 100_000.0
-LK = 20
-HOLD_BARS = 1
-Q = 0.6
-SLIPPAGE_TICKS = 0.5
-COMMISSION = 0.0  # мейкерская
-N_SYMS = 4
-SYMBOLS = ['NG', 'BR', 'Si', 'MXI']
+# ── Параметры ────────────────────────────────────────────────────────────────
+TRAIN_DAYS = 120
 
-TICK = {'NG': 0.0005, 'BR': 0.001, 'Si': 0.0025, 'MXI': 0.01}
-TICK_COST = {'NG': 3.715, 'BR': 0.743, 'Si': 0.0025, 'MXI': 0.10}
-GO = {'NG': 4800, 'BR': 3500, 'Si': 2500, 'MXI': 2000}
-TRAIN_DAYS = 180
+# Для восстановления из лога (когда ATR неизвестен) используем 10 тиков
+AGGRESSIVE_TICKS = 3  # запасной min сдвиг (используется когда нет ATR)
 
 # ── AlgoPack API ────────────────────────────────────────────────────────────
 ALGOPACK_TOKEN = os.environ.get('ALGOPACK_APIKEY', '')
@@ -60,12 +63,100 @@ ALGOPACK_HEADERS = {"Authorization": f"Bearer {ALGOPACK_TOKEN}"}
 CH_HOST = os.environ.get('MOEX_CH_HOST', '10.0.0.64')
 CH = None  # lazy init
 
+# ── SQLite cache ────────────────────────────────────────────────────────────
+CACHE_DB = os.path.join(DATA_DIR, "algopack_cache.db")
+MAX_CATCHUP_DAYS = 5
+INITIAL_DAYS = 185
 
-def get_ch():
-    global CH
-    if CH is None:
-        CH = clickhouse_connect.get_client(host=CH_HOST, database='moex')
-    return CH
+
+def init_cache_db():
+    """Создать таблицы кеша если их нет."""
+    conn = sqlite3.connect(CACHE_DB)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS bars (
+            symbol TEXT,
+            time TEXT,
+            open REAL,
+            close REAL,
+            vol_b INTEGER,
+            vol_s INTEGER,
+            PRIMARY KEY (symbol, time)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cache_meta (
+            symbol TEXT PRIMARY KEY,
+            last_date TEXT,
+            bar_count INTEGER
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def get_cached_bars(symbol):
+    """Загрузить все бары символа из кеша."""
+    conn = sqlite3.connect(CACHE_DB)
+    df = pd.read_sql_query(
+        "SELECT time, open, close, vol_b, vol_s FROM bars WHERE symbol = ? ORDER BY time",
+        conn, params=[symbol]
+    )
+    conn.close()
+    if not df.empty:
+        df['time'] = pd.to_datetime(df['time'])
+    return df
+
+
+def save_bars_to_cache(symbol, df_new):
+    """Сохранить/обновить бары символа в кеше (UPSERT)."""
+    if df_new.empty:
+        return
+    conn = sqlite3.connect(CACHE_DB)
+    c = conn.cursor()
+
+    rows = []
+    for _, row in df_new.iterrows():
+        ts = row['time']
+        if isinstance(ts, pd.Timestamp):
+            ts = ts.strftime('%Y-%m-%d %H:%M:%S')
+        rows.append((
+            symbol, ts,
+            float(row['open']) if pd.notna(row.get('open')) else None,
+            float(row['close']) if pd.notna(row.get('close')) else None,
+            int(row.get('vol_b', 0) or 0),
+            int(row.get('vol_s', 0) or 0),
+        ))
+
+    c.executemany("""
+        INSERT OR REPLACE INTO bars (symbol, time, open, close, vol_b, vol_s)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, rows)
+
+    last_time = df_new['time'].max()
+    if isinstance(last_time, pd.Timestamp):
+        last_date = last_time.strftime('%Y-%m-%d')
+    else:
+        last_date = str(last_time)[:10]
+    cnt = c.execute("SELECT count() FROM bars WHERE symbol = ?", (symbol,)).fetchone()[0]
+    c.execute("""
+        INSERT OR REPLACE INTO cache_meta (symbol, last_date, bar_count)
+        VALUES (?, ?, ?)
+    """, (symbol, last_date, cnt))
+
+    conn.commit()
+    conn.close()
+
+
+def get_cache_last_date(symbol):
+    """Получить последнюю дату в кеше для символа."""
+    conn = sqlite3.connect(CACHE_DB)
+    row = conn.execute(
+        "SELECT last_date FROM cache_meta WHERE symbol = ?", (symbol,)
+    ).fetchone()
+    conn.close()
+    if row and row[0]:
+        return datetime.strptime(row[0], '%Y-%m-%d').date()
+    return None
 
 
 # ── Логирование ────────────────────────────────────────────────────────────
@@ -77,24 +168,32 @@ def log(msg):
     print(line, flush=True)
 
 
-# ── AlgoPack API — получение 1м данных ─────────────────────────────────────
-ALGOPACK_COLUMNS_CACHE = None
+def get_ch():
+    global CH
+    if CH is None:
+        CH = clickhouse_connect.get_client(host=CH_HOST, database='moex')
+    return CH
 
 
 def fetch_algopack_day(ds):
-    """Загрузить все строки за один день из fo/tradestats."""
-    global ALGOPACK_COLUMNS_CACHE
+    """Загрузить все страницы за один день. Возвращает (rows, cols)."""
     all_rows = []
     cols = None
     start = 0
+    max_retries = 3
+    r = None
     while True:
         params = {"date": ds, "limit": 1000, "start": start}
-        try:
-            r = requests.get(ALGOPACK_URL, params=params, headers=ALGOPACK_HEADERS, timeout=30)
-        except Exception as e:
-            log(f"API error for {ds} start={start}: {e}")
-            break
-        if r.status_code != 200:
+        for attempt in range(max_retries):
+            try:
+                r = requests.get(ALGOPACK_URL, params=params, headers=ALGOPACK_HEADERS, timeout=60)
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    log(f"API error for {ds} start={start} after {max_retries} attempts: {e}")
+                    return all_rows, cols
+                time.sleep(2)
+        if r is None or r.status_code != 200:
             log(f"API status {r.status_code} for {ds} start={start}")
             break
         j = r.json()
@@ -103,8 +202,6 @@ def fetch_algopack_day(ds):
             break
         if cols is None:
             cols = j.get("data", {}).get("columns", [])
-            if ALGOPACK_COLUMNS_CACHE is None:
-                ALGOPACK_COLUMNS_CACHE = cols
         all_rows.extend(data)
         if len(data) < 1000:
             break
@@ -112,104 +209,104 @@ def fetch_algopack_day(ds):
     return all_rows, cols
 
 
-def get_1m_bars(symbol, days_back=200):
-    """Загрузить 1м бары для символа за последние days_back дней через AlgoPack API."""
-    today = date.today()
-    all_rows_raw = []
-    cols = None
-
-    for i in range(days_back, 0, -1):
-        ds = (today - timedelta(days=i)).isoformat()
-        raw, c = fetch_algopack_day(ds)
-        if not raw:
-            continue
-        if cols is None and c:
-            cols = c
-        elif cols is None and ALGOPACK_COLUMNS_CACHE:
-            cols = ALGOPACK_COLUMNS_CACHE
-        all_rows_raw.extend(raw)
-
-    if not all_rows_raw or cols is None:
+def fetch_algopack_day_for_symbol(ds, symbol):
+    """Загрузить один день и отфильтровать по символу. Возвращает DataFrame."""
+    raw, cols = fetch_algopack_day(ds)
+    if not raw or cols is None:
         return pd.DataFrame()
 
-    # Фильтруем по asset_code
     records = []
-    for row in all_rows_raw:
+    for row in raw:
         d = dict(zip(cols, row))
         if d.get('asset_code') != symbol:
             continue
         records.append({
-            'tradedate': str(d['tradedate']) if d.get('tradedate') else '',
-            'tradetime': str(d['tradetime']) if d.get('tradetime') else '',
+            'time': f"{d['tradedate']} {d['tradetime']}",
             'open': float(d['pr_open']) if d.get('pr_open') is not None else None,
             'close': float(d['pr_close']) if d.get('pr_close') is not None else None,
             'vol_b': int(d['vol_b']) if d.get('vol_b') is not None else 0,
             'vol_s': int(d['vol_s']) if d.get('vol_s') is not None else 0,
         })
 
-    df = pd.DataFrame(records)
-    if df.empty:
-        return df
+    if not records:
+        return pd.DataFrame()
 
-    df['time'] = pd.to_datetime(df['tradedate'] + ' ' + df['tradetime'])
+    df = pd.DataFrame(records)
+    df['time'] = pd.to_datetime(df['time'])
     df.sort_values('time', inplace=True)
-    df.reset_index(drop=True, inplace=True)
     return df
 
 
-def resample_to_5m(df):
-    """Ресемпл 1м → 5м: open='first', close='last', vol_b='sum', vol_s='sum'."""
-    if df.empty:
-        return df
+def ensure_cache_for_symbol(symbol, days_back=183, max_workers=6):
+    """Убедиться что кеш для символа загружен с параллельными запросами."""
+    last_date = get_cache_last_date(symbol)
+    today = date.today()
 
-    df = df.set_index('time')
-    resampled = df.resample('5T', closed='right', label='right').agg({
-        'open': 'first',
-        'close': 'last',
-        'vol_b': 'sum',
-        'vol_s': 'sum',
-        'tradedate': 'last',
-    })
-    resampled = resampled.dropna(subset=['open', 'close'])
-    resampled = resampled.reset_index()
-    # date колонка
-    resampled['date'] = pd.to_datetime(resampled['time']).dt.date
-    return resampled
+    if last_date is not None:
+        needed = (today - last_date).days
+        if needed < 0:
+            days_to_fetch = INITIAL_DAYS
+            fetch_dates = [(today - timedelta(days=i)).isoformat() for i in range(days_to_fetch, 0, -1)]
+        elif needed == 0:
+            conn = sqlite3.connect(CACHE_DB)
+            last_time = conn.execute(
+                "SELECT max(time) FROM bars WHERE symbol = ?", (symbol,)
+            ).fetchone()[0]
+            cnt = conn.execute("SELECT count() FROM bars WHERE symbol = ?", (symbol,)).fetchone()[0]
+            conn.close()
 
+            if last_time:
+                last_dt = datetime.strptime(last_time, '%Y-%m-%d %H:%M:%S')
+                minutes_old = (datetime.now() - last_dt).total_seconds() / 60
+                if minutes_old < 15 and cnt >= days_back * 100:
+                    return get_cached_bars(symbol)
+                fetch_dates = [today.isoformat()]
+            else:
+                days_to_fetch = INITIAL_DAYS
+                fetch_dates = [(today - timedelta(days=i)).isoformat() for i in range(days_to_fetch, 0, -1)]
+        else:
+            days_to_fetch = min(needed + 1, MAX_CATCHUP_DAYS)
+            fetch_dates = [(last_date + timedelta(days=i)).isoformat() for i in range(1, days_to_fetch + 1)]
+    else:
+        days_to_fetch = INITIAL_DAYS
+        fetch_dates = [(today - timedelta(days=i)).isoformat() for i in range(days_to_fetch, 0, -1)]
 
-# ── Walk-forward пороги ────────────────────────────────────────────────────
-def calc_thresholds(train_df, lk=LK, q=Q):
-    """Рассчитать p_thr и c_thr на train-данных."""
-    if train_df.empty or len(train_df) < lk + 10:
-        return None, None
+    log(f"{symbol}: loading {len(fetch_dates)} days (cache last: {last_date})...")
 
-    train = train_df.copy()
-    train['cvd'] = train['vol_b'].fillna(0) - train['vol_s'].fillna(0)
-    train['cvd_cum'] = train['cvd'].cumsum()
-    train['pchg'] = train['close'].diff(lk)
-    train['cchg'] = train['cvd_cum'].diff(lk)
-    train_v = train.dropna(subset=['pchg', 'cchg'])
+    total_bars = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        fut_to_ds = {executor.submit(fetch_algopack_day_for_symbol, ds, symbol): ds for ds in fetch_dates}
+        for fut in concurrent.futures.as_completed(fut_to_ds):
+            ds = fut_to_ds[fut]
+            try:
+                df = fut.result()
+                if not df.empty:
+                    save_bars_to_cache(symbol, df)
+                    total_bars += len(df)
+                    log(f"{symbol}: {ds} — {len(df)} bars (cached)")
+            except Exception as e:
+                log(f"{symbol}: {ds} error: {e}")
 
-    if len(train_v) < 50:
-        return None, None
+    if total_bars == 0:
+        cached = get_cached_bars(symbol)
+        if not cached.empty:
+            log(f"{symbol}: using cached ({len(cached)} bars)")
+            return cached
+        return pd.DataFrame()
 
-    p_thr = train_v['pchg'].abs().quantile(q)
-    c_thr = train_v['cchg'].abs().quantile(q)
-
-    if p_thr == 0 or c_thr == 0:
-        return None, None
-
-    return float(p_thr), float(c_thr)
+    result = get_cached_bars(symbol)
+    log(f"{symbol}: cache ready — {len(result)} total bars")
+    return result
 
 
 def get_latest_thresholds(symbol):
     """Walk-forward: train на последних 180 днях, считаем пороги."""
-    df_1m = get_1m_bars(symbol, days_back=TRAIN_DAYS + 5)
+    df_1m = ensure_cache_for_symbol(symbol, days_back=TRAIN_DAYS + 5)
     if df_1m.empty:
         log(f"{symbol}: no data for threshold calculation")
         return None, None
 
-    df_5m = resample_to_5m(df_1m)
+    df_5m = resample_to_5m(df_1m, deduplicate=True)
     if df_5m.empty or len(df_5m) < 100:
         log(f"{symbol}: too few 5m bars ({len(df_5m)}) for thresholds")
         return None, None
@@ -234,33 +331,6 @@ def get_latest_thresholds(symbol):
     return p_thr, c_thr
 
 
-# ── Сигналы ────────────────────────────────────────────────────────────────
-def detect_signals(df_5m, p_thr, c_thr, lk=LK):
-    """Детектить CVD divergence сигналы на M5 барах.
-    signal: 1 (bullish), -1 (bearish), 0 (none).
-    """
-    if df_5m.empty or p_thr is None or c_thr is None:
-        return df_5m
-
-    df = df_5m.copy()
-    df['cvd'] = df['vol_b'].fillna(0) - df['vol_s'].fillna(0)
-    df['cvd_cum'] = df['cvd'].cumsum()
-    df['pchg'] = df['close'].diff(lk)
-    df['cchg'] = df['cvd_cum'].diff(lk)
-
-    # Bullish: цена падает, CVD растёт
-    bullish = (df['pchg'] < -p_thr) & (df['cchg'] > c_thr)
-    # Bearish: цена растёт, CVD падает
-    bearish = (df['pchg'] > p_thr) & (df['cchg'] < -c_thr)
-
-    df['signal'] = 0
-    df.loc[bullish, 'signal'] = 1
-    df.loc[bearish, 'signal'] = -1
-
-    return df
-
-
-# ── CH операции ─────────────────────────────────────────────────────────────
 def ensure_tables():
     """Создать таблицы если не существуют (CH)."""
     ch = get_ch()
@@ -293,11 +363,6 @@ def ensure_tables():
         ORDER BY (strategy, updated_at)
     """)
 
-    cnt = ch.query("SELECT count() FROM moex.strategy_portfolio_state WHERE strategy = 'cvd_divergence'").result_rows[0][0]
-    if cnt == 0:
-        ch.command("INSERT INTO moex.strategy_portfolio_state (strategy, capital, peak_capital, lots) VALUES ('cvd_divergence', 100000.0, 100000.0, 1)")
-        log("Initial portfolio state created")
-
 
 def get_next_id():
     ch = get_ch()
@@ -326,21 +391,22 @@ def get_open_trades():
     return trades
 
 
-def get_portfolio_state():
+def get_capital_from_closed_trades():
+    """Рассчитать капитал с начала: 100K + сумма PnL всех закрытых сделок."""
     ch = get_ch()
     rows = ch.query("""
-        SELECT capital, peak_capital, lots
-        FROM moex.strategy_portfolio_state
-        WHERE strategy = 'cvd_divergence'
-        ORDER BY updated_at DESC
-        LIMIT 1
+        SELECT coalesce(sum(pnl_rub), 0)
+        FROM moex.strategy_paper_trades
+        WHERE strategy = 'cvd_divergence' AND status = 'closed'
     """).result_rows
-    if rows:
-        return {'capital': float(rows[0][0]), 'peak_capital': float(rows[0][1]), 'lots': int(rows[0][2])}
-    return {'capital': INITIAL_CAPITAL, 'peak_capital': INITIAL_CAPITAL, 'lots': 1}
+    closed_pnl = float(rows[0][0])
+    capital = INITIAL_CAPITAL + closed_pnl
+    peak = max(INITIAL_CAPITAL, capital)
+    return capital, peak
 
 
-def update_portfolio_state(capital, peak_capital, lots):
+def save_portfolio_snapshot(capital, peak_capital, lots=1):
+    """Дописать текущее состояние в portfolio_state (одна запись за запуск)."""
     ch = get_ch()
     ch.command(f"""
         INSERT INTO moex.strategy_portfolio_state (strategy, capital, peak_capital, lots, updated_at)
@@ -373,20 +439,22 @@ def close_trade(ticker, exit_price, exit_time, pnl_rub):
     log(f"TRADE EXIT: {ticker} @ {exit_price:.4f} pnl={pnl_rub:+.2f}")
 
 
-# ── Основная логика ────────────────────────────────────────────────────────
 def main():
     """Основной цикл paper trader."""
     dry_run = '--dry-run' in sys.argv
     log(f"{'='*60}")
     log(f"CVD Divergence Paper Trader — run at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
+    init_cache_db()
+
     if not dry_run:
         ensure_tables()
 
-    state = get_portfolio_state() if not dry_run else {'capital': INITIAL_CAPITAL, 'peak_capital': INITIAL_CAPITAL, 'lots': 1}
     open_trades = get_open_trades() if not dry_run else {}
-    capital = state['capital']
-    peak_capital = state['peak_capital']
+    capital, peak_capital = get_capital_from_closed_trades() if not dry_run else (INITIAL_CAPITAL, INITIAL_CAPITAL)
+
+    if not dry_run:
+        save_portfolio_snapshot(capital, peak_capital)
 
     log(f"Capital: {capital:,.0f} | Peak: {peak_capital:,.0f}")
     log(f"Open positions: {list(open_trades.keys()) if open_trades else 'none'}")
@@ -395,20 +463,49 @@ def main():
     new_trades = 0
     changes = []
 
+    # ── 1a. Прогрев + train + self-check ──────────────────────────────
+    thresholds = {}
+    df_5m_by_symbol = {}
+    abort = False
+    just_exited = set()
     for symbol in SYMBOLS:
-        # ── 1. Загружаем данные ─────────────────────────────────────────
-        df_1m = get_1m_bars(symbol, days_back=TRAIN_DAYS + 5)
+        df_1m = ensure_cache_for_symbol(symbol, days_back=TRAIN_DAYS + 5)
         if df_1m.empty:
-            log(f"{symbol}: NO DATA")
+            log(f"{symbol}: NO DATA — aborting")
+            abort = True
             continue
+        # Paper trader использует данные из AlgoPack API (мульти-потоковые)
+        df_5m = resample_to_5m(df_1m, deduplicate=True)
+        if df_5m.empty or len(df_5m) < 50:
+            log(f"{symbol}: insufficient 5m bars ({len(df_5m)}) — aborting")
+            abort = True
+            continue
+        df_5m_by_symbol[symbol] = df_5m
 
-        df_5m = resample_to_5m(df_1m)
+        p_thr, c_thr = get_latest_thresholds(symbol)
+        if p_thr is None or c_thr is None or p_thr == 0.0 or c_thr == 0.0:
+            log(f"{symbol}: bad thresholds p={p_thr} c={c_thr} — aborting")
+            abort = True
+            continue
+        thresholds[symbol] = (p_thr, c_thr)
+        log(f"  ✓ {symbol}: p_thr={p_thr:.6f} c_thr={c_thr:.6f} ({len(df_5m)} bars)")
+
+    if abort:
+        log(f"SELF-CHECK FAILED — aborting paper trader")
+        print(f"❌ CVD Paper Trader: self-check failed — see log for details", flush=True)
+        return
+
+    log("✅ Self-check passed — all symbols OK")
+    if not dry_run:
+        log("Starting trading loop")
+
+    for symbol in SYMBOLS:
+        df_5m = df_5m_by_symbol.get(symbol, pd.DataFrame())
         if df_5m.empty or len(df_5m) < 50:
             log(f"{symbol}: insufficient 5m bars ({len(df_5m)})")
             continue
 
-        # ── 2. Walk-forward пороги ─────────────────────────────────────
-        p_thr, c_thr = get_latest_thresholds(symbol)
+        p_thr, c_thr = thresholds.get(symbol, (None, None))
         if p_thr is None:
             continue
 
@@ -421,6 +518,8 @@ def main():
         if len(recent) < 3:
             continue
 
+        today_ds = date.today().isoformat()
+
         # ── 4. Закрытие позиций ────────────────────────────────────────
         if symbol in open_trades:
             trade = open_trades[symbol]
@@ -431,42 +530,66 @@ def main():
             exit_price = float(last_bar['close'])
             exit_time = last_bar['time']
 
-            tick = TICK.get(symbol, 0.001)
-            tick_cost = TICK_COST.get(symbol, 1.0)
-            pnl_ticks = (exit_price - entry_price) * direction / tick
-            slippage_rub = SLIPPAGE_TICKS * tick_cost
-            pnl_rub = pnl_ticks * tick_cost - slippage_rub  # комиссия 0
+            # PnL с slippage: 0.5 тика на вход + 1.0 тик на выход
+            pnl_rub, slippage_total = calc_pnl_rub(
+                symbol, entry_price, exit_price, direction,
+                slippage_in_ticks=SLIPPAGE_IN_TICKS,
+                slippage_out_ticks=SLIPPAGE_OUT_TICKS,
+            )
 
             if not dry_run:
                 close_trade(symbol, exit_price, exit_time, pnl_rub)
 
             go = GO.get(symbol, 3000)
-            max_lots = max(1, int(capital / N_SYMS / go))
+            max_lots = 1  # 1 контракт
             pnl_total = pnl_rub * max_lots
             capital += pnl_total
             peak_capital = max(peak_capital, capital)
             total_pnl_rub += pnl_total
 
-            changes.append(f"  {symbol}: 🔴 CLOSE {trade['direction']} @ {exit_price:.4f} pnl={pnl_rub:+.2f}")
-            log(f"{symbol}: CLOSE {trade['direction']} entry={entry_price} exit={exit_price} pnl={pnl_rub:+.2f}")
+            changes.append(f"  {symbol}: CLOSE {trade['direction']} @ {exit_price:.4f} pnl={pnl_rub:+.2f}")
+            log(f"{symbol}: CLOSE {trade['direction']} entry={entry_price} exit={exit_price} pnl={pnl_rub:+.2f} slippage={slippage_total:.2f}")
+            just_exited.add(symbol)
             del open_trades[symbol]
 
         # ── 5. Новые сигналы ───────────────────────────────────────────
         if symbol in open_trades:
             continue
 
-        # Сигнал на предпоследнем завершённом баре
+        if symbol in just_exited:
+            continue
+
         if len(recent) >= 2:
-            signal_bar = recent.iloc[-2]
+            signal_bar = recent.iloc[-2]  # предпоследний бар (сигнальный)
             signal_val = int(signal_bar['signal'])
 
             if signal_val == 0:
                 continue
 
-            entry_price = float(signal_bar['close'])
+            # Цена закрытия сигнального бара — базовая цена
+            close_price = float(signal_bar['close'])
+
+            # Адаптивный сдвиг лимитки от ATR(14)
+            slippage_ticks = calc_slippage_ticks(symbol, df_5m)
+            tick = TICK.get(symbol, 0.001)
+
+            # Цена лимитного ордера: сдвиг в сторону сигнала
+            limit_price = calc_entry_price(close_price, signal_val, slippage_ticks, tick)
             entry_time = signal_bar['time']
 
-            # Проверяем уникальность
+            # ── ПРОВЕРКА КАСАНИЯ ═══════════════════════════════════════
+            bar_high = float(signal_bar.get('high', close_price))
+            bar_low = float(signal_bar.get('low', close_price))
+
+            touches = check_touch(bar_high, bar_low, limit_price, signal_val)
+
+            if not touches:
+                log(f"NO TOUCH: {symbol} {'LONG' if signal_val==1 else 'SHORT'} "
+                    f"limit={limit_price:.4f} bar(H={bar_high:.4f} L={bar_low:.4f}) "
+                    f"time={entry_time} — skipping")
+                continue
+
+            # Проверяем уникальность (только сегодняшние сигналы)
             if not dry_run:
                 ts = entry_time.strftime('%Y-%m-%d %H:%M:%S') if hasattr(entry_time, 'strftime') else str(entry_time)
                 existing = get_ch().query(f"""
@@ -479,15 +602,15 @@ def main():
             direction_name = 'long' if signal_val == 1 else 'short'
 
             if not dry_run:
-                insert_trade(symbol, signal_val, entry_price, entry_time)
+                insert_trade(symbol, signal_val, limit_price, entry_time)
 
             new_trades += 1
-            changes.append(f"  {symbol}: 🟢 OPEN {direction_name} @ {entry_price:.4f}")
+            changes.append(f"  {symbol}: 🟢 OPEN {direction_name} @ {limit_price:.4f}")
 
     # ── 6. Обновляем portfolio_state ────────────────────────────────────
     if not dry_run:
-        lots = max(1, min(4, int(capital / max(GO.values()))))
-        update_portfolio_state(capital, peak_capital, lots)
+        lots = 1
+        save_portfolio_snapshot(capital, peak_capital)
 
     # ── 7. Вывод ────────────────────────────────────────────────────────
     total_return = (capital / INITIAL_CAPITAL - 1) * 100
@@ -505,19 +628,24 @@ def main():
     log(f"{'='*60}")
 
 
-# ── Проверка пропущенных сигналов ──────────────────────────────────────────
 def catchup_missed_signals():
-    """В начале дня проверяем пропущенные сигналы."""
+    """В начале дня проверяем пропущенные сигналы.
+    
+    Ограничено только сегодняшним днём — сигналы старше сегодня не записываем
+    (предотвращает look-ahead из исторических данных).
+    """
     log("Catchup: checking for missed signals...")
+    init_cache_db()
     ensure_tables()
-    state = get_portfolio_state()
-    capital = state['capital']
+    capital, _ = get_capital_from_closed_trades()
+    today = date.today()
 
     for symbol in SYMBOLS:
-        df_1m = get_1m_bars(symbol, days_back=TRAIN_DAYS + 5)
+        df_1m = ensure_cache_for_symbol(symbol, days_back=TRAIN_DAYS + 5)
         if df_1m.empty:
             continue
-        df_5m = resample_to_5m(df_1m)
+        # Для catchup используем deduplicate=True — это данные из API/файла
+        df_5m = resample_to_5m(df_1m, deduplicate=True)
         if df_5m.empty or len(df_5m) < 100:
             continue
 
@@ -530,6 +658,8 @@ def catchup_missed_signals():
             continue
 
         signals = df_signals[df_signals['signal'] != 0]
+        # Только сегодняшние сигналы!
+        signals = signals[signals['date'] == today]
         caught = 0
         for _, row in signals.iterrows():
             entry_time = row['time']
@@ -542,12 +672,24 @@ def catchup_missed_signals():
                 continue
 
             signal_val = int(row['signal'])
-            entry_price = float(row['close'])
-            insert_trade(symbol, signal_val, entry_price, entry_time)
+            close_price = float(row['close'])
+            tick = TICK.get(symbol, 0.001)
+            limit_price = calc_entry_price(close_price, signal_val, FIXED_SLIPPAGE_TICKS, tick)
+
+            # Проверка касания
+            bar_high = float(row.get('high', close_price))
+            bar_low = float(row.get('low', close_price))
+            touches = check_touch(bar_high, bar_low, limit_price, signal_val)
+
+            if not touches:
+                log(f"CATCHUP NO TOUCH: {symbol} limit={limit_price:.4f} bar(H={bar_high:.4f} L={bar_low:.4f}) — skipping")
+                continue
+
+            insert_trade(symbol, signal_val, limit_price, entry_time)
             caught += 1
 
         if caught > 0:
-            log(f"CATCHUP: {symbol} — {caught} missed signals recorded")
+            log(f"CATCHUP: {symbol} — {caught} missed signals recorded (today only)")
 
 
 if __name__ == '__main__':

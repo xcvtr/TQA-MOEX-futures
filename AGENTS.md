@@ -8,22 +8,20 @@
 git fetch --force && git reset --hard origin/main
 ```
 
-**ВАЖНО:** последние результаты (checkpoint 098):
+**ВАЖНО:** последние результаты (checkpoint 088):
 - **CVD divergence paper trader** — live M5 через AlgoPack API
   - Скрипт: `scripts/cvd_divergence_paper_trader.py`
-  - Данные: AlgoPack fo tradestats (не CH)
-  - Хранение: CH `strategy_paper_trades`, `strategy_portfolio_state`
-  - Cron: `cvd_divergence_scanner.sh` каждые 5 мин будни
-- **CVD divergence v4 (лимитки, комиссия 0)** — 4 фьючерса (NG, BR, Si, MXI), портфельный WFO
-  - M5 lk=20 hold=1 q=0.6 — 66,961 сделок, **WR 66.2%**, Net PnL +73.2M RUB
-  - Все 3 ТФ (M5/M15/H1) положительны
-  - Long/Short симметрия ✅, все 4 символа в плюс
-  - **Ключевые исправления:**
-    - Entry timing look-ahead исправлен (сигнал N → вход N+1 по close)
-    - DD trade-level (а не daily aggregate) — реальная MDD 301% (шум старта)
-    - Margin locking per-symbol (не max(GO))
-  - **70/70 месяцев положительных**, равномерное распределение
-  - Следующий шаг: реалистичный тестер с тейкерскими комиссиями
+  - Библиотека: `scripts/lib_cvd_divergence.py`
+  - Бэктест: `scripts/wf_divergence_v4_realistic.py`
+  - Данные: AlgoPack fo tradestats (SQLite-кеш, ~/.hermes/data/cvd_paper/)
+  - Хранение: CH `moex.strategy_paper_trades`, `moex.strategy_portfolio_state`
+  - Cron: `cvd_paper_trader.sh` каждые 5 мин будни
+  - **Модель:** лимитный вход с touch-check, выход по close след. бара, slippage 1.5 тика
+  - **Спецификации:** MOEX June 2026 (NG=0.001/7.56, BR=0.01/7.56, Si=1.0/1.0, MXI=0.05/0.5)
+  - **Дедупликация:** `deduplicate_1m()` — выбор записи с max(vol) для мульти-потоковых данных
+  - Бэктест v4: 33,631 сделок, WR 74.1%, Net PnL +28.5M RUB, 70/70 мес >0
+  - Аудит: `AUDIT_RESULT.md`
+- **Дашборд:** http://10.0.0.60:8101/ (equity от 100K)
 - **BR 3-red exhaustion + TRIZ smart exit** — стратегия подтверждена на OOS
   - 15m, лимитка min4, комбинированный выход (vol_decay + smacross + proskok)
   - Лучший: zv=3.0 tg=2.0 sl=1.5 → OOS WR 56.4%, PnL +4,861 за 8 мес
