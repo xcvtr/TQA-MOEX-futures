@@ -23,10 +23,18 @@ moex
 ```
 strategies/
   cvd/                          ← одна стратегия
-    engine.py                   ← ядро сигнала, immutable в проде
-    lib.py                      ← утилиты (PG, PnL, slippage)
-    paper_trader.py             ← executor (крон)
+    __init__.py                 ← экспортирует prod (по умолчанию)
+    prod/                       ← стабильная версия (paper/live)
+      engine.py                 ← ядро сигнала, immutable
+      lib.py                    ← PG утилиты, PnL, slippage
+      paper_trader.py           ← executor (крон)
+    dev/                        ← эксперименты (копия prod, можно править)
+      engine.py                 ← модифицированная версия для тестов
     scripts/                    ← вспомогательные скрипты
+      analyze_tpsl.py
+      scan.py
+      wf_*.py
+      mtm_portfolio.py
       analyze_tpsl.py           ← P80/P20 анализ
       scan.py                   ← correlation scan
       wf_*.py                   ← walk-forward / backtest
