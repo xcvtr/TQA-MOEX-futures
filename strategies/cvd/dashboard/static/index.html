@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CVD Divergence — Paper Trader</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0d1117;
+  color: #c9d1d9;
+  padding: 20px;
+}
+h1 { font-size: 22px; margin-bottom: 16px; color: #58a6ff; }
+h2 { font-size: 16px; margin: 20px 0 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; }
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+}
+.card .label { font-size: 11px; color: #8b949e; text-transform: uppercase; }
+.card .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+.card .value.green { color: #3fb950; }
+.card .value.red { color: #f85149; }
+.card .value.orange { color: #d29922; }
+.card .value.blue { color: #58a6ff; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 8px;
+}
+th, td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #21262d;
+}
+th { color: #8b949e; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+tr:hover td { background: #1c2128; }
+.pos-long { color: #3fb950; }
+.pos-short { color: #f85149; }
+.pnl-pos { color: #3fb950; font-weight: 700; }
+.pnl-neg { color: #f85149; font-weight: 700; }
+.chart-container {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+}
+.empty { color: #484f58; text-align: center; padding: 30px; font-size: 14px; }
+.updated { font-size: 11px; color: #484f58; margin-top: 12px; }
+.green-bg { background: rgba(63, 185, 80, 0.1); }
+.red-bg { background: rgba(248, 81, 73, 0.1); }
+</style>
+</head>
+<body>
+
+<h1>📊 CVD Divergence — Paper Trader</h1>
+
+<!-- Метрики -->
+<div class="metrics" id="metrics"></div>
+
+<!-- Health info -->
+<div class="metrics" id="healthInfo"></div>
+
+<!-- Equity curve -->
+<h2>Equity curve</h2>
+<div class="chart-container">
+  <canvas id="equityChart"></canvas>
+</div>
+
+<!-- Статистика per-symbol -->
+<h2>Per-symbol stats</h2>
+<div id="statsTable"></div>
+
+<!-- Открытые позиции -->
+<h2>Open positions</h2>
+<div id="openPositions"></div>
+
+<!-- Последние сделки -->
+<h2>Recent trades</h2>
+<div id="tradesTable"></div>
+
+<div class="updated" id="updated"></div>
+
+<script>
+const COLORS = {
+  green: '#3fb950',
+  red: '#f85149',
+  blue: '#58a6ff',
+  orange: '#d29922',
+};
+
+let equityChart = null;
+
+async function loadAll() {
+  const [state, positions, trades, stats, equity, health] = await Promise.all([
+    fetch('/api/state').then(r => r.json()),
+    fetch('/api/positions').then(r => r.json()),
+    fetch('/api/trades').then(r => r.json()),
+    fetch('/api/stats').then(r => r.json()),
+    fetch('/api/equity').then(r => r.json()),
+    fetch('/api/health').then(r => r.json()),
+  ]);
+
+  renderMetrics(state);
+  renderHealth(health);
+  renderEquity(equity.equity);
+  renderStats(stats.stats);
+  renderPositions(positions.positions);
+  renderTrades(trades.trades);
+  document.getElementById('updated').textContent = 'Updated: ' + new Date().toLocaleString('ru-RU');
+}
+
+function renderMetrics(state) {
+  const m = document.getElementById('metrics');
+  const totalReturn = state.total_return_pct;
+  m.innerHTML = `
+    <div class="card">
+      <div class="label">Capital</div>
+      <div class="value blue">${state.capital.toLocaleString('ru-RU')} ₽</div>
+    </div>
+    <div class="card">
+      <div class="label">Peak</div>
+      <div class="value">${state.peak.toLocaleString('ru-RU')} ₽</div>
+    </div>
+    <div class="card">
+      <div class="label">Drawdown</div>
+      <div class="value ${state.dd_pct < -5 ? 'red' : state.dd_pct < 0 ? 'orange' : ''}">${state.dd_pct.toFixed(2)}%</div>
+    </div>
+    <div class="card">
+      <div class="label">Total Return</div>
+      <div class="value ${totalReturn >= 0 ? 'green' : 'red'}">${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%</div>
+    </div>
+    <div class="card">
+      <div class="label">Lots</div>
+      <div class="value">${state.lots}</div>
+    </div>
+  `;
+}
+
+function renderHealth(health) {
+  const el = document.getElementById('healthInfo');
+  const lastData = health.last_portfolio_update || '—';
+  const lastCron = health.last_cron_run || '—';
+  let cronTime = lastCron;
+  const m = lastCron.match(/\[([^\]]+)\]/);
+  if (m) cronTime = m[1];
+  
+  // Оценка свежести
+  const now = new Date();
+  let dataColor = '#3fb950';  // green
+  let cronColor = '#3fb950';
+  let dataLabel = 'OK';
+  let cronLabel = 'OK';
+
+  if (lastData !== '—') {
+    const dataDate = new Date(lastData.replace(' ', 'T') + '+08:00');
+    const dataMin = (now - dataDate) / 60000;
+    if (dataMin > 10) { dataColor = '#f85149'; dataLabel = 'OLD (>10m)'; }
+    else if (dataMin > 5) { dataColor = '#d29922'; dataLabel = 'stale (>5m)'; }
+  } else {
+    dataColor = '#484f58'; dataLabel = 'no data';
+  }
+
+  if (cronTime !== '—') {
+    const cronDate = new Date(cronTime.replace(' ', 'T') + '+08:00');
+    const cronMin = (now - cronDate) / 60000;
+    if (cronMin > 10) { cronColor = '#f85149'; cronLabel = 'MISSED (>10m)'; }
+    else if (cronMin > 6) { cronColor = '#d29922'; cronLabel = 'delayed (>6m)'; }
+  } else {
+    cronColor = '#484f58'; cronLabel = 'no data';
+  }
+
+  el.innerHTML = `
+    <div class="card" style="grid-column: 1 / -1; text-align: left; font-size: 12px;">
+      <div style="display: flex; gap: 30px; flex-wrap: wrap; align-items: center;">
+        <span>📡 <b>DB data:</b> ${lastData}</span>
+        <span style="color: ${dataColor}; font-weight: 600;">${dataLabel}</span>
+        <span>🕐 <b>Cron:</b> ${cronTime}</span>
+        <span style="color: ${cronColor}; font-weight: 600;">${cronLabel}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderEquity(equity) {
+  const ctx = document.getElementById('equityChart').getContext('2d');
+  if (equityChart) equityChart.destroy();
+
+  const labels = equity.map(e => e.time);
+  const capital = equity.map(e => e.capital);
+  const peak = equity.map(e => e.peak);
+
+  equityChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Capital',
+          data: capital,
+          borderColor: COLORS.blue,
+          backgroundColor: 'rgba(88, 166, 255, 0.05)',
+          fill: true,
+          tension: 0.2,
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+        {
+          label: 'Peak',
+          data: peak,
+          borderColor: COLORS.green,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          borderWidth: 1,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#8b949e', font: { size: 11 } },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#484f58', maxTicksLimit: 10, font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+        y: {
+          ticks: { color: '#484f58', font: { size: 10 }, callback: v => v.toLocaleString('ru-RU') },
+          grid: { color: '#21262d' },
+        },
+      },
+    },
+  });
+}
+
+function renderStats(stats) {
+  const el = document.getElementById('statsTable');
+  if (!stats || stats.length === 0) {
+    el.innerHTML = '<div class="empty">No trades yet</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>Symbol</th><th>Total</th><th>Closed</th><th>Wins</th><th>Losses</th><th>WR</th><th>Total PnL</th><th>Avg PnL</th></tr></thead><tbody>';
+  for (const s of stats) {
+    html += `<tr>
+      <td><b>${s.ticker}</b></td>
+      <td>${s.total}</td>
+      <td>${s.closed}</td>
+      <td>${s.wins}</td>
+      <td>${s.losses}</td>
+      <td class="${s.wr_pct >= 50 ? 'pnl-pos' : 'pnl-neg'}">${s.wr_pct}%</td>
+      <td class="${s.total_pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${s.total_pnl >= 0 ? '+' : ''}${s.total_pnl.toLocaleString('ru-RU')}</td>
+      <td class="${s.avg_pnl >= 0 ? 'pnl-pos' : 'pnl-neg'}">${s.avg_pnl >= 0 ? '+' : ''}${s.avg_pnl.toLocaleString('ru-RU')}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function renderPositions(positions) {
+  const el = document.getElementById('openPositions');
+  if (!positions || positions.length === 0) {
+    el.innerHTML = '<div class="empty">No open positions</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>Symbol</th><th>Direction</th><th>Entry</th><th>Time</th></tr></thead><tbody>';
+  for (const p of positions) {
+    html += `<tr>
+      <td><b>${p.ticker}</b></td>
+      <td class="${p.direction === 'long' ? 'pos-long' : 'pos-short'}">${p.direction === 'long' ? '▲ LONG' : '▼ SHORT'}</td>
+      <td>${p.entry_price}</td>
+      <td>${p.entry_time}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function renderTrades(trades) {
+  const el = document.getElementById('tradesTable');
+  if (!trades || trades.length === 0) {
+    el.innerHTML = '<div class="empty">No completed trades</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>Symbol</th><th>Direction</th><th>Entry</th><th>Exit</th><th>PnL</th><th>Date</th></tr></thead><tbody>';
+  for (const t of trades) {
+    const cls = t.pnl_rub >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const bg = t.pnl_rub >= 0 ? 'green-bg' : 'red-bg';
+    html += `<tr class="${bg}">
+      <td><b>${t.ticker}</b></td>
+      <td class="${t.direction === 'long' ? 'pos-long' : 'pos-short'}">${t.direction === 'long' ? '▲ LONG' : '▼ SHORT'}</td>
+      <td>${t.entry_price ?? '-'}</td>
+      <td>${t.exit_price ?? '-'}</td>
+      <td class="${cls}">${t.pnl_rub >= 0 ? '+' : ''}${t.pnl_rub.toFixed(2)}</td>
+      <td>${t.exit_time ?? '-'}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// Auto-refresh every 30s
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+
+</body>
+</html>
