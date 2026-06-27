@@ -1,44 +1,65 @@
-См. [README.md](README.md)
+# Архитектура проекта TQA-MOEX-futures
 
-Перед началом работы — загрузить skill `checkpoint` и проверить последний чекпойнт в `checkpoint/`.
+## 🏗 PG структура
 
-**⚠️ 2026-06-14: force push — очищена история от больших файлов (signals JSON 500MB+, reports/oi_divergence_scan 1.9GB).**
-Если на этой машине (Hermes-dev .63) `git pull` не работает — выполнить:
+Одна БД `moex` на 10.0.0.60, схемы по типам инструментов:
+
+```
+moex
+├── futures                    ← фьючерсы (наш проект)
+│   ├── ticker_specs           ← ГО, лотность, шаг цены
+│   └── strategy_cvd_*         ← CVD-стратегия (portfolio, params, trades…)
+├── shared
+│   └── calendar               ← макро-календарь (CBR, праздники)
+├── stocks / options / bonds   ← когда появятся
+└── public (пусто)
+```
+
+**Правило:** схема = тип инструмента (не стратегия, не проект).\
+**Исключение:** `shared` для кросс-рыночных данных (календарь).
+
+## 📁 Структура проекта
+
+```
+strategies/
+  cvd/                          ← одна стратегия
+    engine.py                   ← ядро сигнала, immutable в проде
+    lib.py                      ← утилиты (PG, PnL, slippage)
+    paper_trader.py             ← executor (крон)
+    scripts/                    ← вспомогательные скрипты
+      analyze_tpsl.py           ← P80/P20 анализ
+      scan.py                   ← correlation scan
+      wf_*.py                   ← walk-forward / backtest
+      mtm_portfolio.py          ← портфельный MTM
+      paper_trader.sh
+
+  oi_div/                       ← следующая стратегия (когда появится)
+
+scripts/                        ← общие утилиты, не привязанные к стратегии
+```
+
+## 🧠 Принципы
+
+1. **Схема = рынок** (futures, stocks, options), а не стратегия
+2. **Новая стратегия = новая папка в `strategies/`**, новый код не трогает старый
+3. **Engine immutable в проде** — эксперименты через новый engine, не правку существующего
+4. **PG — единый источник конфигов**, хардкода нет
+5. **`shared.` только для кросс-рыночных данных**
+6. **TP/SL = P80/P20 per symbol per direction**, из `futures.strategy_cvd_portfolio`
+7. **Конфиги не в JSON/файлах** — всё в PG с репликацией
+
+## 🔑 Текущее состояние (chkpt 103b)
+
+- CVD-портфель: 18 тикеров (FV, OZ, TI, AS, VI, DL, S0, PS, Si, FN, TN, SS, W4, WU, GZ, IP, RB, CR, GC)
+- TP/SL: P80/P20, long/short отдельно
+- Specs: 64 тикера в `futures.ticker_specs`
+- Engine: `strategies/cvd/engine.py` — чистый сигнал, без зависимостей
+- PG библиотека: `strategies/cvd/lib.py` — загрузка из PG, PnL, slippage
+- Следующий шаг: интеграция TP/SL в paper trader
+
+## ⚠️ Force push
+
+Если не работает `git pull`:
 ```
 git fetch --force && git reset --hard origin/main
 ```
-
-**ВАЖНО:** последние результаты (checkpoint 088):
-- **CVD divergence paper trader** — live M5 через AlgoPack API
-  - Скрипт: `scripts/cvd_divergence_paper_trader.py`
-  - Библиотека: `scripts/lib_cvd_divergence.py`
-  - Бэктест: `scripts/wf_divergence_v4_realistic.py`
-  - Данные: AlgoPack fo tradestats (SQLite-кеш, ~/.hermes/data/cvd_paper/)
-  - Хранение: CH `moex.strategy_paper_trades`, `moex.strategy_portfolio_state`
-  - Cron: `cvd_paper_trader.sh` каждые 5 мин будни
-  - **Модель:** лимитный вход с touch-check, выход по close след. бара, slippage 1.5 тика
-  - **Спецификации:** MOEX June 2026 (NG=0.001/7.56, BR=0.01/7.56, Si=1.0/1.0, MXI=0.05/0.5)
-  - **Дедупликация:** `deduplicate_1m()` — выбор записи с max(vol) для мульти-потоковых данных
-  - Бэктест v4: 33,631 сделок, WR 74.1%, Net PnL +28.5M RUB, 70/70 мес >0
-  - Аудит: `AUDIT_RESULT.md`
-- **Дашборд:** http://10.0.0.60:8101/ (equity от 100K)
-- **BR 3-red exhaustion + TRIZ smart exit** — стратегия подтверждена на OOS
-  - 15m, лимитка min4, комбинированный выход (vol_decay + smacross + proskok)
-  - Лучший: zv=3.0 tg=2.0 sl=1.5 → OOS WR 56.4%, PnL +4,861 за 8 мес
-  - **Все 48 конфигов положительны на OOS** — TRIZ-выход решил проблему
-- **FUTOI** загружен: 1.58M строк, 78 тикеров — позиции FIZ/YUR по фьючерсам
-- **HI2** загружен: 1.14M строк — HHI-индекс концентрации рынка
-- **Alerts** загружены: 331K записей — события 99.9 перцентиля
-- **Correlation scan:** CR corr=-0.88, GL corr=+0.82 (YUR_net vs price)
-- **Данные лежат:** CH 10.0.0.60/63, БД moex (futoi, hi2_fo, alerts_fo)**
-
-**Актуальный Roadmap в README.md** — 4 направления: obstats/orderstats, кластерный анализ стакана, глубокий OI, межрыночные связи.
-
-Основные точки входа:
-- `checkpoint/087-futoi-hi2-alerts-correlation.md` — FUTOI/HI2/Alerts анализ
-- `checkpoint/086-disb-analysis.md` — disb-анализ (финальный)
-- `checkpoint/085-ois-divergence-lookahead-audit.md` — верификация OI divergence
-- `checkpoint/084-yurnet-grid-search.md` — yur_net_z + OI spread grid search
-- `scripts/final_ls.py` — OI divergence (исправленная версия с shift(1))
-- `scripts/yurnet_strategy.py` — yur_net_z стратегия (multi-CPU, честная)
-- `scripts/analyze_disb.py` — disb-анализ (исправленная версия)
