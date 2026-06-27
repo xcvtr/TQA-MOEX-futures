@@ -12,7 +12,7 @@ conn = psycopg2.connect(host='10.0.0.60', dbname='moex', user='user')
 cur = conn.cursor()
 
 # Get existing tickers in BG to avoid duplicates
-cur.execute("SELECT ticker FROM ticker_specs")
+cur.execute("SELECT ticker FROM shared.ticker_specs")
 existing = set(r[0] for r in cur.fetchall() or [])
 
 specs = {}
@@ -64,7 +64,7 @@ for base in ['FV','OZ','TI']:
 n = 0
 for t, s in sorted(specs.items()):
     cur.execute("""
-        INSERT INTO ticker_specs (ticker, sec_id, short_name, asset_code, lot_volume, min_step, step_price, decimals, go)
+        INSERT INTO shared.ticker_specs (ticker, sec_id, short_name, asset_code, lot_volume, min_step, step_price, decimals, go)
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
         ON CONFLICT (ticker) DO UPDATE SET
             sec_id=EXCLUDED.sec_id, short_name=EXCLUDED.short_name,
