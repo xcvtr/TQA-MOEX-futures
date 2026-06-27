@@ -12,17 +12,145 @@ lib_cvd_divergence.py — Единая библиотека для CVD divergenc
 4. Slippage: 0.5 тика на вход (мейкер) + 1.0 тик на выход (тейкер) = 1.5 тика round-trip
 """
 
+import os
 import pandas as pd
 import numpy as np
 from datetime import datetime, date
+import psycopg2
 
-# ── MOEX спецификации (реальные, из спецификаций фьючерсов) ──────────────
-# Источник: moex.com/ru/contract.aspx
-TICK = {'NG': 0.001, 'BR': 0.01, 'Si': 1.0, 'MXI': 0.05}
-TICK_COST = {'NG': 7.5635, 'BR': 7.5635, 'Si': 1.0, 'MXI': 0.50}
-GO = {'NG': 4800, 'BR': 3500, 'Si': 2500, 'MXI': 2000}
+# ── PG config for ticker specs ──────────────────────────────────────────
+DB_HOST = os.environ.get('MOEX_DB_HOST', '10.0.0.60')
+DB_PORT = int(os.environ.get('MOEX_DB_PORT', 5432))
+DB_NAME = os.environ.get('MOEX_DB_NAME', 'moex')
+DB_USER = os.environ.get('MOEX_DB_USER', 'user')
+DB_PASS = os.environ.get('MOEX_DB_PASSWORD', '')
+
+# ── Ticker specs (lazy-loaded from PG ticker_specs) ────────────────────
+_TICKER_SPECS_CACHE = None
+TICK = {}          # {ticker: min_step} — lazy-loaded
+TICK_COST = {}     # {ticker: step_price} — lazy-loaded
+GO = {}            # {ticker: go} — lazy-loaded
 SYMBOLS = ['NG', 'BR', 'Si', 'MXI']
 N_SYMS = len(SYMBOLS)
+
+
+def load_ticker_specs(tickers=None):
+    """Загрузить спецификации тикеров из PG ticker_specs.
+
+    Параметры:
+        tickers: список тикеров (или None — загрузить все)
+
+    Возвращает dict: {ticker: {'min_step': float, 'step_price': float,
+                                'lot': int, 'go': float}}
+    Если тикер не найден в БД — возвращает дефолтные значения.
+    """
+    global _TICKER_SPECS_CACHE, TICK, TICK_COST, GO
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST, port=DB_PORT,
+            dbname=DB_NAME, user=DB_USER, password=DB_PASS,
+            connect_timeout=5,
+        )
+        cur = conn.cursor()
+        if tickers is not None and len(tickers) > 0:
+            placeholders = ','.join(['%s'] * len(tickers))
+            cur.execute(f'''
+                SELECT ticker, min_step, step_price, lot_volume, go
+                FROM ticker_specs
+                WHERE ticker IN ({placeholders})
+            ''', list(tickers))
+        else:
+            cur.execute(
+                'SELECT ticker, min_step, step_price, lot_volume, go FROM ticker_specs'
+            )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        specs = {}
+        for r in rows:
+            specs[str(r[0])] = {
+                'min_step': float(r[1]),
+                'step_price': float(r[2]),
+                'lot': int(r[3]),
+                'go': float(r[4]),
+            }
+
+        # If specific tickers were requested — fill missing with defaults
+        if tickers is not None:
+            for t in tickers:
+                if t not in specs:
+                    specs[t] = {
+                        'min_step': 0.01,
+                        'step_price': 1.0,
+                        'lot': 1,
+                        'go': 0.0,
+                    }
+
+        # Update module-level dicts for backward compatibility (mutate in-place)
+        TICK.clear()
+        TICK.update({t: s['min_step'] for t, s in specs.items()})
+        TICK_COST.clear()
+        TICK_COST.update({t: s['step_price'] for t, s in specs.items()})
+        GO.clear()
+        GO.update({t: s['go'] for t, s in specs.items()})
+
+        _TICKER_SPECS_CACHE = specs
+        return specs
+    except Exception as e:
+        print(f'  ⚠ PG load_ticker_specs failed ({e}), using defaults')
+        # Fallback: return defaults for requested tickers
+        specs = {}
+        target = tickers if tickers is not None else SYMBOLS
+        for t in target:
+            specs[t] = {
+                'min_step': 0.01,
+                'step_price': 1.0,
+                'lot': 1,
+                'go': 0.0,
+            }
+        TICK.clear()
+        TICK_COST.clear()
+        GO.clear()
+        TICK.update({t: s['min_step'] for t, s in specs.items()})
+        TICK_COST.update({t: s['step_price'] for t, s in specs.items()})
+        GO.update({t: s['go'] for t, s in specs.items()})
+        _TICKER_SPECS_CACHE = specs
+        return specs
+
+
+def _ensure_specs():
+    """Загрузить specs при первом обращении (если ещё не загружены)."""
+    global _TICKER_SPECS_CACHE
+    if _TICKER_SPECS_CACHE is None:
+        load_ticker_specs()
+
+
+def get_tick(ticker):
+    """Вернуть min_step (TICK) для тикера. Кеширует specs при первом вызове.
+
+    Если тикер не найден — возвращает 0.01.
+    """
+    _ensure_specs()
+    return TICK.get(ticker, 0.01)
+
+
+def get_tick_cost(ticker):
+    """Вернуть step_price (TICK_COST) для тикера. Кеширует specs при первом вызове.
+
+    Если тикер не найден — возвращает 1.0.
+    """
+    _ensure_specs()
+    return TICK_COST.get(ticker, 1.0)
+
+
+def get_go(ticker):
+    """Вернуть GO (гарантийное обеспечение) для тикера.
+
+    Если тикер не найден — возвращает 0.0.
+    """
+    _ensure_specs()
+    return GO.get(ticker, 0.0)
 
 # ── Параметры стратегии ───────────────────────────────────────────────────
 LK = 20
@@ -233,8 +361,8 @@ def calc_pnl_rub(symbol, entry_price, exit_price, direction,
     
     Возвращает (pnl_rub, slippage_total).
     """
-    tick = TICK.get(symbol, 0.001)
-    tick_cost = TICK_COST.get(symbol, 1.0)
+    tick = get_tick(symbol)
+    tick_cost = get_tick_cost(symbol)
     pnl_ticks = (exit_price - entry_price) * direction / tick
     slippage_total = (slippage_in_ticks + slippage_out_ticks) * tick_cost
     pnl_rub = pnl_ticks * tick_cost - slippage_total
@@ -256,7 +384,7 @@ def calc_slippage_ticks(symbol, df_5m=None):
     if df_5m is not None and not df_5m.empty and len(df_5m) >= 14:
         close_diff = df_5m['close'].diff().abs()
         atr_5m = close_diff.rolling(14).mean().iloc[-1]
-        tick = TICK.get(symbol, 0.001)
+        tick = get_tick(symbol)
         atr_ticks = atr_5m / tick if tick > 0 else 0
         slippage = max(MIN_SLIPPAGE_TICKS, min(int(atr_ticks * 0.3), MAX_SLIPPAGE_TICKS))
         return slippage
