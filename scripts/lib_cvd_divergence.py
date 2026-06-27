@@ -56,12 +56,12 @@ def load_ticker_specs(tickers=None):
             placeholders = ','.join(['%s'] * len(tickers))
             cur.execute(f'''
                 SELECT ticker, min_step, step_price, lot_volume, go
-                FROM shared.ticker_specs
+                FROM futures.ticker_specs
                 WHERE ticker IN ({placeholders})
             ''', list(tickers))
         else:
             cur.execute(
-                'SELECT ticker, min_step, step_price, lot_volume, go FROM shared.ticker_specs'
+                'SELECT ticker, min_step, step_price, lot_volume, go FROM futures.ticker_specs'
             )
         rows = cur.fetchall()
         cur.close()
