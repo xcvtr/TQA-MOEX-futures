@@ -1,5 +1,6 @@
-# Engine для CVD-стратегии на MOEX фьючерсах
-#
-# Не зависит от PG, executor-ов, формата хранения.
-# Вход: bars (OHLCV) + params (словарь)
-# Выход: signal {direction, entry_price, reason, score}
+# CVD strategy
+# prod/ — стабильная версия (paper/live)
+# dev/ — эксперименты
+
+from .prod.engine import run, DEFAULT_PARAMS
+from .prod.lib import load_ticker_specs, get_tick, get_tick_cost, get_go
