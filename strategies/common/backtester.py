@@ -92,7 +92,8 @@ class Backtester:
                        argMax(pr_high,SYSTIME) as hi,
                        argMax(pr_low,SYSTIME) as lo,
                        argMax(pr_close,SYSTIME) as prc,
-                       sum(vol_b) as vb, sum(vol_s) as vs
+                       sum(vol_b) as vb, sum(vol_s) as vs,
+                       argMax(oi_close,SYSTIME) as oi
                 FROM moex.tradestats_fo
                 WHERE asset_code='{asset}' AND SYSTIME >= '{start}'
                 GROUP BY bt ORDER BY bt
