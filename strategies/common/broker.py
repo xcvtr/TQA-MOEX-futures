@@ -89,7 +89,9 @@ class BrokerSim:
         ticks = (exit_px - pos.entry_price) / max(pos.min_step, 0.0001)
         if pos.direction == 'short':
             ticks = -ticks
-        pnl = ticks * pos.step_price * pos.shares - self.commission * pos.shares
+        gross = ticks * pos.step_price * pos.shares
+        commission_total = self.commission * 2 * pos.shares  # entry + exit
+        pnl = gross - commission_total
         pos.pnl = round(pnl, 2)
         pos.exit_reason = reason
         pos.exit_price = exit_px
