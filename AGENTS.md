@@ -104,3 +104,28 @@ checkpoint/                     ← чекпойнты (001-105)
 ```
 git fetch --force && git reset --hard origin/main
 ```
+
+---
+
+## 📝 Как делать чекпойнт (обязательно)
+
+При слове «checkpoint» / «чекпойнт» / «сохрани чекпойнт»:
+
+1. Загрузить **`skill_view(name='checkpoint')`** — скилл в `general/checkpoint`, pinned
+2. `session_search(query="checkpoint", limit=3)` — узнать последний номер NNN
+3. Определить проект по месту разговора (не путать проекты!)
+4. Собрать содержимое: что изменилось, ключевые метрики, таблицы в ASCII box-drawing
+5. Сохранить в ДВА места:
+   - Проект: `<project>/checkpoint/<NNN>-desc.md`
+   - Obsidian: `~/obsidian/Projects/<project-name>/<NNN>-desc.md`
+6. Обновить CHANGELOG.md, AGENTS.md, README.md
+7. `git add <файлы>` + `git commit` + `git push`
+8. Уведомление в Matrix (в канал проекта, не путать комнаты!)
+
+**Важно:**
+- Не `git add -A` — только файлы чекпойнта
+- Не путать номер NNN между проектами
+- Проверить большие файлы (>1MB) перед commit
+- Проверить `.env` в gitignore
+- Полный цикл: чекпойнт → Obsidian → CHANGELOG → git commit/push
+- Если не можешь отправить в Matrix — не отправляй, просто закоммить
