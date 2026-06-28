@@ -1,24 +1,24 @@
 # Changelog
 
-## [112] 2026-06-28
+## [114] 2026-06-28
 ### Added
-- Backtester — загрузка данных из CH + Engine + метрики
-- PaperTrader — циклический раннер, состояние в PG
-- futures.portfolio (17 rows, 7 tickers × 4 strategies)
-- futures.paper_state
+- Portfolio test complete — 7 tickers, 3 strategies, 18 months
+- RiskManager (DD-stop 20%, max 5 concurrent)
+- Commission fix (4 RUB × 2, entry+exit)
 
 ### Changed
-- Полная архитектура: Broker → Executor → Engine → Backtester/PaperTrader
-- config.py — очищен от мусора (TICKER_MAP, BASE_V2_*, CORRELATION_GROUPS)
-- AGENTS.md — актуализирован
-
-### Fixed
-- Executor: overlapping positions (skip if open for ticker)
-- Executor: safeguard inf/nan equity
-- Broker: safeguard min_step=0
+- sizing: pure risk formula int(equity × 10% / GO), no caps
+- contracts=NULL in portfolio (no artificial limits)
+- AGENTS.md updated with final metrics
 
 ### Removed
-- scripts/, configs/, data/, docs/, trading_bot/ → archive
-- public.moex_ticker_specs, futures.strategy_cvd_portfolio (PG)
-- 107 legacy root scripts → archive
-- trailing_tp.py (logic merged into BrokerSim)
+- Churn disabled (WR 58.6% but negative PnL)
+
+## [113] 2026-06-28
+### Added
+- RiskManager, commission fix, contracts cap
+- risk.py, Backtester, PaperTrader
+- Engine: all 4 strategies firing, O(n²)→O(n) price_10
+
+## [112] 2026-06-28
+- Architecture complete: Backtester + PaperTrader, portfolio in PG
