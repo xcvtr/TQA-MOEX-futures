@@ -1,32 +1,9 @@
 """Executor — управление позициями и капиталом."""
-from dataclasses import dataclass
-from typing import Optional
-
-@dataclass
-class Signal:
-    ticker: str
-    direction: str  # 'long' | 'short'
-    entry_price: float
-    reason: str
-    score: float
-    strategy: str  # 'stop_hunt' | 'cvd' | 'churn' | 'lunch_rev'
-
-@dataclass
-class Position:
-    ticker: str
-    direction: str
-    entry_price: float
-    entry_bar: int
-    shares: int
-    strategy: str
-    best_price: float = 0.0
-    trail_activated: bool = False
-    closed: bool = False
-    pnl: float = 0.0
-    exit_reason: str = 'open'
+from strategies.common.broker import Position, BrokerSim
 
 class Executor:
     """Управляет позициями, капиталом, ГО."""
+    
     def __init__(self, initial_capital=100000, risk_pct=0.1, max_leverage=10):
         self.equity = float(initial_capital)
         self.peak = float(initial_capital)
@@ -34,33 +11,70 @@ class Executor:
         self.trades = []
         self.risk_pct = risk_pct
         self.max_leverage = max_leverage
+        self.broker = BrokerSim()
     
-    def process_signal(self, signal: Signal, bar_idx: int, specs: dict, broker):
-        """Открыть позицию по сигналу, если есть капитал."""
-        go = specs.get('go', 0)
-        lot = specs.get('lot', 1)
-        if go <= 0: return
+    def process_signal(self, signal: dict, bar_idx: int, specs: dict):
+        """Открыть позицию по сигналу."""
+        ticker = signal['ticker']
+        direction = signal['direction']
+        price = signal['entry_price']
+        strategy = signal['strategy']
         
+        go = float(specs.get('go', 0))
+        lot = int(specs.get('lot_volume', 1))
+        step_price = float(specs.get('step_price', 1.0))
+        min_step = float(specs.get('min_step', 0.01))
+        
+        if go <= 0:
+            return None
+        
+        # Sizing
         max_sh = int(self.equity * self.risk_pct / go)
-        cv = signal.entry_price * lot
+        cv = price * lot
         max_lev = max(1, int(self.equity * self.max_leverage / cv)) if cv > 0 else 1
         shares = max(1, min(max_sh, max_lev))
         
-        if self.equity > go * shares * 1.2:
-            pos = Position(
-                ticker=signal.ticker, direction=signal.direction,
-                entry_price=signal.entry_price, entry_bar=bar_idx,
-                shares=shares, strategy=signal.strategy
-            )
-            self.positions.append(pos)
-            broker.open_position(pos)
+        # Check margin
+        needed = go * shares * 1.2
+        if self.equity < needed:
+            return None
+        
+        pos = Position(
+            ticker=ticker, direction=direction, entry_price=price,
+            entry_bar=bar_idx, shares=shares, strategy=strategy,
+            go=go, step_price=step_price, min_step=min_step, lot=lot
+        )
+        
+        # Apply slippage
+        entry = self.broker.open_with_slippage(pos, price)
+        pos.entry_price = entry
+        
+        self.positions.append(pos)
+        return pos
     
-    def manage_positions(self, bar, bar_idx, specs, broker):
-        """Trailing TP и timeout для всех открытых позиций."""
+    def update_positions(self, bar_idx: int, hi: float, lo: float, prc: float):
+        """Обновить все открытые позиции (trailing, timeout)."""
+        total_pnl = 0.0
         for p in list(self.positions):
-            if p.closed: continue
-            broker.update_price(p, bar)
+            if p.closed:
+                self.positions.remove(p)
+                continue
+            pnl = self.broker.update(p, bar_idx, hi, lo, prc)
+            if p.closed:
+                self.equity += pnl
+                total_pnl += pnl
+                self.trades.append(p)
+        
+        if self.equity > self.peak:
+            self.peak = self.equity
+        
+        return total_pnl
     
     @property
-    def total_go(self):
-        return sum(p.shares * specs_map.get(p.ticker, {}).get('go', 0) for p in self.positions)
+    def max_dd_pct(self) -> float:
+        if self.peak <= 0: return 0
+        return (self.peak - self.equity) / self.peak * 100
+    
+    @property
+    def total_return_pct(self) -> float:
+        return (self.equity / 100000 - 1) * 100
