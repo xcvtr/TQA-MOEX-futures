@@ -209,7 +209,7 @@ class PaperTrader:
                     continue
                 signal = check_fn(bar_data, ticker, params)
                 if signal:
-                    self.executor.process_signal(signal, int(bar_idx), specs)
+                    self.executor.process_signal(signal, int(bar_idx), specs, bar_data)
 
             # Управление позициями
             self.executor.manage_positions(
@@ -217,6 +217,7 @@ class PaperTrader:
                 float(df['hi'].iloc[-1]),
                 float(df['lo'].iloc[-1]),
                 float(df['prc'].iloc[-1]),
+                float(bar_data.get('vol', 0)),
             )
 
     def run(self, n_ticks: int = None, asset_map: dict = None):

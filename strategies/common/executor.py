@@ -83,11 +83,14 @@ class Executor:
 
     # ── Сигналы ─────────────────────────────────────────────────────
 
-    def process_signal(self, signal, bar_idx, specs):
-        """Создать позицию по сигналу. Вернуть Position или None."""
+    def process_signal(self, signal, bar_idx, specs, bar_data=None):
+        """Создать позицию по сигналу. Вернуть Position или None.
+        
+        bar_data: dict с данными бара (нужен для объёма и slippage).
+        """
         ticker = signal['ticker']
         direction = signal['direction']
-        price = float(signal['entry_price'])
+        raw_price = float(signal['entry_price'])
         strategy = signal['strategy']
 
         self.rm.update(self.equity)
@@ -112,7 +115,7 @@ class Executor:
 
         # Sizing
         max_by_go = int(self.equity * RISK_PCT / float(go))
-        cv = float(price) * lot
+        cv = float(raw_price) * lot
         if cv <= 0 or not np.isfinite(cv) or np.isinf(self.equity) or np.isnan(self.equity):
             return None
 
@@ -123,29 +126,37 @@ class Executor:
 
         shares = max(1, min(max_by_go, max_by_lev))
 
-        # Фиксированные контракты из портфеля (если заданы)
-        max_c = self.get_max_contracts(ticker, strategy)
-        if max_c is not None:
-            shares = min(shares, int(max_c))
+        # Проверка ликвидности (vol — уже в контрактах)
+        if bar_data:
+            vol_contracts = float(bar_data.get('vol', 0))
+            if vol_contracts > 0 and shares / vol_contracts > 0.5:
+                return None
 
         # Проверка ГО
         needed = go * shares * 1.2
         if self.equity < needed:
             return None
 
+        # Вход с проскальзыванием
+        slippage_ticks = 1  # DEFAULT_SLIPPAGE_IN
+        if direction == 'long':
+            entry_price = raw_price + slippage_ticks * min_step
+        else:
+            entry_price = raw_price - slippage_ticks * min_step
+
         trailing_params = self.get_trailing(ticker, strategy)
-        pos = Position(ticker, direction, price, bar_idx, shares, strategy,
+        pos = Position(ticker, direction, entry_price, bar_idx, shares, strategy,
                        go, step_price, min_step, trailing_params)
         self.positions.append(pos)
         return pos
 
-    def manage_positions(self, bar_idx, hi, lo, prc):
+    def manage_positions(self, bar_idx, hi, lo, prc, volume=0):
         """Обновить все открытые позиции через брокера."""
         for p in list(self.positions):
             if p.closed:
                 self.positions.remove(p)
                 continue
-            pnl = self.broker.update(p, bar_idx, hi, lo, prc)
+            pnl = self.broker.update(p, bar_idx, hi, lo, prc, volume)
             if p.closed:
                 if np.isfinite(pnl):
                     self.equity += float(pnl)

@@ -103,7 +103,7 @@ class PortfolioEngine:
                     signal = check_fn(bar, ticker, params)
                     if signal:
                         specs = (ticker_specs or {}).get(ticker, {})
-                        self.executor.process_signal(signal, bar_idx, specs)
+                        self.executor.process_signal(signal, bar_idx, specs, bar)
 
             # Управление позициями
             for ticker, df in bars_dict.items():
@@ -112,6 +112,7 @@ class PortfolioEngine:
                     hi = float(bar.get('hi', bar.get('high', 0)))
                     lo = float(bar.get('lo', bar.get('low', 0)))
                     prc = float(bar.get('prc', bar.get('close', 0)))
-                    self.executor.manage_positions(bar_idx, hi, lo, prc)
+                    vol = float(bar.get('vol', 0))
+                    self.executor.manage_positions(bar_idx, hi, lo, prc, vol)
 
         return self.executor
