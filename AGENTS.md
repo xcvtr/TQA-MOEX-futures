@@ -2,17 +2,15 @@
 
 ## 🏗 PG структура
 
-Одна БД `moex` на 10.0.0.60, схемы по типам инструментов:
+Одна БД `moex` на 10.0.0.60, все данные только в БД:
 
 ```
 moex
-├── futures                    ← фьючерсы (наш проект)
-│   ├── ticker_specs           ← ГО, лотность, шаг цены (64 tickers)
-│   └── strategy_cvd_*         ← CVD (legacy, не используется)
-├── shared
-│   └── calendar               ← макро-календарь (пусто)
-├── stocks / options / bonds   ← когда появятся
-└── public (пусто)
+├── futures
+│   ├── ticker_specs           ← справочник: ГО, лотность, шаг цены (64 tickers)
+│   └── portfolio              ← портфель: тикер × стратегия, параметры, трейлинг
+└── shared
+    └── calendar               ← макро-календарь (пусто)
 ```
 
 ## 📁 Структура проекта
@@ -26,42 +24,33 @@ strategies/
     trailing_tp.py              ← параметры 0.5/0.3/12 bars
 
   stop_hunt/                    ← Stop Hunt (ложные пробои) ✅ prod
-    prod/engine.py (36 tk scan прошел)
+    prod/engine.py
     dev/
-    scripts/
 
   cvd/                          ← CVD (dcvd_z) ✅ prod
-    prod/engine.py, lib.py, paper_trader.py
+    prod/engine.py, lib.py
     dev/
-    scripts/ (analyze_tpsl, scan, wf_*)
 
   churn/                        ← Churn (OI flat + vol surge) ✅ prod
     prod/engine.py
     dev/
-    scripts/
 
   lunch_rev/                    ← Lunch Reversal (13:00 MSK) ✅ prod
     prod/engine.py
     dev/
-    scripts/
 
-  crowd-bias/                   ← исследование (не активна)
-  volume-climax/                ← исследование (не активна)
-  whale-detector/               ← исследование (не активна)
-
-scripts/                        ← общие утилиты и сканеры
-configs/                        ← бэкап конфигов
-checkpoint/                     ← чекпойнты (001-107)
+checkpoint/                     ← чекпойнты (001-108)
 reports/                        ← отчёты сканирования
 ```
 
-## 🧠 Принципы
+## 🗄 Принципы хранения данных
 
-1. **Схема = рынок** (futures), а не стратегия
-2. **Новая стратегия = `strategies/xxx/`**, новый код не трогает старый
-3. **Engine immutable** — эксперименты в dev/
-4. **PG — единый источник конфигов**, хардкода нет
-5. **Trailing TP (0.5%/0.3%) — основной выход**, а не фиксированный TP/SL
+1. **Всё в БД** — конфиги, портфель, состояние. Никаких JSON/YAML на диске.
+2. **`futures.ticker_specs`** — справочник (ГО, лот, шаг цены)
+3. **`futures.portfolio`** — портфель: какие стратегии на каких тикерах, параметры трейлинга
+4. **Trailing TP (0.5%/0.3%) — основной выход**
+5. **Схема = рынок** (futures), а не стратегия
+6. **Новая стратегия = `strategies/xxx/`**, не трогает старый код
 
 ---
 
@@ -86,17 +75,21 @@ bar → [Engine] → strategy.check_signal() → Signal → [Executor] → [Brok
 
 Si solo (Stop Hunt): 100K → **7,248,273 RUB** (+7,148%), MDD 1.28%, Calmar 5,594.
 
-### 🥇 Портфель
+### 🥇 Портфель (в БД `futures.portfolio`)
 
-| Тикер | GO | Контр | ГО | Стратегии |
-|-------|:--:|:-----:|:--:|-----------|
-| GZ (Газпром) | 2,070 | 5 | 10,350 | StopHunt + CVD + Churn |
-| SR (Сбербанк) | 6,620 | 2 | 13,240 | StopHunt + CVD + Churn |
-| NG (Natural Gas) | 8,027 | 2 | 16,054 | StopHunt + Churn |
-| VB (ВТБ) | 1,556 | 5 | 7,780 | StopHunt + Churn |
-| W4 (Пшеница) | 2,255 | 5 | 11,275 | StopHunt + Churn |
+| Тикер | GO | Контр | Стратегии |
+|-------|:--:|:-----:|-----------|
+| GZ (Газпром) | 2,070 | 5 | StopHunt + CVD + Churn |
+| SR (Сбербанк) | 6,620 | 2 | StopHunt + CVD + Churn |
+| NG (Natural Gas) | 8,027 | 2 | StopHunt + Churn |
+| VB (ВТБ) | 1,556 | 5 | StopHunt + Churn |
+| W4 (Пшеница) | 2,255 | 5 | StopHunt + Churn |
+| Si (USDRUB) | 15,252 | авто | StopHunt + CVD + LunchRev |
+| CR (CNYRUB) | — | авто | StopHunt + CVD |
 
 Средняя корреляция портфеля: ~0.001
+
+Параметры стратегий: `futures.portfolio.params` (JSONB)
 
 ### 🔑 Ключевые открытия
 
@@ -119,10 +112,10 @@ Si solo (Stop Hunt): 100K → **7,248,273 RUB** (+7,148%), MDD 1.28%, Calmar 5,5
 
 ## 🔜 Что дальше
 
-1. **Портфельный тест** — одновременный запуск всех 4 стратегий на 5+ тикерах
+1. **Engine + portfolio из PG** — читать `futures.portfolio`, не хардкодить
 2. **BrokerLive** — подключение к Alor API
-3. **Расширение портфеля** — добавить новые тикеры (CR и др.)
-4. **Добавить Stop Loss** для стратегий без трейлинга
+3. **Расширение портфеля** — больше тикеров, веса
+4. **Докер + копия для прода**
 
 ## ⚠️ Force push
 
