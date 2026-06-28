@@ -1,15 +1,56 @@
-# Стратегии MOEX (TQA-MOEX)
+# Portfolio Engine — универсальный loop для всех стратегий
 
-| # | Стратегия | ТФ | WR | Сигналов | Статус |
-|:-:|:----------|:--:|:--:|:--------:|:------|
-| 1 | 🐋 [Whale Detector](whale-detector/README.md) — OI fiz/yur | D1 | **77.8%** | 18/3.3г | ✅ Работает |
-| 2 | 📈 [Volume Climax](volume-climax/README.md) — H4 экстремумы | H4 | **78%** | 50-200/мес | ✅ Работает |
-| 3 | 🎯 [Crowd Bias](crowd-bias/README.md) — против толпы | WIP | 46.4% | — | 🔬 Анализ |
+## Принцип
 
-## Данные
+Один loop по барам. На каждом баре вызывает **все активные стратегии**.
+Каждая стратегия: `check_signal(bar, ticker) → Signal | None`.
 
-- Цены: `moex_prices_5m` (Alor OpenAPI, 59 тикеров)
-- OI: `openinterest_moex` (MOEX ISS futoi, 64 тикера, лаг ~14д)
-- Securities: `moex_securities` (ГО/плечо, ежедневное обновление)
-- Дашборд: http://10.0.0.60:5057/
-- Скрипты: корень проекта (whale_detector.py, moex_equity_dashboard.py и др.)
+```python
+for bar in bars:
+    for strategy in active_strategies:
+        for ticker in strategy.tickers:
+            signal = strategy.check_signal(bar, ticker)
+            if signal:
+                portfolio.process(signal)
+    portfolio.manage_positions(bar)  # trailing TP, timeout
+```
+
+## Структура
+
+```
+strategies/
+  common/
+    engine.py        ← портфельный loop
+    trailing_tp.py   ← общий Trailing TP
+    portfolio.py     ← управление позициями
+
+  stop_hunt/
+    prod/engine.py   ← check_signal() — Stop Hunt логика
+
+  churn/
+    prod/engine.py   ← check_signal() — Churn логика
+
+  lunch_rev/
+    prod/engine.py   ← check_signal() — Lunch Reversal
+
+  cvd/
+    prod/engine.py   ← check_signal() — CVD (уже есть)
+```
+
+Каждый `engine.py`:
+- Не знает про портфель, позиции, капитал
+- Только: `check_signal(bar_data, ticker, params) → Signal | None`
+- Сигнал: `{direction, entry_price, reason, score}`
+
+`common/engine.py`:
+- Читает конфиг портфеля (PG `futures.strategy_portfolio` или CSV)
+- На каждом баре: все стратегии → все тикеры → сигналы → позиции
+- Управляет ГО, реинвестом, пересечением позиций
+- Вызывает `common/trailing_tp.py` для каждой открытой позиции
+
+## Преимущества
+
+1. Новая стратегия = новый `strategies/xxx/prod/engine.py` с `check_signal()`
+2. Портфельный loop не меняется
+3. Trailing TP общий для всех
+4. Конфиг портфеля — одна PG таблица
