@@ -1,6 +1,7 @@
 """Executor — управляет капиталом, позициями, портфелем. Broker снаружи."""
 
 import os
+import numpy as np
 import psycopg2
 from strategies.common.broker import Position, BrokerSim
 
@@ -79,8 +80,13 @@ class Executor:
         """Создать позицию по сигналу. Вернуть Position или None."""
         ticker = signal['ticker']
         direction = signal['direction']
-        price = signal['entry_price']
+        price = float(signal['entry_price'])
         strategy = signal['strategy']
+
+        # Не открывать если уже есть открытая позиция по этому тикеру
+        for p in self.positions:
+            if not p.closed and p.ticker == ticker:
+                return None
 
         go = float(specs.get('go', 0))
         step_price = float(specs.get('step_price', 1.0))
@@ -91,9 +97,14 @@ class Executor:
             return None
 
         # Sizing
-        max_by_go = int(self.equity * RISK_PCT / go)
-        cv = price * lot
-        max_by_lev = max(1, int(self.equity * MAX_LEVERAGE / cv)) if cv > 0 else 1
+        max_by_go = int(self.equity * RISK_PCT / float(go))
+        cv = float(price) * lot
+        if cv <= 0 or not np.isfinite(cv) or np.isinf(self.equity) or np.isnan(self.equity):
+            return None
+        try:
+            max_by_lev = max(1, int(self.equity * MAX_LEVERAGE / cv))
+        except (OverflowError, ValueError):
+            return None
         shares = max(1, min(max_by_go, max_by_lev))
 
         # Проверка ГО
@@ -117,7 +128,11 @@ class Executor:
                 continue
             pnl = self.broker.update(p, bar_idx, hi, lo, prc)
             if p.closed:
-                self.equity += pnl
+                if np.isfinite(pnl):
+                    self.equity += float(pnl)
+                else:
+                    p.closed = False  # откат — пропускаем эту сделку
+                    continue
                 self.trades.append(p)
 
         if self.equity > self.peak:

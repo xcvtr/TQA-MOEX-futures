@@ -86,7 +86,7 @@ class BrokerSim:
         return 0.0
 
     def _close(self, pos: Position, exit_px: float, reason: str) -> float:
-        ticks = (exit_px - pos.entry_price) / pos.min_step
+        ticks = (exit_px - pos.entry_price) / max(pos.min_step, 0.0001)
         if pos.direction == 'short':
             ticks = -ticks
         pnl = ticks * pos.step_price * pos.shares - self.commission * pos.shares
