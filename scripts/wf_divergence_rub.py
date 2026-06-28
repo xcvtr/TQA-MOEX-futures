@@ -75,7 +75,7 @@ for SYM in ['NG', 'BR', 'Si', 'MXI']:
             i += 60; continue
         
         train = df[df['date'].isin(train_dates)].copy()
-        test = df[df['date'].isin(test_dates)].copy()
+        test = df[df['date'].isin(test_dates)].copy().reset_index(drop=True)
         if len(train) < 200 or len(test) < 20:
             i += 60; continue
         

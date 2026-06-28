@@ -1,7 +1,0 @@
-Full scan: order_block on 59 tickers (30d data)
-Generated: 2026-06-08 12:58
-
-Ticker   Sig    WR%     PF      Total
-----------------------------------------
-BR         1      100.0    999.99   1       
-SBERF      1      0.0      0.00     1       

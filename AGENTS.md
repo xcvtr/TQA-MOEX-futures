@@ -19,17 +19,40 @@ moex
 
 ```
 strategies/
-  cvd/                          ← CVD (закрыто — no edge без трейлинга)
+  common/                       ← общая архитектура (Engine → Executor → Broker)
+    engine.py                   ← портфельный loop по барам
+    executor.py                 ← управление позициями, капиталом, ГО
+    broker.py                   ← BrokerSim + BrokerLive (заглушка)
+    trailing_tp.py              ← параметры 0.5/0.3/12 bars
+
+  stop_hunt/                    ← Stop Hunt (ложные пробои) ✅ prod
+    prod/engine.py (36 tk scan прошел)
+    dev/
+    scripts/
+
+  cvd/                          ← CVD (dcvd_z) ✅ prod
     prod/engine.py, lib.py, paper_trader.py
     dev/
     scripts/ (analyze_tpsl, scan, wf_*)
 
-  stop_hunt/                    ← следующая стратегия (не создана)
-  lunch_reversal/               ← следующая (не создана)
+  churn/                        ← Churn (OI flat + vol surge) ✅ prod
+    prod/engine.py
+    dev/
+    scripts/
 
-scripts/                        ← общие утилиты
+  lunch_rev/                    ← Lunch Reversal (13:00 MSK) ✅ prod
+    prod/engine.py
+    dev/
+    scripts/
+
+  crowd-bias/                   ← исследование (не активна)
+  volume-climax/                ← исследование (не активна)
+  whale-detector/               ← исследование (не активна)
+
+scripts/                        ← общие утилиты и сканеры
 configs/                        ← бэкап конфигов
-checkpoint/                     ← чекпойнты (001-105)
+checkpoint/                     ← чекпойнты (001-107)
+reports/                        ← отчёты сканирования
 ```
 
 ## 🧠 Принципы
@@ -42,42 +65,42 @@ checkpoint/                     ← чекпойнты (001-105)
 
 ---
 
-## 📊 РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ (chkpt 105)
+## 📊 РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ (chkpt 107)
 
-### 11 сигналов × Trailing TP
+### Архитектура
 
-Все протестированы на `moex.tradestats_fo`, Oct'24 — Jun'26, с Trailing TP (activation=0.5%, trail=0.3%, max 96 bars).
+Создана и протестирована 3-слойная архитектура:
 
-| # | Сигнал | Тикеры | WR | NetP80 | Статус |
-|---|--------|--------|:--:|:------:|:------:|
-| 1 | **Stop Hunt** (ложные пробои) | GZ/Si/CR | 91/82/82% | +11/+7/+7 | ✅ **Внедрить** |
-| 2 | **Lunch Reversal** (13-14 MSK) | GZ/Si | 87/83% | +10.6/+7.4 | ✅ **Внедрить** |
-| 3 | **CVD** (dcvd_z>0.6) | GZ/Si/CR | 84/76/74% | +9/+6.6/+6 | ✅ **Внедрить** |
-| 4 | Churn (OI flat+vol) | GZ/Si/CR | 85/74/74% | +9.3/+6.4/+5.5 | 🟡 Опционально |
-| 5 | Vol Profile S/R | GZ/Si/CR | 86/83/87% | +8.1/+6.5/+6.3 | 🟡 Опционально |
-| 6 | Disb_z+OI_z Combo | GZ/Si/CR | 72/70/66% | +1.2/+2.4/+1.9 | 🟡 Слабый |
-| 7 | OI Spike new_shorts | GZ/Si/CR | 64/58/56% | −1.2/−1.7/−1.4 | ❌ |
-| 8 | Cross-ticker Si/CR | Si/CR | 59% | — | ❌ Слабый |
-| 9 | FIZ/YUR Divergence | все | ~50% | — | ❌ Нет edge |
-| 10 | HHI + Price Div | — | слишком редко | — | ❌ |
-| 11 | Session: Open Drive | все | 37-50% | — | ❌ Антисигнал |
+```
+bar → [Engine] → strategy.check_signal() → Signal → [Executor] → [Broker]
+```
 
-### 🥇 Портфель (8 стратегий)
+### 4 стратегии × Trailing TP (Si solo)
 
-| № | Тикер | Сигнал | WR | NetP80 | Вес |
-|---|-------|--------|:--:|:------:|:---:|
-| 1 | **GZ** | **Stop Hunt** | **91%** | **+10.95** | 15% |
-| 2 | **GZ** | **Lunch Reversal** | 87% | +10.59 | 15% |
-| 3 | **GZ** | **CVD** | 84% | +9.04 | 15% |
-| 4 | **Si** | **Stop Hunt** | 82% | +7.28 | 15% |
-| 5 | **Si** | **Lunch Reversal** | 83% | +7.39 | 10% |
-| 6 | **Si** | **CVD** | 76% | +6.59 | 10% |
-| 7 | **CR** | **Stop Hunt** | 82% | +6.95 | 10% |
-| 8 | **CR** | **CVD** | 74% | +6.01 | 10% |
+| Стратегия | WR | NetP80 | Статус |
+|-----------|:--:|:------:|:------:|
+| **Stop Hunt** | 82% | +7.28% | ✅ **prod** |
+| **Lunch Reversal** | 83% | +7.39% | ✅ **prod** |
+| **CVD** | 76% | +6.59% | ✅ **prod** |
+| **Churn** | 74% | +6.40% | ✅ **prod** |
+
+Si solo (Stop Hunt): 100K → **7,248,273 RUB** (+7,148%), MDD 1.28%, Calmar 5,594.
+
+### 🥇 Портфель
+
+| Тикер | GO | Контр | ГО | Стратегии |
+|-------|:--:|:-----:|:--:|-----------|
+| GZ (Газпром) | 2,070 | 5 | 10,350 | StopHunt + CVD + Churn |
+| SR (Сбербанк) | 6,620 | 2 | 13,240 | StopHunt + CVD + Churn |
+| NG (Natural Gas) | 8,027 | 2 | 16,054 | StopHunt + Churn |
+| VB (ВТБ) | 1,556 | 5 | 7,780 | StopHunt + Churn |
+| W4 (Пшеница) | 2,255 | 5 | 11,275 | StopHunt + Churn |
+
+Средняя корреляция портфеля: ~0.001
 
 ### 🔑 Ключевые открытия
 
-1. **Trailing TP (0.5/0.3%) — главный edge.** Любой сигнал + трейлинг даёт 75-91% WR. Даже CVD с корреляцией −0.0029.
+1. **Trailing TP (0.5/0.3%) — главный edge.** Любой сигнал + трейлинг даёт 75-91% WR.
 2. **Stop Hunt — лучший entry.** Ложные пробои 20-барового диапазона + retrace 30%.
 3. **Сигнал почти не важен** — трейлинг важнее входа.
 
@@ -85,18 +108,21 @@ checkpoint/                     ← чекпойнты (001-105)
 
 | Файл | Описание |
 |------|----------|
-| `reports/triz_moex_futures_analysis.md` | TRIZ анализ 10 идей |
-| `/home/user/test_all_7_signals.py` | 7 сигналов × Trailing TP |
-| `/home/user/all_7_signals_results.csv` | Полные результаты |
-| `/home/user/stop_hunt_scenarios.py` | Тест сессионных фильтров |
-| `checkpoint/105-triz-ideas-all-tested.md` | Чекпойнт |
+| `reports/scan_stop_hunt.md` | Stop Hunt scan (36 tk) |
+| `reports/scan_cvd.md` | CVD scan (23 tk) |
+| `reports/scan_churn.md` | Churn scan (36 tk) |
+| `reports/scan_lunch_reversal.md` | Lunch scan (28 tk) |
+| `reports/scan_vol_profile.md` | Vol Profile scan |
+| `checkpoint/105-triz-ideas-all-tested.md` | TRIZ анализ 10 идей |
 
-### 🔜 Что дальше
+---
 
-1. Создать `strategies/stop_hunt/` с engine + paper_trader
-2. Создать `strategies/lunch_reversal/` 
-3. Сохранить параметры портфеля в PG
-4. Добавить Trailing TP как общий модуль
+## 🔜 Что дальше
+
+1. **Портфельный тест** — одновременный запуск всех 4 стратегий на 5+ тикерах
+2. **BrokerLive** — подключение к Alor API
+3. **Расширение портфеля** — добавить новые тикеры (CR и др.)
+4. **Добавить Stop Loss** для стратегий без трейлинга
 
 ## ⚠️ Force push
 

@@ -1,8 +1,0 @@
-Full scan: volume_surge on 59 tickers (30d data)
-Generated: 2026-06-08 12:58
-
-Ticker   Sig    WR%     PF      Total
-----------------------------------------
-BM         1      100.0    999.99   2       
-KC         2      50.0     1.21     5       
-HY         1      0.0      0.00     1       
