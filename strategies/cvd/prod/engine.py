@@ -1,72 +1,28 @@
-# Default params for CVD strategy
-# Period=20 bars (100 min), Lookahead=12 bars (60 min), Z=0.6
+"""CVD engine — check_signal() only."""
 import numpy as np
 
-DEFAULT_PARAMS = {
-    'period': 20,
-    'lookahead': 12,
-    'z_threshold': 0.6,
-    'data_source': 'tradestats_fo',
-    'min_signals': 10,
-}
-
-def compute_cvd_z(cvd, period=20):
-    n = len(cvd)
-    z = np.zeros(n)
-    for i in range(period, n):
-        s = cvd[i-period:i]
-        if s.std() > 0:
-            z[i] = (cvd[i] - s.mean()) / s.std()
-    return z
-
-def run(ticker, bars, params=None):
-    """Compute CVD signal for a ticker.
-    
-    Args:
-        ticker: str
-        bars: DataFrame with columns [bt, prc, vb, vs, ...]
-        params: dict with period, lookahead, z_threshold
-    
-    Returns:
-        dict with ticker, direction, entry_price, reason, score
-        or None if no signal
+def check_signal(bar_data: dict, ticker: str, params: dict = None) -> dict:
+    """
+    CVD: Cumulative Volume Delta z-score.
+    LONG:  dcvd_z > 0.6
+    SHORT: dcvd_z < -0.6
     """
     if params is None:
-        params = DEFAULT_PARAMS
+        params = {'period': 20, 'z_threshold': 0.6}
     
-    period = params.get('period', 20)
-    lookahead = params.get('lookahead', 12)
-    z_thresh = params.get('z_threshold', 0.6)
+    dcvd_z = bar_data.get('dcvd_z', 0)
+    prc = bar_data.get('prc', 0)
     
-    n = len(bars)
-    if n < period + lookahead:
+    if np.isnan(dcvd_z):
         return None
     
-    cvd = bars['vb'].values.astype(float) - bars['vs'].values.astype(float)
-    dcvd = np.diff(cvd, prepend=cvd[0])
-    dcvd_z = compute_cvd_z(dcvd, period)
-    
-    price = float(bars['prc'].iloc[-1])
-    last_z = dcvd_z[-1]
-    
-    if np.isnan(last_z):
-        return None
-    
-    if last_z > z_thresh:
-        return {
-            'ticker': ticker,
-            'direction': 'long',
-            'entry_price': price,
-            'reason': f'CVD_z={last_z:.2f} > {z_thresh}',
-            'score': float(last_z),
-        }
-    elif last_z < -z_thresh:
-        return {
-            'ticker': ticker,
-            'direction': 'short',
-            'entry_price': price,
-            'reason': f'CVD_z={last_z:.2f} < -{z_thresh}',
-            'score': float(-last_z),
-        }
+    if dcvd_z > params['z_threshold']:
+        return {'ticker': ticker, 'direction': 'long', 'entry_price': prc,
+                'reason': f'cvd_long_z={dcvd_z:.2f}', 'score': round(float(dcvd_z), 4),
+                'strategy': 'cvd'}
+    elif dcvd_z < -params['z_threshold']:
+        return {'ticker': ticker, 'direction': 'short', 'entry_price': prc,
+                'reason': f'cvd_short_z={dcvd_z:.2f}', 'score': round(float(-dcvd_z), 4),
+                'strategy': 'cvd'}
     
     return None
