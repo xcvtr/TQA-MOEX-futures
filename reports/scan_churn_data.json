@@ -1,0 +1,1649 @@
+{
+  "AF": {
+    "bars": 272674,
+    "signals": 6577,
+    "metrics": {
+      "trades": 6577,
+      "wr": 54.99,
+      "mean_return_pct": 0.0391,
+      "mean_return_rub": 182.3,
+      "total_pnl_rub": 1198992.85,
+      "total_return_pct": 1198.99,
+      "avg_dd": 0.7074,
+      "avg_hold": 9.84,
+      "netp80_rub": 97.85,
+      "sharpe": 3.818,
+      "profit_factor": 2.17,
+      "mdd": 9.72,
+      "avg_qty": 11.1,
+      "final_equity": 1298992.86
+    },
+    "spec": {
+      "asset_code": "AFLT",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "1018.57"
+    }
+  },
+  "AL": {
+    "bars": 262026,
+    "signals": 7342,
+    "metrics": {
+      "trades": 7342,
+      "wr": 51.51,
+      "mean_return_pct": 0.0411,
+      "mean_return_rub": 259.26,
+      "total_pnl_rub": 1903477.37,
+      "total_return_pct": 1903.48,
+      "avg_dd": 0.7749,
+      "avg_hold": 9.84,
+      "netp80_rub": 40.89,
+      "sharpe": 3.041,
+      "profit_factor": 1.887,
+      "mdd": 16.41,
+      "avg_qty": 27.5,
+      "final_equity": 2003477.37
+    },
+    "spec": {
+      "asset_code": "ALRS",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "564.01"
+    }
+  },
+  "AS": {
+    "bars": 57438,
+    "signals": 3549,
+    "metrics": {
+      "trades": 3549,
+      "wr": 28.91,
+      "mean_return_pct": -0.1075,
+      "mean_return_rub": -27.92,
+      "total_pnl_rub": -99090.27,
+      "total_return_pct": -99.09,
+      "avg_dd": 0.9771,
+      "avg_hold": 7.51,
+      "netp80_rub": -632590.24,
+      "sharpe": -0.762,
+      "profit_factor": 1.0,
+      "mdd": 100.0,
+      "avg_qty": 678898.1,
+      "final_equity": 909.73
+    },
+    "spec": {
+      "asset_code": "ASTR",
+      "lot_volume": 1,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "46.01"
+    }
+  },
+  "AU": {
+    "bars": 45436,
+    "signals": 6,
+    "metrics": {
+      "trades": 6,
+      "wr": 66.67,
+      "mean_return_pct": 0.3333,
+      "mean_return_rub": 331.16,
+      "total_pnl_rub": 1986.95,
+      "total_return_pct": 1.99,
+      "avg_dd": 1.0033,
+      "avg_hold": 9.83,
+      "netp80_rub": 93.43,
+      "sharpe": 0.825,
+      "profit_factor": 2.79,
+      "mdd": 0.74,
+      "avg_qty": 1.0,
+      "final_equity": 101986.95
+    },
+    "spec": {
+      "asset_code": "AUDU",
+      "lot_volume": 1000,
+      "min_step": "0.0001",
+      "step_price": "7.70611",
+      "go": "7098.57"
+    }
+  },
+  "BM": {
+    "bars": 164567,
+    "signals": 2106,
+    "metrics": {
+      "trades": 2106,
+      "wr": 49.19,
+      "mean_return_pct": 0.0274,
+      "mean_return_rub": 34.8,
+      "total_pnl_rub": 73298.63,
+      "total_return_pct": 73.3,
+      "avg_dd": 0.489,
+      "avg_hold": 10.19,
+      "netp80_rub": 7.51,
+      "sharpe": 0.866,
+      "profit_factor": 1.317,
+      "mdd": 21.01,
+      "avg_qty": 7.7,
+      "final_equity": 173298.63
+    },
+    "spec": {
+      "asset_code": "BRM",
+      "lot_volume": 1,
+      "min_step": "0.01",
+      "step_price": "0.77061",
+      "go": "1363.13"
+    }
+  },
+  "BR": {
+    "bars": 886854,
+    "signals": 2086,
+    "metrics": {
+      "trades": 2086,
+      "wr": 57.38,
+      "mean_return_pct": 0.078,
+      "mean_return_rub": 189.9,
+      "total_pnl_rub": 396128.29,
+      "total_return_pct": 396.13,
+      "avg_dd": 0.6342,
+      "avg_hold": 9.59,
+      "netp80_rub": 357.59,
+      "sharpe": 2.563,
+      "profit_factor": 1.64,
+      "mdd": 20.04,
+      "avg_qty": 2.0,
+      "final_equity": 496128.29
+    },
+    "spec": {
+      "asset_code": "BR",
+      "lot_volume": 10,
+      "min_step": "0.01",
+      "step_price": "7.70611",
+      "go": "13634.52"
+    }
+  },
+  "CC": {
+    "bars": 132287,
+    "signals": 3695,
+    "metrics": {
+      "trades": 3695,
+      "wr": 55.72,
+      "mean_return_pct": 0.1148,
+      "mean_return_rub": 1190.76,
+      "total_pnl_rub": 4399846.22,
+      "total_return_pct": 4399.85,
+      "avg_dd": 0.6916,
+      "avg_hold": 8.68,
+      "netp80_rub": -2292.16,
+      "sharpe": 1.088,
+      "profit_factor": 1.113,
+      "mdd": 72.76,
+      "avg_qty": 741.3,
+      "final_equity": 4499846.22
+    },
+    "spec": {
+      "asset_code": "COCOA",
+      "lot_volume": 10,
+      "min_step": "0.1",
+      "step_price": "1.0",
+      "go": "654.25"
+    }
+  },
+  "CE": {
+    "bars": 66148,
+    "signals": 3550,
+    "metrics": {
+      "trades": 3550,
+      "wr": 53.27,
+      "mean_return_pct": 0.0759,
+      "mean_return_rub": 362.91,
+      "total_pnl_rub": 1288318.93,
+      "total_return_pct": 1288.32,
+      "avg_dd": 0.41,
+      "avg_hold": 10.44,
+      "netp80_rub": 469.94,
+      "sharpe": 2.024,
+      "profit_factor": 1.234,
+      "mdd": 38.47,
+      "avg_qty": 85.2,
+      "final_equity": 1388318.93
+    },
+    "spec": {
+      "asset_code": "COPPER",
+      "lot_volume": 10,
+      "min_step": "1.0",
+      "step_price": "0.77061",
+      "go": "1351.14"
+    }
+  },
+  "CR": {
+    "bars": 409457,
+    "signals": 4324,
+    "metrics": {
+      "trades": 4324,
+      "wr": 57.75,
+      "mean_return_pct": 1.4862,
+      "mean_return_rub": 6.66080518937443e+27,
+      "total_pnl_rub": 2.8801321638855037e+31,
+      "total_return_pct": 2.8801321638855034e+28,
+      "avg_dd": 1.33,
+      "avg_hold": 9.74,
+      "netp80_rub": 4.840675586866314e+21,
+      "sharpe": 6.358,
+      "profit_factor": 2.396,
+      "mdd": 37.18,
+      "avg_qty": 3.052916482933994e+25,
+      "final_equity": 2.8801321638855033e+31
+    },
+    "spec": {
+      "asset_code": "CNY",
+      "lot_volume": 1000,
+      "min_step": "0.001",
+      "step_price": "1.0",
+      "go": "1301.23"
+    }
+  },
+  "DX": {
+    "bars": 70157,
+    "signals": 1310,
+    "metrics": {
+      "trades": 1310,
+      "wr": 58.55,
+      "mean_return_pct": 0.0423,
+      "mean_return_rub": 55.9,
+      "total_pnl_rub": 73227.89,
+      "total_return_pct": 73.23,
+      "avg_dd": 0.4352,
+      "avg_hold": 10.08,
+      "netp80_rub": 58.68,
+      "sharpe": 2.485,
+      "profit_factor": 2.91,
+      "mdd": 1.69,
+      "avg_qty": 1.0,
+      "final_equity": 173227.89
+    },
+    "spec": {
+      "asset_code": "DAX",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "0.87403",
+      "go": "1807.26"
+    }
+  },
+  "ED": {
+    "bars": 412039,
+    "signals": 5470,
+    "metrics": {
+      "trades": 5470,
+      "wr": 42.05,
+      "mean_return_pct": -0.0211,
+      "mean_return_rub": -12.63,
+      "total_pnl_rub": -69070.92,
+      "total_return_pct": -69.07,
+      "avg_dd": 0.0897,
+      "avg_hold": 11.91,
+      "netp80_rub": -23.41,
+      "sharpe": -1.2,
+      "profit_factor": 0.746,
+      "mdd": 70.43,
+      "avg_qty": 1.0,
+      "final_equity": 30929.08
+    },
+    "spec": {
+      "asset_code": "ED",
+      "lot_volume": 1000,
+      "min_step": "0.0001",
+      "step_price": "7.70611",
+      "go": "6871.88"
+    }
+  },
+  "Eu": {
+    "bars": 437505,
+    "signals": 7010,
+    "metrics": {
+      "trades": 7010,
+      "wr": 58.96,
+      "mean_return_pct": 0.0551,
+      "mean_return_rub": 635.37,
+      "total_pnl_rub": 4453956.37,
+      "total_return_pct": 4453.96,
+      "avg_dd": 0.8844,
+      "avg_hold": 10.59,
+      "netp80_rub": 343.07,
+      "sharpe": 2.537,
+      "profit_factor": 3.944,
+      "mdd": 11.09,
+      "avg_qty": 1.0,
+      "final_equity": 4553956.37
+    },
+    "spec": {
+      "asset_code": "Eu",
+      "lot_volume": 1000,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "15252.32"
+    }
+  },
+  "FF": {
+    "bars": 54578,
+    "signals": 1963,
+    "metrics": {
+      "trades": 1963,
+      "wr": 65.36,
+      "mean_return_pct": 0.0309,
+      "mean_return_rub": 41.4,
+      "total_pnl_rub": 81265.24,
+      "total_return_pct": 81.27,
+      "avg_dd": 0.8596,
+      "avg_hold": 7.52,
+      "netp80_rub": 62.79,
+      "sharpe": 1.393,
+      "profit_factor": 1.272,
+      "mdd": 26.11,
+      "avg_qty": 9.9,
+      "final_equity": 181265.24
+    },
+    "spec": {
+      "asset_code": "TTF",
+      "lot_volume": 1,
+      "min_step": "0.005",
+      "step_price": "0.43701",
+      "go": "1748.01"
+    }
+  },
+  "FV": {
+    "bars": 77153,
+    "signals": 2,
+    "metrics": {
+      "trades": 2,
+      "wr": 100.0,
+      "mean_return_pct": 278.3953,
+      "mean_return_rub": 658809.75,
+      "total_pnl_rub": 1317619.5,
+      "total_return_pct": 1317.62,
+      "avg_dd": 1.0692,
+      "avg_hold": 6.0,
+      "netp80_rub": 0.0,
+      "sharpe": 10.444,
+      "profit_factor": 0.0,
+      "mdd": 0.0,
+      "avg_qty": 25.5,
+      "final_equity": 1417619.5
+    },
+    "spec": {
+      "asset_code": "FV",
+      "lot_volume": 1,
+      "min_step": "0.01",
+      "step_price": "1.0",
+      "go": "1000.0"
+    }
+  },
+  "GD": {
+    "bars": 564150,
+    "signals": 3269,
+    "metrics": {
+      "trades": 3269,
+      "wr": 60.2,
+      "mean_return_pct": 0.4331,
+      "mean_return_rub": 26613849.69,
+      "total_pnl_rub": 87000674639.75,
+      "total_return_pct": 87000674.64,
+      "avg_dd": 0.6378,
+      "avg_hold": 10.39,
+      "netp80_rub": 81454.49,
+      "sharpe": 4.085,
+      "profit_factor": 5.678,
+      "mdd": 38.62,
+      "avg_qty": 7014.0,
+      "final_equity": 87000774639.75
+    },
+    "spec": {
+      "asset_code": "GOLD",
+      "lot_volume": 1,
+      "min_step": "0.1",
+      "step_price": "7.70611",
+      "go": "32138.47"
+    }
+  },
+  "GK": {
+    "bars": 276733,
+    "signals": 7374,
+    "metrics": {
+      "trades": 7374,
+      "wr": 27.79,
+      "mean_return_pct": 0.4021,
+      "mean_return_rub": 52241263.35,
+      "total_pnl_rub": 385227075977.17,
+      "total_return_pct": 385227075.98,
+      "avg_dd": 0.8321,
+      "avg_hold": 9.51,
+      "netp80_rub": -15050218844.43,
+      "sharpe": 0.422,
+      "profit_factor": 1.002,
+      "mdd": 99.69,
+      "avg_qty": 3893085318.6,
+      "final_equity": 385227175977.16
+    },
+    "spec": {
+      "asset_code": "GMKN",
+      "lot_volume": 10,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "240.88"
+    }
+  },
+  "GL": {
+    "bars": 344367,
+    "signals": 5100,
+    "metrics": {
+      "trades": 5100,
+      "wr": 45.88,
+      "mean_return_pct": -0.0429,
+      "mean_return_rub": -17.49,
+      "total_pnl_rub": -89197.21,
+      "total_return_pct": -89.2,
+      "avg_dd": 0.3132,
+      "avg_hold": 11.44,
+      "netp80_rub": -29.3,
+      "sharpe": -1.833,
+      "profit_factor": 0.625,
+      "mdd": 90.91,
+      "avg_qty": 3.4,
+      "final_equity": 10802.79
+    },
+    "spec": {
+      "asset_code": "GLDRUBTOM",
+      "lot_volume": 1,
+      "min_step": "0.1",
+      "step_price": "0.1",
+      "go": "1123.66"
+    }
+  },
+  "GZ": {
+    "bars": 475363,
+    "signals": 5528,
+    "metrics": {
+      "trades": 5528,
+      "wr": 66.68,
+      "mean_return_pct": 0.3041,
+      "mean_return_rub": 308791507.29,
+      "total_pnl_rub": 1706999452295.9,
+      "total_return_pct": 1706999452.3,
+      "avg_dd": 2.3819,
+      "avg_hold": 8.89,
+      "netp80_rub": 33654374.83,
+      "sharpe": 7.004,
+      "profit_factor": 9.003,
+      "mdd": 20.36,
+      "avg_qty": 784241.1,
+      "final_equity": 1706999552295.9
+    },
+    "spec": {
+      "asset_code": "GAZR",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "2070.08"
+    }
+  },
+  "HS": {
+    "bars": 136857,
+    "signals": 2718,
+    "metrics": {
+      "trades": 2718,
+      "wr": 44.11,
+      "mean_return_pct": 0.0025,
+      "mean_return_rub": 2.55,
+      "total_pnl_rub": 6920.46,
+      "total_return_pct": 6.92,
+      "avg_dd": 0.375,
+      "avg_hold": 10.37,
+      "netp80_rub": 1.99,
+      "sharpe": 1.428,
+      "profit_factor": 1.475,
+      "mdd": 2.86,
+      "avg_qty": 1.0,
+      "final_equity": 106920.46
+    },
+    "spec": {
+      "asset_code": "HANG",
+      "lot_volume": 1000,
+      "min_step": "1.0",
+      "step_price": "0.09826",
+      "go": "237.0"
+    }
+  },
+  "HY": {
+    "bars": 155953,
+    "signals": 3258,
+    "metrics": {
+      "trades": 3258,
+      "wr": 56.35,
+      "mean_return_pct": 0.0192,
+      "mean_return_rub": 26.68,
+      "total_pnl_rub": 86913.46,
+      "total_return_pct": 86.91,
+      "avg_dd": 0.8016,
+      "avg_hold": 9.68,
+      "netp80_rub": 21.56,
+      "sharpe": 4.161,
+      "profit_factor": 2.819,
+      "mdd": 1.2,
+      "avg_qty": 1.0,
+      "final_equity": 186913.45
+    },
+    "spec": {
+      "asset_code": "HYDR",
+      "lot_volume": 10000,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "665.78"
+    }
+  },
+  "IB": {
+    "bars": 72512,
+    "signals": 5045,
+    "metrics": {
+      "trades": 5045,
+      "wr": 45.91,
+      "mean_return_pct": 0.0574,
+      "mean_return_rub": 297.11,
+      "total_pnl_rub": 1498943.99,
+      "total_return_pct": 1498.94,
+      "avg_dd": 0.5625,
+      "avg_hold": 10.24,
+      "netp80_rub": -1760.45,
+      "sharpe": 1.295,
+      "profit_factor": 1.079,
+      "mdd": 81.87,
+      "avg_qty": 311.5,
+      "final_equity": 1598943.99
+    },
+    "spec": {
+      "asset_code": "IBIT",
+      "lot_volume": 1,
+      "min_step": "0.01",
+      "step_price": "0.77061",
+      "go": "796.93"
+    }
+  },
+  "IP": {
+    "bars": 10419,
+    "signals": 119,
+    "metrics": {
+      "trades": 119,
+      "wr": 63.87,
+      "mean_return_pct": 1.0689,
+      "mean_return_rub": 2072.92,
+      "total_pnl_rub": 246677.12,
+      "total_return_pct": 246.68,
+      "avg_dd": 1.431,
+      "avg_hold": 4.99,
+      "netp80_rub": 5517.8,
+      "sharpe": 5.988,
+      "profit_factor": 4.243,
+      "mdd": 5.67,
+      "avg_qty": 227.7,
+      "final_equity": 346677.12
+    },
+    "spec": {
+      "asset_code": "IPO",
+      "lot_volume": 1,
+      "min_step": "0.5",
+      "step_price": "0.5",
+      "go": "95.52"
+    }
+  },
+  "KC": {
+    "bars": 73732,
+    "signals": 3619,
+    "metrics": {
+      "trades": 3619,
+      "wr": 49.18,
+      "mean_return_pct": 0.2004,
+      "mean_return_rub": 28992.36,
+      "total_pnl_rub": 104923362.52,
+      "total_return_pct": 104923.36,
+      "avg_dd": 0.5479,
+      "avg_hold": 9.01,
+      "netp80_rub": -752969.57,
+      "sharpe": 2.503,
+      "profit_factor": 1.023,
+      "mdd": 94.83,
+      "avg_qty": 187283.6,
+      "final_equity": 105023362.52
+    },
+    "spec": {
+      "asset_code": "COFFEE",
+      "lot_volume": 10,
+      "min_step": "0.001",
+      "step_price": "0.77061",
+      "go": "279.56"
+    }
+  },
+  "LK": {
+    "bars": 324299,
+    "signals": 7414,
+    "metrics": {
+      "trades": 7414,
+      "wr": 59.87,
+      "mean_return_pct": 0.3212,
+      "mean_return_rub": 180695546019.03,
+      "total_pnl_rub": 1339676778185052.5,
+      "total_return_pct": 1339676778185.05,
+      "avg_dd": 0.549,
+      "avg_hold": 10.35,
+      "netp80_rub": 69570823797.53,
+      "sharpe": 4.557,
+      "profit_factor": 2.629,
+      "mdd": 14.97,
+      "avg_qty": 1134427157.0,
+      "final_equity": 1339676778285053.0
+    },
+    "spec": {
+      "asset_code": "LKOH",
+      "lot_volume": 10,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "8930.79"
+    }
+  },
+  "MC": {
+    "bars": 119416,
+    "signals": 5776,
+    "metrics": {
+      "trades": 5776,
+      "wr": 60.68,
+      "mean_return_pct": 0.0124,
+      "mean_return_rub": 18.08,
+      "total_pnl_rub": 104415.23,
+      "total_return_pct": 104.42,
+      "avg_dd": 0.5642,
+      "avg_hold": 9.41,
+      "netp80_rub": 14.0,
+      "sharpe": 2.448,
+      "profit_factor": 1.585,
+      "mdd": 2.98,
+      "avg_qty": 1.6,
+      "final_equity": 204415.23
+    },
+    "spec": {
+      "asset_code": "MTLR",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "2045.89"
+    }
+  },
+  "ME": {
+    "bars": 232413,
+    "signals": 6210,
+    "metrics": {
+      "trades": 6210,
+      "wr": 57.65,
+      "mean_return_pct": 0.0379,
+      "mean_return_rub": 151.63,
+      "total_pnl_rub": 941648.09,
+      "total_return_pct": 941.65,
+      "avg_dd": 0.6112,
+      "avg_hold": 10.4,
+      "netp80_rub": 110.83,
+      "sharpe": 3.986,
+      "profit_factor": 2.741,
+      "mdd": 4.11,
+      "avg_qty": 2.6,
+      "final_equity": 1041648.09
+    },
+    "spec": {
+      "asset_code": "MOEX",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "3094.63"
+    }
+  },
+  "MG": {
+    "bars": 150259,
+    "signals": 5020,
+    "metrics": {
+      "trades": 5020,
+      "wr": 59.84,
+      "mean_return_pct": 0.0404,
+      "mean_return_rub": 130.24,
+      "total_pnl_rub": 653816.71,
+      "total_return_pct": 653.82,
+      "avg_dd": 0.6927,
+      "avg_hold": 9.83,
+      "netp80_rub": 81.6,
+      "sharpe": 3.693,
+      "profit_factor": 2.687,
+      "mdd": 3.83,
+      "avg_qty": 1.0,
+      "final_equity": 753816.71
+    },
+    "spec": {
+      "asset_code": "MAGN",
+      "lot_volume": 1000,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "3439.8"
+    }
+  },
+  "MM": {
+    "bars": 439626,
+    "signals": 3857,
+    "metrics": {
+      "trades": 3857,
+      "wr": 59.32,
+      "mean_return_pct": 1.3534,
+      "mean_return_rub": 4.994243043852937e+22,
+      "total_pnl_rub": 1.926279542014078e+26,
+      "total_return_pct": 1.9262795420140783e+23,
+      "avg_dd": 1.3105,
+      "avg_hold": 10.52,
+      "netp80_rub": 4.746805851012155e+16,
+      "sharpe": 5.357,
+      "profit_factor": 8.328,
+      "mdd": 47.58,
+      "avg_qty": 8.471043214406086e+19,
+      "final_equity": 1.9262795420140782e+26
+    },
+    "spec": {
+      "asset_code": "MXI",
+      "lot_volume": 1,
+      "min_step": "0.05",
+      "step_price": "0.5",
+      "go": "3093.15"
+    }
+  },
+  "MX": {
+    "bars": 391827,
+    "signals": 4553,
+    "metrics": {
+      "trades": 4553,
+      "wr": 54.62,
+      "mean_return_pct": 0.5715,
+      "mean_return_rub": 1264559609517.54,
+      "total_pnl_rub": 5757539902133373.0,
+      "total_return_pct": 5757539902133.37,
+      "avg_dd": 0.7503,
+      "avg_hold": 10.98,
+      "netp80_rub": 11583099487.2,
+      "sharpe": 3.904,
+      "profit_factor": 7.427,
+      "mdd": 49.29,
+      "avg_qty": 606262559.2,
+      "final_equity": 5757539902233371.0
+    },
+    "spec": {
+      "asset_code": "MIX",
+      "lot_volume": 1,
+      "min_step": "25.0",
+      "step_price": "25.0",
+      "go": "30885.68"
+    }
+  },
+  "MY": {
+    "bars": 21499,
+    "signals": 472,
+    "metrics": {
+      "trades": 472,
+      "wr": 69.7,
+      "mean_return_pct": 0.3177,
+      "mean_return_rub": 712.25,
+      "total_pnl_rub": 336183.3,
+      "total_return_pct": 336.18,
+      "avg_dd": 0.7078,
+      "avg_hold": 8.69,
+      "netp80_rub": 1269.1,
+      "sharpe": 4.964,
+      "profit_factor": 2.435,
+      "mdd": 6.94,
+      "avg_qty": 14.4,
+      "final_equity": 436183.3
+    },
+    "spec": {
+      "asset_code": "MOEXCNY",
+      "lot_volume": 1,
+      "min_step": "0.1",
+      "step_price": "1.14872",
+      "go": "1492.58"
+    }
+  },
+  "NA": {
+    "bars": 329417,
+    "signals": 4800,
+    "metrics": {
+      "trades": 4800,
+      "wr": 50.04,
+      "mean_return_pct": 0.0088,
+      "mean_return_rub": 10.44,
+      "total_pnl_rub": 50130.38,
+      "total_return_pct": 50.13,
+      "avg_dd": 0.2816,
+      "avg_hold": 11.21,
+      "netp80_rub": 8.95,
+      "sharpe": 0.534,
+      "profit_factor": 1.406,
+      "mdd": 8.35,
+      "avg_qty": 1.0,
+      "final_equity": 150130.38
+    },
+    "spec": {
+      "asset_code": "NASD",
+      "lot_volume": 41,
+      "min_step": "1.0",
+      "step_price": "0.77061",
+      "go": "3068.34"
+    }
+  },
+  "NG": {
+    "bars": 838767,
+    "signals": 2181,
+    "metrics": {
+      "trades": 2181,
+      "wr": 56.58,
+      "mean_return_pct": 0.2682,
+      "mean_return_rub": 12212.6,
+      "total_pnl_rub": 26635683.27,
+      "total_return_pct": 26635.68,
+      "avg_dd": 1.0774,
+      "avg_hold": 9.07,
+      "netp80_rub": -2036.96,
+      "sharpe": 2.743,
+      "profit_factor": 1.487,
+      "mdd": 47.3,
+      "avg_qty": 237.9,
+      "final_equity": 26735683.27
+    },
+    "spec": {
+      "asset_code": "NG",
+      "lot_volume": 100,
+      "min_step": "0.001",
+      "step_price": "7.70611",
+      "go": "8126.38"
+    }
+  },
+  "NM": {
+    "bars": 204321,
+    "signals": 6997,
+    "metrics": {
+      "trades": 6997,
+      "wr": 57.98,
+      "mean_return_pct": 0.0378,
+      "mean_return_rub": 185.58,
+      "total_pnl_rub": 1298492.18,
+      "total_return_pct": 1298.49,
+      "avg_dd": 0.7079,
+      "avg_hold": 9.95,
+      "netp80_rub": 137.92,
+      "sharpe": 3.813,
+      "profit_factor": 2.343,
+      "mdd": 6.64,
+      "avg_qty": 6.1,
+      "final_equity": 1398492.18
+    },
+    "spec": {
+      "asset_code": "NLMK",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "1134.65"
+    }
+  },
+  "NR": {
+    "bars": 219570,
+    "signals": 2720,
+    "metrics": {
+      "trades": 2720,
+      "wr": 7.57,
+      "mean_return_pct": -0.3906,
+      "mean_return_rub": -37.09,
+      "total_pnl_rub": -100876.05,
+      "total_return_pct": -100.88,
+      "avg_dd": 1.1571,
+      "avg_hold": 9.18,
+      "netp80_rub": -169.81,
+      "sharpe": -2.002,
+      "profit_factor": 0.694,
+      "mdd": 100.56,
+      "avg_qty": 28.3,
+      "final_equity": -876.05
+    },
+    "spec": {
+      "asset_code": "NGM",
+      "lot_volume": 1,
+      "min_step": "0.001",
+      "step_price": "0.07706",
+      "go": "81.66"
+    }
+  },
+  "OJ": {
+    "bars": 41611,
+    "signals": 1985,
+    "metrics": {
+      "trades": 1985,
+      "wr": 69.87,
+      "mean_return_pct": 0.2283,
+      "mean_return_rub": 3791.49,
+      "total_pnl_rub": 7526109.72,
+      "total_return_pct": 7526.11,
+      "avg_dd": 0.7857,
+      "avg_hold": 7.18,
+      "netp80_rub": 5767.84,
+      "sharpe": 2.572,
+      "profit_factor": 1.656,
+      "mdd": 33.2,
+      "avg_qty": 135.7,
+      "final_equity": 7626109.72
+    },
+    "spec": {
+      "asset_code": "ORANGE",
+      "lot_volume": 100,
+      "min_step": "0.001",
+      "step_price": "7.70611",
+      "go": "1770.04"
+    }
+  },
+  "PD": {
+    "bars": 258354,
+    "signals": 3957,
+    "metrics": {
+      "trades": 3957,
+      "wr": 60.15,
+      "mean_return_pct": 0.1906,
+      "mean_return_rub": 3308.54,
+      "total_pnl_rub": 13091876.97,
+      "total_return_pct": 13091.88,
+      "avg_dd": 0.7246,
+      "avg_hold": 9.48,
+      "netp80_rub": 2946.39,
+      "sharpe": 0.655,
+      "profit_factor": 2.274,
+      "mdd": 82.65,
+      "avg_qty": 7.6,
+      "final_equity": 13191876.97
+    },
+    "spec": {
+      "asset_code": "PLD",
+      "lot_volume": 1,
+      "min_step": "0.01",
+      "step_price": "0.77061",
+      "go": "23995.6"
+    }
+  },
+  "PS": {
+    "bars": 100369,
+    "signals": 4757,
+    "metrics": {
+      "trades": 4757,
+      "wr": 41.01,
+      "mean_return_pct": 0.4257,
+      "mean_return_rub": 7182330896.03,
+      "total_pnl_rub": 34166348072391.16,
+      "total_return_pct": 34166348072.39,
+      "avg_dd": 0.9858,
+      "avg_hold": 8.45,
+      "netp80_rub": -158034776912.6,
+      "sharpe": 4.37,
+      "profit_factor": 1.052,
+      "mdd": 87.01,
+      "avg_qty": 22160676662.6,
+      "final_equity": 34166348172390.99
+    },
+    "spec": {
+      "asset_code": "POSI",
+      "lot_volume": 1,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "271.32"
+    }
+  },
+  "PT": {
+    "bars": 324713,
+    "signals": 3495,
+    "metrics": {
+      "trades": 3495,
+      "wr": 59.8,
+      "mean_return_pct": 0.1753,
+      "mean_return_rub": 10359.89,
+      "total_pnl_rub": 36207814.26,
+      "total_return_pct": 36207.81,
+      "avg_dd": 0.7808,
+      "avg_hold": 9.6,
+      "netp80_rub": 528.3,
+      "sharpe": 2.431,
+      "profit_factor": 5.123,
+      "mdd": 52.93,
+      "avg_qty": 7.2,
+      "final_equity": 36307814.26
+    },
+    "spec": {
+      "asset_code": "PLT",
+      "lot_volume": 1,
+      "min_step": "0.1",
+      "step_price": "7.70611",
+      "go": "28083.77"
+    }
+  },
+  "RB": {
+    "bars": 133713,
+    "signals": 7241,
+    "metrics": {
+      "trades": 7241,
+      "wr": 46.58,
+      "mean_return_pct": 0.444,
+      "mean_return_rub": 748077091752208.9,
+      "total_pnl_rub": 5.416826221377745e+18,
+      "total_return_pct": 5416826221377744.0,
+      "avg_dd": 0.5511,
+      "avg_hold": 10.16,
+      "netp80_rub": -145426852046.25,
+      "sharpe": 6.22,
+      "profit_factor": 5.863,
+      "mdd": 13.69,
+      "avg_qty": 9857727965591.9,
+      "final_equity": 5.416826221377844e+18
+    },
+    "spec": {
+      "asset_code": "RGBI",
+      "lot_volume": 1,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "1357.58"
+    }
+  },
+  "RI": {
+    "bars": 469407,
+    "signals": 3355,
+    "metrics": {
+      "trades": 3355,
+      "wr": 53.68,
+      "mean_return_pct": 0.0749,
+      "mean_return_rub": 94.14,
+      "total_pnl_rub": 315830.08,
+      "total_return_pct": 315.83,
+      "avg_dd": 0.3484,
+      "avg_hold": 10.9,
+      "netp80_rub": 132.06,
+      "sharpe": 0.417,
+      "profit_factor": 1.366,
+      "mdd": 76.28,
+      "avg_qty": 1.0,
+      "final_equity": 415830.08
+    },
+    "spec": {
+      "asset_code": "RTS",
+      "lot_volume": 1,
+      "min_step": "10.0",
+      "step_price": "15.41222",
+      "go": "23568.88"
+    }
+  },
+  "RM": {
+    "bars": 276275,
+    "signals": 3355,
+    "metrics": {
+      "trades": 3355,
+      "wr": 45.1,
+      "mean_return_pct": -0.0059,
+      "mean_return_rub": -6.75,
+      "total_pnl_rub": -22652.59,
+      "total_return_pct": -22.65,
+      "avg_dd": 0.3345,
+      "avg_hold": 10.92,
+      "netp80_rub": -73.29,
+      "sharpe": -0.149,
+      "profit_factor": 0.955,
+      "mdd": 63.8,
+      "avg_qty": 4.8,
+      "final_equity": 77347.41
+    },
+    "spec": {
+      "asset_code": "RTSM",
+      "lot_volume": 1,
+      "min_step": "0.5",
+      "step_price": "7.70611",
+      "go": "2193.72"
+    }
+  },
+  "RN": {
+    "bars": 279304,
+    "signals": 6778,
+    "metrics": {
+      "trades": 6778,
+      "wr": 61.88,
+      "mean_return_pct": 0.1104,
+      "mean_return_rub": 24755.95,
+      "total_pnl_rub": 167795841.59,
+      "total_return_pct": 167795.84,
+      "avg_dd": 1.178,
+      "avg_hold": 9.91,
+      "netp80_rub": 30258.65,
+      "sharpe": 4.381,
+      "profit_factor": 2.817,
+      "mdd": 8.2,
+      "avg_qty": 169.1,
+      "final_equity": 167895841.58
+    },
+    "spec": {
+      "asset_code": "ROSN",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "7512.35"
+    }
+  },
+  "S0": {
+    "bars": 35517,
+    "signals": 1719,
+    "metrics": {
+      "trades": 1719,
+      "wr": 43.69,
+      "mean_return_pct": 0.6038,
+      "mean_return_rub": 1346144.34,
+      "total_pnl_rub": 2314022124.65,
+      "total_return_pct": 2314022.12,
+      "avg_dd": 1.003,
+      "avg_hold": 7.88,
+      "netp80_rub": -2674313.89,
+      "sharpe": 5.093,
+      "profit_factor": 1.296,
+      "mdd": 56.23,
+      "avg_qty": 940117.0,
+      "final_equity": 2314122124.65
+    },
+    "spec": {
+      "asset_code": "SOFL",
+      "lot_volume": 10,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "149.48"
+    }
+  },
+  "SE": {
+    "bars": 61291,
+    "signals": 4068,
+    "metrics": {
+      "trades": 4068,
+      "wr": 52.75,
+      "mean_return_pct": 0.055,
+      "mean_return_rub": 183.26,
+      "total_pnl_rub": 745487.2,
+      "total_return_pct": 745.49,
+      "avg_dd": 0.8852,
+      "avg_hold": 8.53,
+      "netp80_rub": -107.25,
+      "sharpe": 1.236,
+      "profit_factor": 1.486,
+      "mdd": 74.61,
+      "avg_qty": 41.5,
+      "final_equity": 845487.2
+    },
+    "spec": {
+      "asset_code": "SPBE",
+      "lot_volume": 10,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "639.5"
+    }
+  },
+  "SF": {
+    "bars": 436438,
+    "signals": 4711,
+    "metrics": {
+      "trades": 4711,
+      "wr": 55.27,
+      "mean_return_pct": 0.0525,
+      "mean_return_rub": 221.34,
+      "total_pnl_rub": 1042721.75,
+      "total_return_pct": 1042.72,
+      "avg_dd": 0.2394,
+      "avg_hold": 10.9,
+      "netp80_rub": 380.75,
+      "sharpe": 2.005,
+      "profit_factor": 2.184,
+      "mdd": 9.43,
+      "avg_qty": 3.7,
+      "final_equity": 1142721.75
+    },
+    "spec": {
+      "asset_code": "SPYF",
+      "lot_volume": 1,
+      "min_step": "0.01",
+      "step_price": "0.77061",
+      "go": "7712.02"
+    }
+  },
+  "SN": {
+    "bars": 211852,
+    "signals": 5398,
+    "metrics": {
+      "trades": 5398,
+      "wr": 60.17,
+      "mean_return_pct": 0.0408,
+      "mean_return_rub": 146.78,
+      "total_pnl_rub": 792298.02,
+      "total_return_pct": 792.3,
+      "avg_dd": 0.8412,
+      "avg_hold": 10.03,
+      "netp80_rub": 70.0,
+      "sharpe": 3.203,
+      "profit_factor": 3.115,
+      "mdd": 8.46,
+      "avg_qty": 1.0,
+      "final_equity": 892298.02
+    },
+    "spec": {
+      "asset_code": "SNGR",
+      "lot_volume": 1000,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "3537.24"
+    }
+  },
+  "SP": {
+    "bars": 261642,
+    "signals": 4982,
+    "metrics": {
+      "trades": 4982,
+      "wr": 60.82,
+      "mean_return_pct": 0.0804,
+      "mean_return_rub": 1066.15,
+      "total_pnl_rub": 5311577.79,
+      "total_return_pct": 5311.58,
+      "avg_dd": 0.8485,
+      "avg_hold": 10.25,
+      "netp80_rub": 1016.93,
+      "sharpe": 5.808,
+      "profit_factor": 4.956,
+      "mdd": 2.04,
+      "avg_qty": 4.5,
+      "final_equity": 5411577.79
+    },
+    "spec": {
+      "asset_code": "SBPR",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "6120.65"
+    }
+  },
+  "SR": {
+    "bars": 476132,
+    "signals": 6245,
+    "metrics": {
+      "trades": 6245,
+      "wr": 57.76,
+      "mean_return_pct": 0.0562,
+      "mean_return_rub": 511.86,
+      "total_pnl_rub": 3196568.46,
+      "total_return_pct": 3196.57,
+      "avg_dd": 0.5802,
+      "avg_hold": 10.41,
+      "netp80_rub": 553.6,
+      "sharpe": 4.417,
+      "profit_factor": 3.082,
+      "mdd": 8.57,
+      "avg_qty": 5.5,
+      "final_equity": 3296568.46
+    },
+    "spec": {
+      "asset_code": "SBRF",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "6105.46"
+    }
+  },
+  "SS": {
+    "bars": 151975,
+    "signals": 6715,
+    "metrics": {
+      "trades": 6715,
+      "wr": 27.06,
+      "mean_return_pct": 0.2625,
+      "mean_return_rub": 193987113.5,
+      "total_pnl_rub": 1302623467136.92,
+      "total_return_pct": 1302623467.14,
+      "avg_dd": 0.877,
+      "avg_hold": 8.48,
+      "netp80_rub": -345771214538.14,
+      "sharpe": 2.138,
+      "profit_factor": 1.0,
+      "mdd": 99.95,
+      "avg_qty": 104538804252.6,
+      "final_equity": 1302623567136.11
+    },
+    "spec": {
+      "asset_code": "SMLT",
+      "lot_volume": 1,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "147.2"
+    }
+  },
+  "SV": {
+    "bars": 565006,
+    "signals": 3010,
+    "metrics": {
+      "trades": 3010,
+      "wr": 61.96,
+      "mean_return_pct": 0.3993,
+      "mean_return_rub": 4067206.88,
+      "total_pnl_rub": 12242292697.68,
+      "total_return_pct": 12242292.7,
+      "avg_dd": 1.2442,
+      "avg_hold": 9.21,
+      "netp80_rub": 6124.03,
+      "sharpe": 4.597,
+      "profit_factor": 7.64,
+      "mdd": 32.41,
+      "avg_qty": 2191.1,
+      "final_equity": 12242392697.68
+    },
+    "spec": {
+      "asset_code": "SILV",
+      "lot_volume": 10,
+      "min_step": "0.01",
+      "step_price": "7.70611",
+      "go": "11138.6"
+    }
+  },
+  "Si": {
+    "bars": 726972,
+    "signals": 4852,
+    "metrics": {
+      "trades": 4852,
+      "wr": 65.23,
+      "mean_return_pct": 0.0941,
+      "mean_return_rub": 1863.97,
+      "total_pnl_rub": 9043994.53,
+      "total_return_pct": 9043.99,
+      "avg_dd": 1.6215,
+      "avg_hold": 9.76,
+      "netp80_rub": 4899.03,
+      "sharpe": 3.29,
+      "profit_factor": 6.081,
+      "mdd": 6.66,
+      "avg_qty": 1.0,
+      "final_equity": 9143994.53
+    },
+    "spec": {
+      "asset_code": "Si",
+      "lot_volume": 1000,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "13283.67"
+    }
+  },
+  "TI": {
+    "bars": 104420,
+    "signals": 1810,
+    "metrics": {
+      "trades": 1810,
+      "wr": 62.65,
+      "mean_return_pct": 8.2549,
+      "mean_return_rub": -4.037418395055714e+20,
+      "total_pnl_rub": -7.307727295050841e+23,
+      "total_return_pct": -7.307727295050841e+20,
+      "avg_dd": 0.9469,
+      "avg_hold": 9.67,
+      "netp80_rub": 94310.9,
+      "sharpe": 1.254,
+      "profit_factor": 0.071,
+      "mdd": 1405.06,
+      "avg_qty": 4850233357345197.0,
+      "final_equity": -7.307727295050841e+23
+    },
+    "spec": {
+      "asset_code": "TI",
+      "lot_volume": 1,
+      "min_step": "0.01",
+      "step_price": "1.0",
+      "go": "1000.0"
+    }
+  },
+  "TN": {
+    "bars": 105811,
+    "signals": 5266,
+    "metrics": {
+      "trades": 5266,
+      "wr": 34.2,
+      "mean_return_pct": 3.5119,
+      "mean_return_rub": 2.339314189960518e+16,
+      "total_pnl_rub": 1.2318828524332088e+20,
+      "total_return_pct": 1.231882852433208e+17,
+      "avg_dd": 1.138,
+      "avg_hold": 9.57,
+      "netp80_rub": -1.0179120878400848e+16,
+      "sharpe": 0.502,
+      "profit_factor": 2.142,
+      "mdd": 75.63,
+      "avg_qty": 2885941012677895.5,
+      "final_equity": 1.2318828524332091e+20
+    },
+    "spec": {
+      "asset_code": "TRNF",
+      "lot_volume": 1,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "283.28"
+    }
+  },
+  "TT": {
+    "bars": 191815,
+    "signals": 4762,
+    "metrics": {
+      "trades": 4762,
+      "wr": 59.87,
+      "mean_return_pct": 0.0453,
+      "mean_return_rub": 158.1,
+      "total_pnl_rub": 752872.11,
+      "total_return_pct": 752.87,
+      "avg_dd": 0.5581,
+      "avg_hold": 10.13,
+      "netp80_rub": 132.0,
+      "sharpe": 3.001,
+      "profit_factor": 2.138,
+      "mdd": 8.54,
+      "avg_qty": 1.0,
+      "final_equity": 852872.11
+    },
+    "spec": {
+      "asset_code": "TATN",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "9382.86"
+    }
+  },
+  "UC": {
+    "bars": 121883,
+    "signals": 3920,
+    "metrics": {
+      "trades": 3920,
+      "wr": 30.84,
+      "mean_return_pct": -0.0097,
+      "mean_return_rub": -8.16,
+      "total_pnl_rub": -31980.22,
+      "total_return_pct": -31.98,
+      "avg_dd": 0.0734,
+      "avg_hold": 11.88,
+      "netp80_rub": -42.46,
+      "sharpe": -0.841,
+      "profit_factor": 0.782,
+      "mdd": 39.88,
+      "avg_qty": 1.0,
+      "final_equity": 68019.78
+    },
+    "spec": {
+      "asset_code": "UCNY",
+      "lot_volume": 1000,
+      "min_step": "0.001",
+      "step_price": "11.4872",
+      "go": "8740.8"
+    }
+  },
+  "VB": {
+    "bars": 406019,
+    "signals": 6996,
+    "metrics": {
+      "trades": 6996,
+      "wr": 53.66,
+      "mean_return_pct": 0.0566,
+      "mean_return_rub": 710.03,
+      "total_pnl_rub": 4967387.58,
+      "total_return_pct": 4967.39,
+      "avg_dd": 0.7879,
+      "avg_hold": 9.95,
+      "netp80_rub": 363.0,
+      "sharpe": 3.014,
+      "profit_factor": 1.855,
+      "mdd": 29.36,
+      "avg_qty": 38.8,
+      "final_equity": 5067387.58
+    },
+    "spec": {
+      "asset_code": "VTBR",
+      "lot_volume": 100,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "1351.25"
+    }
+  },
+  "VI": {
+    "bars": 24794,
+    "signals": 57,
+    "metrics": {
+      "trades": 57,
+      "wr": 82.46,
+      "mean_return_pct": 0.9481,
+      "mean_return_rub": 1231.33,
+      "total_pnl_rub": 70186.0,
+      "total_return_pct": 70.19,
+      "avg_dd": 1.4373,
+      "avg_hold": 3.79,
+      "netp80_rub": 1949.51,
+      "sharpe": 4.794,
+      "profit_factor": 10.367,
+      "mdd": 3.9,
+      "avg_qty": 6.3,
+      "final_equity": 170186.0
+    },
+    "spec": {
+      "asset_code": "RVI",
+      "lot_volume": 1,
+      "min_step": "0.05",
+      "step_price": "7.70611",
+      "go": "1870.91"
+    }
+  },
+  "W4": {
+    "bars": 82368,
+    "signals": 498,
+    "metrics": {
+      "trades": 498,
+      "wr": 90.36,
+      "mean_return_pct": 3.8663,
+      "mean_return_rub": 18402033097.14,
+      "total_pnl_rub": 9164212482376.72,
+      "total_return_pct": 9164212482.38,
+      "avg_dd": 2.2829,
+      "avg_hold": 4.64,
+      "netp80_rub": 2247891454.97,
+      "sharpe": 12.318,
+      "profit_factor": 7.778,
+      "mdd": 16.02,
+      "avg_qty": 25081816.6,
+      "final_equity": 9164212582376.72
+    },
+    "spec": {
+      "asset_code": "WHEAT",
+      "lot_volume": 1,
+      "min_step": "10.0",
+      "step_price": "10.0",
+      "go": "2199.21"
+    }
+  },
+  "WU": {
+    "bars": 94587,
+    "signals": 4976,
+    "metrics": {
+      "trades": 4976,
+      "wr": 37.66,
+      "mean_return_pct": 0.5405,
+      "mean_return_rub": 2308458336473.22,
+      "total_pnl_rub": 1.148688868229072e+16,
+      "total_return_pct": 11486888682287.48,
+      "avg_dd": 1.0104,
+      "avg_hold": 8.4,
+      "netp80_rub": -809713862213168.2,
+      "sharpe": 3.598,
+      "profit_factor": 1.002,
+      "mdd": 99.33,
+      "avg_qty": 159064844829841.7,
+      "final_equity": 1.148688868238748e+16
+    },
+    "spec": {
+      "asset_code": "WUSH",
+      "lot_volume": 10,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "180.96"
+    }
+  },
+  "X5": {
+    "bars": 69159,
+    "signals": 5546,
+    "metrics": {
+      "trades": 5546,
+      "wr": 42.7,
+      "mean_return_pct": 0.4965,
+      "mean_return_rub": 4174873928438.9,
+      "total_pnl_rub": 2.3153850807122164e+16,
+      "total_return_pct": 23153850807122.16,
+      "avg_dd": 0.994,
+      "avg_hold": 10.04,
+      "netp80_rub": -2740356451895.12,
+      "sharpe": 3.567,
+      "profit_factor": 2.667,
+      "mdd": 58.34,
+      "avg_qty": 347412330754.0,
+      "final_equity": 2.315385080722216e+16
+    },
+    "spec": {
+      "asset_code": "X5",
+      "lot_volume": 1,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "413.27"
+    }
+  },
+  "YD": {
+    "bars": 113324,
+    "signals": 7370,
+    "metrics": {
+      "trades": 7370,
+      "wr": 48.58,
+      "mean_return_pct": 0.3323,
+      "mean_return_rub": 344745424029.82,
+      "total_pnl_rub": 2540773775099771.0,
+      "total_return_pct": 2540773775099.77,
+      "avg_dd": 0.7494,
+      "avg_hold": 10.03,
+      "netp80_rub": -1744752545809.76,
+      "sharpe": 4.552,
+      "profit_factor": 1.194,
+      "mdd": 73.62,
+      "avg_qty": 199061252150.2,
+      "final_equity": 2540773775199774.0
+    },
+    "spec": {
+      "asset_code": "YDEX",
+      "lot_volume": 1,
+      "min_step": "1.0",
+      "step_price": "1.0",
+      "go": "682.98"
+    }
+  }
+}

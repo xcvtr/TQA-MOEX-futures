@@ -1,1 +1,0 @@
-/home/user/projects/moex-algopack/scripts/load_algopack_fo.py

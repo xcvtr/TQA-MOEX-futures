@@ -1,0 +1,15 @@
+{
+  "initial_capital": 100000,
+  "final_capital": 708531465.27,
+  "total_return_pct": 708431.5,
+  "cagr_pct": 369.1,
+  "max_dd_pct": 0.3,
+  "calmar": 1397.72,
+  "total_trades": 88410,
+  "total_commissions": 265230.0,
+  "total_gross_rub": 177107866.32,
+  "total_net_rub": 176842636.32,
+  "duration_years": 5.7,
+  "pos_months": 70,
+  "total_months": 70
+}

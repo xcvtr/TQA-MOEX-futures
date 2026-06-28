@@ -1,2 +1,0 @@
-Fix slippage: 0.5 tick = 0.005% instead of 0.02% (2 ticks was too high)
-1 tick for most futures = 1 ruble / price ≈ 0.01% → 0.5 tick = 0.005%
