@@ -1,60 +1,51 @@
-"""Executor — управление позициями и капиталом."""
+"""Executor — финальная версия."""
 from strategies.common.broker import Position, BrokerSim
 
+ACTIVATION_PCT = 0.5
+TRAIL_PCT = 0.3
+TIMEOUT_BARS = 12
+COMMISSION = 4
+RISK_PCT = 0.1
+MAX_LEVERAGE = 10
+
 class Executor:
-    """Управляет позициями, капиталом, ГО."""
-    
-    def __init__(self, initial_capital=100000, risk_pct=0.1, max_leverage=10):
+    def __init__(self, initial_capital=100000):
         self.equity = float(initial_capital)
+        self.initial = float(initial_capital)
         self.peak = float(initial_capital)
         self.positions = []
         self.trades = []
-        self.risk_pct = risk_pct
-        self.max_leverage = max_leverage
         self.broker = BrokerSim()
+        self.eq_curve = []
     
-    def process_signal(self, signal: dict, bar_idx: int, specs: dict):
-        """Открыть позицию по сигналу."""
+    def process_signal(self, signal, bar_idx, specs):
         ticker = signal['ticker']
         direction = signal['direction']
         price = signal['entry_price']
         strategy = signal['strategy']
         
         go = float(specs.get('go', 0))
-        lot = int(specs.get('lot_volume', 1))
         step_price = float(specs.get('step_price', 1.0))
         min_step = float(specs.get('min_step', 0.01))
+        lot = int(specs.get('lot_volume', 1))
         
-        if go <= 0:
-            return None
+        if go <= 0: return None
         
-        # Sizing
-        max_sh = int(self.equity * self.risk_pct / go)
+        max_sh = int(self.equity * RISK_PCT / go)
         cv = price * lot
-        max_lev = max(1, int(self.equity * self.max_leverage / cv)) if cv > 0 else 1
+        max_lev = max(1, int(self.equity * MAX_LEVERAGE / cv)) if cv > 0 else 1
         shares = max(1, min(max_sh, max_lev))
         
-        # Check margin
         needed = go * shares * 1.2
         if self.equity < needed:
             return None
         
-        pos = Position(
-            ticker=ticker, direction=direction, entry_price=price,
-            entry_bar=bar_idx, shares=shares, strategy=strategy,
-            go=go, step_price=step_price, min_step=min_step, lot=lot
-        )
-        
-        # Apply slippage
-        entry = self.broker.open_with_slippage(pos, price)
-        pos.entry_price = entry
-        
+        pos = Position(ticker, direction, price, bar_idx, shares, strategy,
+                       go, step_price, min_step)
         self.positions.append(pos)
         return pos
     
-    def update_positions(self, bar_idx: int, hi: float, lo: float, prc: float):
-        """Обновить все открытые позиции (trailing, timeout)."""
-        total_pnl = 0.0
+    def update_positions(self, bar_idx, hi, lo, prc):
         for p in list(self.positions):
             if p.closed:
                 self.positions.remove(p)
@@ -62,19 +53,22 @@ class Executor:
             pnl = self.broker.update(p, bar_idx, hi, lo, prc)
             if p.closed:
                 self.equity += pnl
-                total_pnl += pnl
                 self.trades.append(p)
         
         if self.equity > self.peak:
             self.peak = self.equity
-        
-        return total_pnl
+        self.eq_curve.append(self.equity)
     
     @property
-    def max_dd_pct(self) -> float:
-        if self.peak <= 0: return 0
-        return (self.peak - self.equity) / self.peak * 100
+    def max_dd_pct(self):
+        peak = self.initial
+        max_dd = 0.0
+        for eq in self.eq_curve:
+            if eq > peak: peak = eq
+            dd = (peak - eq) / peak * 100
+            if dd > max_dd: max_dd = dd
+        return max_dd
     
     @property
-    def total_return_pct(self) -> float:
-        return (self.equity / 100000 - 1) * 100
+    def total_return_pct(self):
+        return (self.equity / self.initial - 1) * 100
