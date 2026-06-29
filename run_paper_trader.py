@@ -11,7 +11,6 @@ from strategies.lunch_rev.prod.engine import check_signal as lunch
 STRATEGIES = [
     ('stop_hunt', sh, ['GZ','SR','NG','VB','W4','Si','CR'], None),
     ('cvd', cvd, ['GZ','SR','Si','CR'], None),
-    ('lunch_rev', lunch, ['Si'], None),
 ]
 
 if __name__ == '__main__':
