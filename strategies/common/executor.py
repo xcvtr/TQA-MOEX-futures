@@ -7,7 +7,7 @@ import psycopg2
 from strategies.common.broker import Position, BrokerSim
 from strategies.common.risk import RiskManager
 
-RISK_PCT = 0.1          # доля капитала на 1 сделку
+RISK_PCT = 0.02          # доля капитала на 1 сделку
 MAX_LEVERAGE = 10
 
 PG_CONFIG = dict(
