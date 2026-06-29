@@ -33,15 +33,16 @@ N_CONTEXT = 50  # баров контекста для индикаторов
 class PaperTrader:
     """Paper trading runner. Синхронный цикл: загрузка → сигналы → управление."""
 
-    def __init__(self, strategies: list, executor: Executor = None, capital=100_000):
+    def __init__(self, strategies: list, executor: Executor = None, capital=100_000, use_pg=False):
         """
         strategies: [(name, check_signal_fn, tickers, params), ...]
         executor: если None — создаётся с BrokerSim
+        use_pg: True = читать данные из PG (препрод), False = из CH
         """
         self.strategies = strategies
         self.executor = executor or Executor(broker=BrokerSim(), initial_capital=capital)
         self.ch = cc.get_client(**CH_CONFIG)
-        self.use_pg = False
+        self.use_pg = use_pg
         self._context = {}    # {ticker: DataFrame последних N_CONTEXT баров}
         self._specs = {}      # {ticker: specs}
 
@@ -236,14 +237,31 @@ class PaperTrader:
                 if signal:
                     self.executor.process_signal(signal, int(bar_idx), specs, bar_data)
 
-            # Управление позициями
-            self.executor.manage_positions(
-                int(bar_idx),
-                float(df['hi'].iloc[-1]),
-                float(df['lo'].iloc[-1]),
-                float(df['prc'].iloc[-1]),
-                float(bar_data.get('vol', 0)),
-            )
+            # Управление позициями — через broker напрямую
+            for p in list(self.executor.positions):
+                if p.closed:
+                    continue
+                pnl = self.executor.broker.update(
+                    p, int(bar_idx),
+                    float(df['hi'].iloc[-1]),
+                    float(df['lo'].iloc[-1]),
+                    float(df['prc'].iloc[-1]),
+                    float(bar_data.get('vol', 0)),
+                )
+                if p.closed:
+                    import numpy as np
+                    if np.isfinite(pnl):
+                        self.executor.equity += float(pnl)
+                    else:
+                        p.closed = False
+                        continue
+                    self.executor.trades.append(p)
+
+            # Cleanup + equity tracking
+            self.executor.positions = [p for p in self.executor.positions if not p.closed]
+            if self.executor.equity > self.executor.peak:
+                self.executor.peak = self.executor.equity
+            self.executor.rm.update(self.executor.equity)
 
     def run(self, n_ticks: int = None, asset_map: dict = None):
         """Запустить N тиков (None = бесконечно)."""
