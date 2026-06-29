@@ -19,11 +19,7 @@ if __name__ == '__main__':
     old_equity = pt.executor.equity
     
     try:
-        # Catch-up только при первом запуске (ещё нет сделок)
-        if len(pt.executor.trades) == 0:
-            pt.catch_up()
-        else:
-            pt.tick()
+        pt.tick()
         pt._save_state()
     except Exception as e:
         import traceback
