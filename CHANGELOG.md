@@ -1,17 +1,21 @@
 # Changelog
 
-## [119] 2026-06-28
-### Fixed
-- **CRITICAL look-ahead**: сигнал на bar[i], вход на open[i+1] + 1 tick.
-  Stop Hunt соло: было 100K→95.9B, стало 100K→1.13M (+1,029%).
-### Results
-- Финальный реалистичный портфель: 100K→201K (+101%), 107 сделок, WR 64.5%, MDD 23.4%.
+## [126] 2026-06-29
+### Pre-production live
+- PaperTrader: catch_up(), use_pg, trailing state save/restore
+- Loader: snapshot API вместо candles, prefix mapping
+- PG prices: backfill 700 bars from CH, live update every 15 min
+- Dashboard: systemd service, weight, RM status
+- Portfolio weight: GZ=1.5, Si=1.2, etc.
+- Lunch Reversal: disabled
 
-## [118] 2026-06-28
-- TRIZ fix: immediate stop execution, zero entry slippage
+## [125] 2026-06-28
+- PaperTrader first trade: Lunch Reversal +6,219 RUB
 
-## [117] 2026-06-28
-- Audit complete, TRIZ analysis via OpenCode
+## [124-120] 2026-06-28
+- Loader, PG prices, prod/test separation
+- Backtester, PaperTrader, RiskManager
 
-## [116-112] 2026-06-28
-- Architecture: Backtester, PaperTrader, RiskManager, portfolio in PG
+## [119-112] 2026-06-28
+- Architecture: Engine→Executor→Broker, audit, TRIZ fixes
+- Realistic portfolio: 100K→201K (+101%), 64.5% WR
