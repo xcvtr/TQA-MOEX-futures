@@ -306,63 +306,108 @@ def _ensure_ch_prices_table():
     client.close()
 
 
-def fetch_candles(ticker: str, days: int = 3) -> Optional[list[dict]]:
-    """Fetch 5-min candles from MOEX ISS."""
-    from_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-    to_date = datetime.now().strftime("%Y-%m-%d")
 
-    url = (
-        "https://iss.moex.com/iss/engines/futures/"
-        f"markets/forts/securities/{ticker}/candles.csv"
-        f"?from={from_date}&till={to_date}&interval=5&iss.meta=off"
-    )
 
+def fetch_market_snapshot() -> dict:
+    """Fetch current marketdata snapshot from MOEX ISS.
+    Returns {short_ticker: {opn, hi, lo, prc, vol}} mapped by prefix."""
+    url = "https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.only=marketdata"
+    headers = {"User-Agent": "Mozilla/5.0"}
     for attempt in range(RETRY_ATTEMPTS):
         try:
-            headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
             resp = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-            if resp.status_code == 404:
-                return None
             if resp.status_code != 200:
-                log.warning("HTTP %d for %s prices (attempt %d/%d)",
-                            resp.status_code, ticker, attempt + 1, RETRY_ATTEMPTS)
-                if attempt < RETRY_ATTEMPTS - 1:
-                    time.sleep(RETRY_DELAY)
-                continue
-
-            text = resp.text
-            reader = csv.reader(io.StringIO(text), delimiter=";")
-            records = []
-            for row in reader:
-                if len(row) < 7:
-                    continue
-                if row[0] in ("begin", "") or row[0].startswith("["):
-                    continue
-                try:
-                    dt = datetime.strptime(row[0].strip(), "%Y-%m-%d %H:%M:%S")
-                except ValueError:
-                    continue
-                try:
-                    records.append({
-                        "bt": dt,
-                        "opn": float(row[1]),
-                        "hi": float(row[2]),
-                        "lo": float(row[3]),
-                        "prc": float(row[4]),
-                        "vol": int(float(row[6])),
-                    })
-                except (ValueError, IndexError):
-                    continue
-            return records if records else None
-
-        except requests.RequestException as e:
-            log.warning("Network error for %s prices: %s (attempt %d/%d)",
-                        ticker, e, attempt + 1, RETRY_ATTEMPTS)
-            if attempt < RETRY_ATTEMPTS - 1:
+                log.warning("HTTP %d for marketdata (attempt %d/%d)", resp.status_code, attempt + 1, RETRY_ATTEMPTS)
                 time.sleep(RETRY_DELAY)
+                continue
+            data = resp.json()
+            cols = data["marketdata"]["columns"]
+            now = datetime.now()
+            best = {}
+            for row in data["marketdata"]["data"]:
+                md = dict(zip(cols, row))
+                secid = md.get("SECID", "")
+                if not secid or not secid.isascii():
+                    continue
+                prefix = secid.rstrip("0123456789")[:-1]
+                vt = int(md.get("VOLTODAY", 0) or 0)
+                if prefix not in best or vt > best[prefix]["vol_today"]:
+                    best[prefix] = {"vol_today": vt, "opn": float(md.get("OPEN", 0) or 0),
+                                    "hi": float(md.get("HIGH", 0) or 0), "lo": float(md.get("LOW", 0) or 0),
+                                    "prc": float(md.get("LAST", 0) or 0), "bt": now}
+            return best
+        except (requests.RequestException, json.JSONDecodeError) as e:
+            log.warning("Marketdata error: %s (attempt %d/%d)", e, attempt + 1, RETRY_ATTEMPTS)
+            time.sleep(RETRY_DELAY)
+    return {}
 
-    return None
 
+def save_price_snapshot(ticker: str, data: dict, pg_write: bool = True) -> bool:
+    """Write a single marketdata snapshot to CH + PG."""
+    _ensure_ch_prices_table()
+    client = get_ch()
+    row = (ticker, data["bt"], data["opn"], data["hi"], data["lo"], data["prc"], data["vol_today"])
+    try:
+        client.insert("prices_5min", [row], column_names=["ticker","bt","opn","hi","lo","prc","vol"])
+    except Exception as e:
+        log.warning("CH insert failed: %s", e)
+    client.close()
+    if not pg_write:
+        return True
+    try:
+        pg_conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, connect_timeout=5)
+        with pg_conn.cursor() as cur:
+            execute_values(cur, "INSERT INTO futures.prices (ticker,bt,opn,hi,lo,prc,vol) VALUES %s ON CONFLICT DO NOTHING", [row])
+            cur.execute("DELETE FROM futures.prices WHERE bt < now() - INTERVAL '2 months'")
+        pg_conn.commit()
+        pg_conn.close()
+    except Exception as e:
+        log.warning("PG prices write failed: %s", e)
+    return True
+
+
+def load_all_prices():
+    """Fetch current marketdata for ALL tickers to CH."""
+    snapshot = fetch_market_snapshot()
+    if not snapshot:
+        log.warning("No marketdata available")
+        return 0
+    log.info("Loading prices for %d tickers (CH only)", len(snapshot))
+    total = 0
+    for ticker, data in sorted(snapshot.items()):
+        try:
+            save_price_snapshot(ticker, data, pg_write=False)
+            total += 1
+        except Exception as e:
+            log.error("Failed to save %s: %s", ticker, e)
+    log.info("Done: %d tickers saved to CH", total)
+    return total
+
+
+def load_portfolio_prices():
+    """Fetch current marketdata for PORTFOLIO tickers to PG + CH."""
+    conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, connect_timeout=5)
+    cur = conn.cursor()
+    cur.execute("SELECT DISTINCT ticker FROM futures.portfolio WHERE enabled = true")
+    portfolio = {r[0] for r in cur.fetchall()}
+    cur.close()
+    conn.close()
+    snapshot = fetch_market_snapshot()
+    if not snapshot:
+        log.warning("No marketdata available")
+        return 0
+    log.info("Loading prices for portfolio (%d tickers) to PG + CH", len(portfolio))
+    total = 0
+    for ticker in sorted(portfolio):
+        if ticker not in snapshot:
+            log.info("  %s: not found in marketdata", ticker)
+            continue
+        data = snapshot[ticker]
+        save_price_snapshot(ticker, data, pg_write=True)
+        log.info("  %s: prc=%s vol=%s", ticker, data.get("prc"), data.get("vol_today"))
+        total += 1
+    log.info("Done: %d tickers saved to PG + CH", total)
+    return total
 
 def save_prices(ticker: str, records: list[dict], pg_write: bool = True) -> int:
     """Write 5-min bars to CH prices_5min + PG futures.prices."""
@@ -409,60 +454,6 @@ def save_prices(ticker: str, records: list[dict], pg_write: bool = True) -> int:
         log.warning("PG prices write failed: %s", e)
 
     return len(rows)
-
-
-def load_all_prices():
-    """Fetch last 3 days of 5-min bars for ALL tickers → CH."""
-    log.info("=== Loading 5-min prices for all %d tickers (CH only) ===", len(MOEX_OI_TICKERS))
-    total = 0
-    for ticker in MOEX_OI_TICKERS:
-        try:
-            records = fetch_candles(ticker, days=3)
-            if not records:
-                log.info("  %s: no price data", ticker)
-                continue
-            n = save_prices(ticker, records, pg_write=False)  # только CH
-            log.info("  %s: %d bars", ticker, n)
-            total += n
-            time.sleep(0.3)
-        except Exception as e:
-            log.error("Failed to load prices for %s: %s", ticker, e)
-    log.info("=== Done: %d total price bars to CH ===", total)
-    return total
-
-
-def load_portfolio_prices():
-    """Fetch last 3 days of 5-min bars for PORTFOLIO tickers → PG + CH."""
-    conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
-                            user=DB_USER, password=DB_PASSWORD, connect_timeout=5)
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT DISTINCT p.ticker, COALESCE(s.asset_code, p.ticker)
-        FROM futures.portfolio p
-        LEFT JOIN futures.ticker_specs s ON p.ticker = s.ticker
-        WHERE p.enabled = true
-    """)
-    portfolio = cur.fetchall()
-    cur.close()
-    conn.close()
-
-    log.info("=== Loading 5-min prices for portfolio (%d tickers) → PG + CH ===", len(portfolio))
-    total = 0
-    for ticker, asset in portfolio:
-        try:
-            records = fetch_candles(ticker, days=3)
-            if not records:
-                log.info("  %s: no price data", ticker)
-                continue
-            n = save_prices(ticker, records, pg_write=True)  # CH + PG
-            log.info("  %s: %d bars (asset=%s)", ticker, n, asset)
-            total += n
-            time.sleep(0.3)
-        except Exception as e:
-            log.error("Failed to load prices for %s: %s", ticker, e)
-    log.info("=== Done: %d total price bars to PG + CH ===", total)
-    return total
-    return total
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────
