@@ -18,3 +18,4 @@ data/
 *.hdf5
 .omo/
 logs/
+algopack_token.py
