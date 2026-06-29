@@ -364,7 +364,7 @@ def fetch_candles(ticker: str, days: int = 3) -> Optional[list[dict]]:
     return None
 
 
-def save_prices(ticker: str, records: list[dict]) -> int:
+def save_prices(ticker: str, records: list[dict], pg_write: bool = True) -> int:
     """Write 5-min bars to CH prices_5min + PG futures.prices."""
     if not records:
         return 0
@@ -387,7 +387,10 @@ def save_prices(ticker: str, records: list[dict]) -> int:
     )
     client.close()
 
-    # PostgreSQL
+    # PostgreSQL (только для портфеля)
+    if not pg_write:
+        return len(rows)
+
     try:
         pg_conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
                                    user=DB_USER, password=DB_PASSWORD, connect_timeout=5)
@@ -409,8 +412,27 @@ def save_prices(ticker: str, records: list[dict]) -> int:
 
 
 def load_all_prices():
+    """Fetch last 3 days of 5-min bars for ALL tickers → CH."""
+    log.info("=== Loading 5-min prices for all %d tickers (CH only) ===", len(MOEX_OI_TICKERS))
+    total = 0
+    for ticker in MOEX_OI_TICKERS:
+        try:
+            records = fetch_candles(ticker, days=3)
+            if not records:
+                log.info("  %s: no price data", ticker)
+                continue
+            n = save_prices(ticker, records, pg_write=False)  # только CH
+            log.info("  %s: %d bars", ticker, n)
+            total += n
+            time.sleep(0.3)
+        except Exception as e:
+            log.error("Failed to load prices for %s: %s", ticker, e)
+    log.info("=== Done: %d total price bars to CH ===", total)
+    return total
+
+
+def load_portfolio_prices():
     """Fetch last 3 days of 5-min bars for PORTFOLIO tickers → PG + CH."""
-    # Читаем портфель из PG
     conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
                             user=DB_USER, password=DB_PASSWORD, connect_timeout=5)
     cur = conn.cursor()
@@ -424,7 +446,7 @@ def load_all_prices():
     cur.close()
     conn.close()
 
-    log.info("=== Loading 5-min prices for portfolio (%d tickers) ===", len(portfolio))
+    log.info("=== Loading 5-min prices for portfolio (%d tickers) → PG + CH ===", len(portfolio))
     total = 0
     for ticker, asset in portfolio:
         try:
@@ -432,14 +454,14 @@ def load_all_prices():
             if not records:
                 log.info("  %s: no price data", ticker)
                 continue
-            # Пишем в PG futures.prices + CH
-            n = save_prices(ticker, records)
+            n = save_prices(ticker, records, pg_write=True)  # CH + PG
             log.info("  %s: %d bars (asset=%s)", ticker, n, asset)
             total += n
             time.sleep(0.3)
         except Exception as e:
             log.error("Failed to load prices for %s: %s", ticker, e)
-    log.info("=== Done: %d total price bars for portfolio ===", total)
+    log.info("=== Done: %d total price bars to PG + CH ===", total)
+    return total
     return total
 
 
@@ -449,14 +471,17 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="MOEX data loader")
     parser.add_argument("--dry-run", action="store_true", help="Test imports only")
-    parser.add_argument("--load-prices", action="store_true", help="Load 5-min price data")
+    parser.add_argument("--load-prices", action="store_true", help="Load 5-min price data for ALL tickers (CH only)")
+    parser.add_argument("--load-portfolio-prices", action="store_true", help="Load 5-min price data for PORTFOLIO tickers (PG + CH)")
     args = parser.parse_args()
 
     if args.dry_run:
         log.info("dry-run: imports OK")
         sys.exit(0)
 
-    if args.load_prices:
+    if args.load_portfolio_prices:
+        load_portfolio_prices()
+    elif args.load_prices:
         load_all_prices()
     else:
         update_all()
