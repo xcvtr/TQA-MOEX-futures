@@ -68,6 +68,8 @@ td{padding:4px;border-bottom:1px solid #21262d}
 <div class="metric"><div class="val" id=trades>--</div><div class=label>Trades</div></div>
 <div class="metric"><div class="val" id=open_pos>--</div><div class=label>Open</div></div>
 <div class="metric" id=mdd_c><div class="val" id=mdd>--</div><div class=label>Max DD %</div></div>
+<div class="metric"><div class="val" id=dd>--</div><div class=label>Current DD %</div></div>
+<div class="metric"><div class="val" id=rm_status>--</div><div class=label>RiskManager</div></div>
 </div>
 
 <div class=card>
@@ -93,6 +95,10 @@ async function load(){
   document.getElementById('open_pos').textContent=(d.positions||[]).length
   document.getElementById('mdd').textContent=(d.mdd_pct||0).toFixed(1)+'%'
   document.getElementById('mdd_c').className=(d.mdd_pct||0)>20?'metric neg':'metric'
+  document.getElementById('dd').textContent=(d.dd_pct||0).toFixed(1)+'%'
+  let rm=document.getElementById('rm_status')
+  if(d.rm_active){rm.textContent='Active';rm.style.color='#3fb950'}
+  else{rm.textContent='STOP: '+d.rm_reason;rm.style.color='#f85149'}
 
   let tbody=document.getElementById('positions'); tbody.innerHTML=''
   for(let p of d.positions||[]){
@@ -137,11 +143,18 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(HTML.encode())
             elif self.path == '/api/state':
                 state = get_state()
-                data = {'equity': 100000, 'return_pct': 0, 'n_trades': 0, 'mdd_pct': 0, 'positions': []}
+                data = {'equity': 100000, 'return_pct': 0, 'n_trades': 0, 'mdd_pct': 0, 'positions': [],
+                        'dd_pct': 0, 'rm_active': True, 'rm_reason': 'ok'}
                 if 'capital' in state:
                     data['equity'] = float(state['capital'])
+                if 'peak' in state:
+                    peak = float(state['peak'])
+                    data['dd_pct'] = round((peak - data['equity']) / peak * 100, 1)
                 if 'positions' in state:
                     data['positions'] = json.loads(state['positions'])
+                if data['dd_pct'] >= 20:
+                    data['rm_active'] = False
+                    data['rm_reason'] = f'dd_stop ({data["dd_pct"]}%)'
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()

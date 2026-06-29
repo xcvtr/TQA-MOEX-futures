@@ -323,6 +323,12 @@ class PaperTrader:
             VALUES ('capital', %s)
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
         """, (str(round(self.executor.equity, 2)),))
+        # Peak (для расчёта DD)
+        cur.execute("""
+            INSERT INTO futures.paper_state (key, value)
+            VALUES ('peak', %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+        """, (str(round(self.executor.peak, 2)),))
 
         # Открытые позиции (сериализовать)
         positions = []
