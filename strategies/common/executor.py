@@ -137,12 +137,8 @@ class Executor:
         if self.equity < needed:
             return None
 
-        # Вход с проскальзыванием
-        slippage_ticks = 1  # DEFAULT_SLIPPAGE_IN
-        if direction == 'long':
-            entry_price = raw_price + slippage_ticks * min_step
-        else:
-            entry_price = raw_price - slippage_ticks * min_step
+        # Вход без проскальзывания (сигнал на close, вход по close)
+        entry_price = raw_price
 
         trailing_params = self.get_trailing(ticker, strategy)
         pos = Position(ticker, direction, entry_price, bar_idx, shares, strategy,

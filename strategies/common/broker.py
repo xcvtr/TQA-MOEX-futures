@@ -111,9 +111,12 @@ class BrokerSim:
                 retrace_from_peak = (cur_retrace_abs - pos.best_abs) / pos.best_abs * 100
 
             if retrace_from_peak >= pos.trail_pct:
-                pos._stop_triggered = True
-                pos.exit_reason = 'trailing_tp'
-                return 0.0
+                # Исполняем стоп НЕМЕДЛЕННО на этом баре по уровню стопа + slippage
+                if direction == 'long':
+                    stop_px = pos.best_abs * (1 - pos.trail_pct / 100)
+                else:
+                    stop_px = pos.best_abs * (1 + pos.trail_pct / 100)
+                return self._close_market(pos, stop_px, 'trailing_tp', volume)
 
         # 5. Таймаут
         if not pos._stop_triggered and bar_idx - pos.entry_bar >= pos.timeout_bars:
