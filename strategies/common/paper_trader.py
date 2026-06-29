@@ -1,25 +1,32 @@
 """PaperTrader — циклический раннер для paper trading.
 
 На каждом тике:
-1. Загружает последние бары из CH для контекста
+1. Загружает последние бары из PG
 2. Вычисляет индикаторы
 3. Запускает check_signal() всех стратегий
 4. Executor управляет позициями через BrokerSim
 5. Сохраняет состояние в PG (на случай рестарта)
+
+use_pg=True  — только PG (препрод/прод)
+use_pg=False — только CH (для отладки/тестов)
 """
 
 import os
 import json
 import numpy as np
 import pandas as pd
-import clickhouse_connect as cc
-import psycopg2
 from datetime import datetime
+
+try:
+    import clickhouse_connect as cc
+except ImportError:
+    cc = None
+
+import psycopg2
 
 from strategies.common.executor import Executor
 from strategies.common.broker import BrokerSim
 
-CH_CONFIG = dict(host=os.getenv('MOEX_CH_HOST', '10.0.0.60'), port=8123, database='moex')
 PG_CONFIG = dict(
     host=os.getenv('MOEX_PG_HOST', '10.0.0.60'),
     port=int(os.getenv('MOEX_PG_PORT', '5432')),
@@ -41,8 +48,11 @@ class PaperTrader:
         """
         self.strategies = strategies
         self.executor = executor or Executor(broker=BrokerSim(), initial_capital=capital)
-        self.ch = cc.get_client(**CH_CONFIG)
         self.use_pg = use_pg
+        if not use_pg and cc is not None:
+            self.ch = cc.get_client(host='10.0.0.60', port=8123, database='moex')
+        else:
+            self.ch = None
         self._context = {}    # {ticker: DataFrame последних N_CONTEXT баров}
         self._specs = {}      # {ticker: specs}
 

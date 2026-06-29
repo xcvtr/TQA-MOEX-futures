@@ -6,7 +6,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from strategies.common.paper_trader import PaperTrader
 from strategies.stop_hunt.prod.engine import check_signal as sh
 from strategies.cvd.prod.engine import check_signal as cvd
-from strategies.lunch_rev.prod.engine import check_signal as lunch
 
 STRATEGIES = [
     ('stop_hunt', sh, ['GZ','SR','NG','VB','W4','Si','CR'], None),
