@@ -21,7 +21,11 @@ if __name__ == '__main__':
     old_equity = pt.executor.equity
     
     try:
-        pt.tick()
+        # Catch-up только при первом запуске (ещё нет сделок)
+        if len(pt.executor.trades) == 0:
+            pt.catch_up()
+        else:
+            pt.tick()
         pt._save_state()
     except Exception as e:
         import traceback
@@ -30,18 +34,16 @@ if __name__ == '__main__':
         sys.exit(1)
 
     s = pt.status()
-    new_trades = len(pt.executor.trades)
-    new_trades_count = new_trades - old_trades
+    new_trades = len(pt.executor.trades) - old_trades
     dd = (pt.executor.peak - pt.executor.equity) / pt.executor.peak * 100 if pt.executor.peak > 0 else 0
     
-    # Формируем отчёт
     report = []
-    report.append(f"📊 PaperTrader | Eq={s['equity']:>.0f} ({s['return_pct']:>.1f}%) DD={dd:.1f}%")
+    report.append(f"📊 PaperTrader | Eq={s['equity']:>.0f} ({s['return_pct']:>.1f}%) DD={dd:.1f}% | Сделок: {s['total_trades']}")
     
-    if new_trades_count:
-        t = pt.executor.trades[-1]
-        sign = '✅' if t.pnl > 0 else '❌'
-        report.append(f"  {sign} {t.strategy} {t.direction} {t.ticker} pnl={t.pnl:>+.0f}")
+    from collections import Counter
+    if pt.executor.trades:
+        sc = Counter(t.strategy for t in pt.executor.trades)
+        report.append(f"  По стратегиям: {dict(sc)}")
     
     if s['open_positions']:
         for p in s['positions']:
