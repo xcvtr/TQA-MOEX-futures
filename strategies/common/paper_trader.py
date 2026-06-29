@@ -345,6 +345,7 @@ class PaperTrader:
                     'step_price': p.step_price,
                     'min_step': p.min_step,
                     'best_price': p.best_price,
+                    'best_abs': p.best_abs,
                     'trail_activated': p.trail_activated,
                 })
         cur.execute("""
@@ -386,6 +387,7 @@ class PaperTrader:
                     pd['go'], pd['step_price'], pd['min_step'],
                 )
                 pos.best_price = pd.get('best_price', 0.0)
+                pos.best_abs = pd.get('best_abs', 0.0)
                 pos.trail_activated = pd.get('trail_activated', False)
                 self.executor.positions.append(pos)
 

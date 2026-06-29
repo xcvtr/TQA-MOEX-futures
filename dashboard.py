@@ -22,18 +22,18 @@ def get_portfolio():
     conn = psycopg2.connect(**PG, connect_timeout=3)
     cur = conn.cursor()
     cur.execute("""
-        SELECT p.ticker, p.strategy, p.enabled
+        SELECT p.ticker, p.strategy, p.enabled, p.weight
         FROM futures.portfolio p
         WHERE p.enabled = true
         ORDER BY p.ticker, p.strategy
     """)
     rows = cur.fetchall()
-    # Add latest price per ticker
     result = []
     for r in rows:
         cur.execute("SELECT prc, bt FROM futures.prices WHERE ticker=%s ORDER BY bt DESC LIMIT 1", (r[0],))
         pr = cur.fetchone()
-        result.append([r[0], r[1], r[2], float(pr[0]) if pr else 0, str(pr[1])[:19] if pr and pr[1] else '-'])
+        result.append([r[0], r[1], r[2], float(r[3]) if r[3] else 1.0,
+                       float(pr[0]) if pr else 0, str(pr[1])[:19] if pr and pr[1] else '-'])
     cur.close()
     conn.close()
     return result
@@ -80,7 +80,7 @@ td{padding:4px;border-bottom:1px solid #21262d}
 
 <div class=card>
 <h2>Портфель</h2>
-<table><thead><tr><th>Тикер</th><th>Стратегия</th><th>Статус</th><th>Цена</th><th>Обновлено</th></tr></thead>
+<table><thead><tr><th>Тикер</th><th>Стратегия</th><th>Статус</th><th>Вес</th><th>Цена</th><th>Обновлено</th></tr></thead>
 <tbody id=portfolio></tbody></table>
 </div>
 
@@ -125,6 +125,7 @@ async function loadPortfolio(){
    let s=tr.insertCell(); s.textContent=r[2]?'active':'off'; s.className=r[2]?'enabled':'disabled'
    tr.insertCell().textContent=r[3]
    tr.insertCell().textContent=r[4]
+   tr.insertCell().textContent=r[5]
   }
  }catch(e){}
 }

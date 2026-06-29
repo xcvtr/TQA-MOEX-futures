@@ -113,8 +113,9 @@ class Executor:
         if go <= 0:
             return None
 
-        # Sizing
-        max_by_go = int(self.equity * RISK_PCT / float(go))
+        # Sizing c weight
+        weight = float(self._portfolio.get((ticker, strategy), {}).get('weight', 1.0))
+        max_by_go = int(self.equity * RISK_PCT * weight / float(go))
         cv = float(raw_price) * lot
         if cv <= 0 or not np.isfinite(cv) or np.isinf(self.equity) or np.isnan(self.equity):
             return None
