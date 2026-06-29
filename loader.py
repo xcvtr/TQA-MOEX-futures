@@ -389,7 +389,8 @@ def save_prices(ticker: str, records: list[dict]) -> int:
 
     # PostgreSQL
     try:
-        pg_conn = psycopg2.connect(host="10.0.0.60", dbname="moex", user="user")
+        pg_conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
+                                   user=DB_USER, password=DB_PASSWORD, connect_timeout=5)
         with pg_conn.cursor() as cur:
             execute_values(
                 cur,
@@ -408,22 +409,37 @@ def save_prices(ticker: str, records: list[dict]) -> int:
 
 
 def load_all_prices():
-    """Fetch last 3 days of 5-min bars for all tickers → CH + PG."""
-    log.info("=== Loading 5-min prices for %d tickers ===", len(MOEX_OI_TICKERS))
+    """Fetch last 3 days of 5-min bars for PORTFOLIO tickers → PG + CH."""
+    # Читаем портфель из PG
+    conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
+                            user=DB_USER, password=DB_PASSWORD, connect_timeout=5)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT DISTINCT p.ticker, COALESCE(s.asset_code, p.ticker)
+        FROM futures.portfolio p
+        LEFT JOIN futures.ticker_specs s ON p.ticker = s.ticker
+        WHERE p.enabled = true
+    """)
+    portfolio = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    log.info("=== Loading 5-min prices for portfolio (%d tickers) ===", len(portfolio))
     total = 0
-    for ticker in MOEX_OI_TICKERS:
+    for ticker, asset in portfolio:
         try:
             records = fetch_candles(ticker, days=3)
             if not records:
                 log.info("  %s: no price data", ticker)
                 continue
+            # Пишем в PG futures.prices + CH
             n = save_prices(ticker, records)
-            log.info("  %s: %d bars", ticker, n)
+            log.info("  %s: %d bars (asset=%s)", ticker, n, asset)
             total += n
             time.sleep(0.3)
         except Exception as e:
             log.error("Failed to load prices for %s: %s", ticker, e)
-    log.info("=== Done: %d total price bars ===", total)
+    log.info("=== Done: %d total price bars for portfolio ===", total)
     return total
 
 
