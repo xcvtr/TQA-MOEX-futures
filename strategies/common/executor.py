@@ -151,20 +151,7 @@ class Executor:
         return pos
 
     def manage_positions(self, bar_idx, hi, lo, prc, volume=0):
-        """Обновить все открытые позиции через брокера."""
-        for p in list(self.positions):
-            if p.closed:
-                self.positions.remove(p)
-                continue
-            pnl = self.broker.update(p, bar_idx, hi, lo, prc, volume)
-            if p.closed:
-                if np.isfinite(pnl):
-                    self.equity += float(pnl)
-                else:
-                    p.closed = False
-                    continue
-                self.trades.append(p)
-
+        """Обновить equity tracking (positions обновляются в engine напрямую)."""
         if self.equity > self.peak:
             self.peak = self.equity
         self.eq_curve.append(self.equity)

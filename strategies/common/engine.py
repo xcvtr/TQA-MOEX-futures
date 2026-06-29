@@ -105,14 +105,34 @@ class PortfolioEngine:
                         specs = (ticker_specs or {}).get(ticker, {})
                         self.executor.process_signal(signal, bar_idx, specs, bar)
 
-            # Управление позициями
-            for ticker, df in bars_dict.items():
-                if bar_idx < len(df):
-                    bar = df.iloc[bar_idx]
-                    hi = float(bar.get('hi', bar.get('high', 0)))
-                    lo = float(bar.get('lo', bar.get('low', 0)))
-                    prc = float(bar.get('prc', bar.get('close', 0)))
-                    vol = float(bar.get('vol', 0))
-                    self.executor.manage_positions(bar_idx, hi, lo, prc, vol)
+            # Управление позициями — передаём бары ТОЛЬКО своего тикера
+            for p in list(self.executor.positions):
+                if p.closed:
+                    continue
+                df = bars_dict.get(p.ticker)
+                if df is None or bar_idx >= len(df):
+                    continue
+                bar = df.iloc[bar_idx]
+                hi = float(bar.get('hi', bar.get('high', 0)))
+                lo = float(bar.get('lo', bar.get('low', 0)))
+                prc = float(bar.get('prc', bar.get('close', 0)))
+                vol = float(bar.get('vol', 0))
+                pnl = self.executor.broker.update(p, bar_idx, hi, lo, prc, vol)
+                if p.closed:
+                    if np.isfinite(pnl):
+                        self.executor.equity += float(pnl)
+                    else:
+                        p.closed = False
+                        continue
+                    self.executor.trades.append(p)
+
+            # Cleanup closed positions
+            self.executor.positions = [p for p in self.executor.positions if not p.closed]
+
+            # Equity curve
+            self.executor.eq_curve.append(self.executor.equity)
+            if self.executor.equity > self.executor.peak:
+                self.executor.peak = self.executor.equity
+            self.executor.rm.update(self.executor.equity)
 
         return self.executor
