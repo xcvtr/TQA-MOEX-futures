@@ -59,6 +59,13 @@ def load_date(target_date):
         log.error("Fetch failed: %s", e)
         return 0
     log.info("  %d raw rows", len(raw))
+    
+    # Also fetch FUTOI (OI by client groups)
+    try:
+        futoi_raw = list(moexalgo.Market('forts').futoi(date=dt_str, native=True))
+    except Exception:
+        futoi_raw = []
+    log.info("  %d futoi rows", len(futoi_raw))
     groups = defaultdict(list)
     for r in raw:
         t = short_ticker(r.get('ticker', ''))
@@ -111,6 +118,51 @@ def load_date(target_date):
             except Exception as e:
                 log.warning("PG fail %s: %s", ticker, e)
         total += len(ch_rows)
+
+    # Save FUTOI
+    if futoi_raw:
+        futoi_groups = defaultdict(lambda: {'bf': 0, 'sf': 0, 'by': 0, 'sy': 0})
+        for r in futoi_raw:
+            t = short_ticker(r.get('ticker', ''))
+            if not t or not r.get('tradedate'):
+                continue
+            td = r.get('tradetime', '')
+            dd = r.get('tradedate')
+            if isinstance(dd, str):
+                dd = datetime.strptime(dd, '%Y-%m-%d').date()
+            if isinstance(td, str):
+                bt = datetime.combine(dd, datetime.strptime(td, '%H:%M:%S').time())
+            else:
+                bt = td
+            cl = r.get('clgroup', '')
+            buy = int(r.get('pos_long', 0) or 0)
+            sell = int(r.get('pos_short', 0) or 0)
+            key = (t, bt)
+            if str(cl) in ('FIZ', '0'):
+                futoi_groups[key]['bf'] += buy
+                futoi_groups[key]['sf'] += sell
+            elif str(cl) in ('YUR', '1'):
+                futoi_groups[key]['by'] += buy
+                futoi_groups[key]['sy'] += sell
+
+        fo_rows = [(r[0], r[1], v['bf'], v['sf'], v['by'], v['sy']) for r, v in futoi_groups.items()]
+        if fo_rows:
+            try:
+                ch.insert('moex.futoi', fo_rows,
+                          column_names=['ticker','bt','buy_fiz','sell_fiz','buy_yur','sell_yur'])
+            except Exception as e:
+                log.warning("CH futoi fail: %s", e)
+            try:
+                fo_pg = [r for r in fo_rows if r[0] in portfolio]
+                if fo_pg:
+                    execute_values(pcur,
+                        'INSERT INTO futures.futoi (ticker,bt,buy_fiz,sell_fiz,buy_yur,sell_yur) VALUES %s ON CONFLICT DO NOTHING',
+                        fo_pg)
+                    pg.commit()
+            except Exception as e:
+                log.warning("PG futoi fail: %s", e)
+            log.info("  %d futoi rows", len(fo_rows))
+
     ch.close()
     pcur.close()
     pg.close()
