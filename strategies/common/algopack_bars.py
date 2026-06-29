@@ -158,6 +158,7 @@ def load_date(target_date):
                     execute_values(pcur,
                         'INSERT INTO futures.futoi (ticker,bt,buy_fiz,sell_fiz,buy_yur,sell_yur) VALUES %s ON CONFLICT DO NOTHING',
                         fo_pg)
+                    pcur.execute("DELETE FROM futures.futoi WHERE bt < now() - INTERVAL '2 months'")
                     pg.commit()
             except Exception as e:
                 log.warning("PG futoi fail: %s", e)
