@@ -274,57 +274,55 @@ class PaperTrader:
             self.executor.rm.update(self.executor.equity)
 
     def catch_up(self, asset_map: dict = None):
-        """Прогнать ВСЕ исторические бары из PG (catch-up after restart)."""
+        """Один проход по последним барам из PG для инициализации индикаторов."""
         if asset_map is None:
             asset_map = self._build_asset_map()
-        
+
         for ticker, asset in asset_map.items():
             if ticker not in self._specs:
                 continue
-            df = self.fetch_bars_from_pg(ticker, 500)  # все доступные
+            # Загружаем достаточно баров для индикаторов (200 = ~16 часов)
+            df = self.fetch_bars_from_pg(ticker, 200)
             if df.empty or len(df) < 25:
                 continue
             self._context[ticker] = df
-            
-            # Прогоняем каждый бар
-            for bar_idx in range(25, len(df)):
-                # Берём контекст до bar_idx для индикаторов
-                sub_df = df.iloc[:bar_idx + 1]
-                bar_data = self.compute_indicators(ticker, sub_df)
-                if not bar_data:
+
+            bar_data = self.compute_indicators(ticker, df)
+            if not bar_data:
+                continue
+
+            specs = self._specs.get(ticker, {})
+            for name, check_fn, tickers, params in self.strategies:
+                if ticker not in tickers:
                     continue
-                
-                specs = self._specs.get(ticker, {})
-                for name, check_fn, tickers, params in self.strategies:
-                    if ticker not in tickers:
+                signal = check_fn(bar_data, ticker, params)
+                if signal:
+                    self.executor.process_signal(signal, 0, specs, bar_data)
+
+            # Управление позициями — по последнему бару
+            last = df.iloc[-1]
+            for p in list(self.executor.positions):
+                if p.closed:
+                    continue
+                pnl = self.executor.broker.update(
+                    p, 0, float(last['hi']), float(last['lo']),
+                    float(last['prc']), float(bar_data.get('vol', 0)),
+                )
+                if p.closed:
+                    import numpy as np
+                    if np.isfinite(pnl):
+                        self.executor.equity += float(pnl)
+                    else:
+                        p.closed = False
                         continue
-                    signal = check_fn(bar_data, ticker, params)
-                    if signal:
-                        self.executor.process_signal(signal, bar_idx, specs, bar_data)
-                
-                # Управление позициями
-                for p in list(self.executor.positions):
-                    if p.closed:
-                        continue
-                    row = df.iloc[bar_idx]
-                    pnl = self.executor.broker.update(
-                        p, bar_idx,
-                        float(row['hi']), float(row['lo']), float(row['prc']),
-                        float(bar_data.get('vol', 0)),
-                    )
-                    if p.closed:
-                        import numpy as np
-                        if np.isfinite(pnl):
-                            self.executor.equity += float(pnl)
-                        else:
-                            p.closed = False
-                            continue
-                        self.executor.trades.append(p)
-                
-                self.executor.positions = [p for p in self.executor.positions if not p.closed]
-                if self.executor.equity > self.executor.peak:
-                    self.executor.peak = self.executor.equity
-                self.executor.rm.update(self.executor.equity)
+                    self.executor.trades.append(p)
+
+            self.executor.positions = [p for p in self.executor.positions if not p.closed]
+            if self.executor.equity > self.executor.peak:
+                self.executor.peak = self.executor.equity
+            self.executor.rm.update(self.executor.equity)
+        self._save_state()
+
     def run(self, n_ticks: int = None, asset_map: dict = None):
         """Запустить N тиков (None = бесконечно)."""
         tick_count = 0
