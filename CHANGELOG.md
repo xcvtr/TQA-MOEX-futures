@@ -1,15 +1,22 @@
 # Changelog
 
-## [128] 2026-06-29
-### Final architecture
-- PRI=PG (PaperTrader, prices 2mo, portfolio, state)
-- STDBY=CH (Backtester, tradestats_fo 18+mo)
-- PG: 43,779 bars across 7 tickers, 28 Apr → 19 Jun
-- Autopurge: DELETE > 2 months on every write
-- PaperTrader PG-only (use_pg=True, self.ch=None)
+## [132] 2026-06-30
+### Added
+- AlgoPack bars loader (algopack_bars.py) — 5-min bars with vol_b/vol_s/oi
+- Cron: algopack bars every 5 min during trading hours
+- FUTOI via moexalgo (same loader)
+- CH moex.bars (ReplicatedReplacingMergeTree) + moex.futoi
 
-## [127] 2026-06-29
-- Pre-prod: cron, dashboard, trailing state, weights
+### Fixed
+- vol_b/vol_s backfill into PG from CH (43K bars updated)
+- PaperTrader catch_up uses Engine (proper indicator computation)
+- RISK_PCT 0.1 → 0.02 (realistic)
+- Endpoint: apim.moex.com (not iss.moex.com)
 
-## [126-112] 2026-06-28
-- Architecture, audit, TRIZ fixes, realistic backtester
+## [131] 2026-06-29
+- PaperTrader catch_up, tick() only mode
+- Architecture: Engine→Executor→Broker→PaperTrader
+
+## [130-101] 2026-06-28/29
+- Complete rewrite: audit, TRIZ fixes, look-ahead fix
+- Realistic backtester, PG/CH separation
