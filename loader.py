@@ -83,56 +83,58 @@ def get_last_time(ticker: str) -> Optional[datetime]:
 
 
 def save_oi_records(ticker: str, records: list[dict]) -> int:
-    """Insert OI records into ClickHouse AND PostgreSQL. Returns count of rows inserted."""
+    """Insert OI records into CH moex.futoi + PG futures.futoi."""
     if not records:
         return 0
 
-    seen = set()
-    rows = []
-    now = datetime.now()
+    # Group fiz/yur into one row per timestamp
+    from collections import defaultdict
+    groups = defaultdict(lambda: {'buy_fiz': 0, 'sell_fiz': 0, 'buy_yur': 0, 'sell_yur': 0})
     for r in records:
-        key = (r["time"], r["clgroup"])
-        if key not in seen:
-            seen.add(key)
-            rows.append((
-                r["time"], ticker, r["buy_orders"], r["sell_orders"],
-                r["clgroup"], now, 0, 0,
-            ))
+        key = r["time"]
+        clgroup = r.get("clgroup", "")
+        buy = r.get("buy_orders", 0)
+        sell = r.get("sell_orders", 0)
+        is_fiz = clgroup == "FIZ" or clgroup == 0 or clgroup == "0"
+        is_yur = clgroup == "YUR" or clgroup == 1 or clgroup == "1"
+        if is_fiz:
+            groups[key]["buy_fiz"] += buy
+            groups[key]["sell_fiz"] += sell
+        elif is_yur:
+            groups[key]["buy_yur"] += buy
+            groups[key]["sell_yur"] += sell
 
-    # ClickHouse
+    rows = [(ticker, bt, v["buy_fiz"], v["sell_fiz"], v["buy_yur"], v["sell_yur"])
+            for bt, v in sorted(groups.items())]
+
+    # ClickHouse moex.futoi
     client = get_ch()
     client.insert(
-        CH_TABLE,
-        rows,
-        column_names=["time", "symbol", "buy_orders", "sell_orders",
-                      "clgroup", "created_at", "buy_accounts", "sell_accounts"],
+        "moex.futoi", rows,
+        column_names=["ticker", "bt", "buy_fiz", "sell_fiz", "buy_yur", "sell_yur"],
     )
     client.close()
 
-    # PostgreSQL (primary 10.0.0.63, configured via DB_HOST/DB_PORT/DB_NAME)
-    pg_rows = [(ticker, r["time"], r["buy_orders"], r["sell_orders"], r["clgroup"])
-               for r in records]
+    # PostgreSQL futures.futoi
     try:
         pg_conn = psycopg2.connect(
-            host=PG_HOST, port=PG_PORT, dbname=DB_NAME,
-            user=DB_USER, password=DB_PASSWORD,
+            host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
+            user=DB_USER, password=DB_PASSWORD, connect_timeout=5,
         )
         with pg_conn.cursor() as cur:
-            execute_values(
-                cur,
-                """INSERT INTO openinterest_moex (symbol, time, buy_orders, sell_orders, clgroup)
+            execute_values(cur,
+                """INSERT INTO futures.futoi (ticker, bt, buy_fiz, sell_fiz, buy_yur, sell_yur)
                    VALUES %s
-                   ON CONFLICT (symbol, time, clgroup)
-                   DO UPDATE SET buy_orders = EXCLUDED.buy_orders,
-                                 sell_orders = EXCLUDED.sell_orders,
-                                 created_at = NOW()""",
-                [(ticker, r["time"], r["buy_orders"], r["sell_orders"], r["clgroup"])
-                 for r in records],
+                   ON CONFLICT (ticker, bt)
+                   DO UPDATE SET buy_fiz = EXCLUDED.buy_fiz, sell_fiz = EXCLUDED.sell_fiz,
+                                 buy_yur = EXCLUDED.buy_yur, sell_yur = EXCLUDED.sell_yur""",
+                rows,
             )
+            cur.execute("DELETE FROM futures.futoi WHERE bt < now() - INTERVAL '2 months'")
         pg_conn.commit()
         pg_conn.close()
     except Exception as e:
-        log.warning("PG write failed (standby?): %s", e)
+        log.warning("PG futoi write failed: %s", e)
 
     return len(rows)
 
