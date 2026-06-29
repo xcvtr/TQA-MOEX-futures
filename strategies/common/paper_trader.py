@@ -11,6 +11,7 @@
 import os
 import json
 import numpy as np
+import pandas as pd
 import clickhouse_connect as cc
 import psycopg2
 from datetime import datetime
@@ -40,6 +41,7 @@ class PaperTrader:
         self.strategies = strategies
         self.executor = executor or Executor(broker=BrokerSim(), initial_capital=capital)
         self.ch = cc.get_client(**CH_CONFIG)
+        self.use_pg = False
         self._context = {}    # {ticker: DataFrame последних N_CONTEXT баров}
         self._specs = {}      # {ticker: specs}
 
@@ -108,6 +110,26 @@ class PaperTrader:
               AND SYSTIME > now() - INTERVAL {n_bars * 5 + 60} MINUTE
             GROUP BY bt ORDER BY bt
         """)
+
+    def fetch_bars_from_pg(self, ticker: str, n_bars: int = N_CONTEXT):
+        """Загрузить последние n_bars 5-минутных баров из PG futures.prices."""
+        conn = psycopg2.connect(**PG_CONFIG, connect_timeout=5)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT bt, opn, hi, lo, prc, vol FROM futures.prices WHERE ticker=%s ORDER BY bt DESC LIMIT %s",
+            (ticker, n_bars),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows, columns=['bt', 'opn', 'hi', 'lo', 'prc', 'vol'])
+        df = df.sort_values('bt').reset_index(drop=True)
+        df['vb'] = df['vol'].astype(float) * 0.5
+        df['vs'] = df['vol'].astype(float) * 0.5
+        df['oi_close'] = 0
+        return df
 
     def compute_indicators(self, ticker: str, df) -> dict:
         """Вычислить индикаторы для сигналов. Вернуть bar_data для check_signal."""
@@ -192,7 +214,10 @@ class PaperTrader:
         for ticker, asset in asset_map.items():
             if ticker not in self._specs:
                 continue
-            df = self.fetch_bars(asset, N_CONTEXT)
+            if self.use_pg:
+                df = self.fetch_bars_from_pg(ticker, N_CONTEXT)
+            else:
+                df = self.fetch_bars(asset, N_CONTEXT)
             if df.empty or len(df) < 25:
                 continue
             self._context[ticker] = df
