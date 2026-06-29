@@ -1,26 +1,17 @@
 # Changelog
 
-## [118] 2026-06-28
+## [119] 2026-06-28
 ### Fixed
-- **TRIZ: Immediate stop execution** — трейлинг-стоп исполняется на том же баре,
-  а не на следующем. Эффективный трейлинг 0.3% вместо 0.8-1.3%.
-- **Entry slippage 0** — сигнал на close = вход по close, без лишнего тика.
-- **Результат**: портфель из убыточного (-20.8%) стал прибыльным (+2,669%).
+- **CRITICAL look-ahead**: сигнал на bar[i], вход на open[i+1] + 1 tick.
+  Stop Hunt соло: было 100K→95.9B, стало 100K→1.13M (+1,029%).
+### Results
+- Финальный реалистичный портфель: 100K→201K (+101%), 107 сделок, WR 64.5%, MDD 23.4%.
+
+## [118] 2026-06-28
+- TRIZ fix: immediate stop execution, zero entry slippage
 
 ## [117] 2026-06-28
-- Audit complete: trailing fix, market stops, slippage, liquidity, commission
-- .omo/ added to gitignore
+- Audit complete, TRIZ analysis via OpenCode
 
-## [116] 2026-06-28
-- CRITICAL BUG: multi-ticker position management fix
-- Realistic results after audit
-
-## [115] 2026-06-28
-- Audit: trailing formula, market stops, slippage, liquidity, commission
-
-## [114] 2026-06-28
-- Portfolio test complete, risk-based sizing
-
-## [113] 2026-06-28
-- RiskManager, commission fix, contracts cap
-- Engine: all 4 strategies firing
+## [116-112] 2026-06-28
+- Architecture: Backtester, PaperTrader, RiskManager, portfolio in PG
