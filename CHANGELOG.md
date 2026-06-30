@@ -1,5 +1,13 @@
 # Changelog
 
+## [134] 2026-07-01
+### Fixed
+- AlgoPack bars: add second == 0 filter (минута %5 + секунда=00)
+- 179 clean bars/ticker for June 30 loaded
+### Added
+- run_paper_trader.py: output only on new trades (тихий режим)
+- Cron: AlgoPack → local (без шума в чат)
+
 ## [134] 2026-06-30
 ### Fixed
 - AlgoPack bars: filter daily snapshots, keep only real 5-min bars (minute % 5 == 0)
