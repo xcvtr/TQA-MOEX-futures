@@ -66,10 +66,18 @@ def load_date(target_date):
     except Exception:
         futoi_raw = []
     log.info("  %d futoi rows", len(futoi_raw))
+    # Group by short ticker, filter only true 5-min bars (not daily snapshots)
     groups = defaultdict(list)
     for r in raw:
+        # Keep only rows at exact 5-min boundaries (tradetime minute % 5 == 0)
+        td = r.get('tradetime')
+        if td is None:
+            continue
+        minute = td.minute if hasattr(td, 'minute') else 0
+        if minute % 5 != 0:
+            continue
         t = short_ticker(r.get('ticker', ''))
-        if t and r.get('tradedate'):
+        if t and r.get('pr_close') is not None:
             groups[t].append(r)
     ch = get_ch()
     import psycopg2
