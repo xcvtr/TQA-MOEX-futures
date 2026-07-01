@@ -83,7 +83,7 @@ def get_last_time(ticker: str) -> Optional[datetime]:
 
 
 def save_oi_records(ticker: str, records: list[dict]) -> int:
-    """Insert OI records into CH moex.futoi + PG futures.futoi."""
+    """Insert OI records into CH moex.futoi_iss + PG futures.futoi_iss."""
     if not records:
         return 0
 
@@ -107,15 +107,18 @@ def save_oi_records(ticker: str, records: list[dict]) -> int:
     rows = [(ticker, bt, v["buy_fiz"], v["sell_fiz"], v["buy_yur"], v["sell_yur"])
             for bt, v in sorted(groups.items())]
 
-    # ClickHouse moex.futoi
-    client = get_ch()
-    client.insert(
-        "moex.futoi", rows,
-        column_names=["ticker", "bt", "buy_fiz", "sell_fiz", "buy_yur", "sell_yur"],
-    )
-    client.close()
+    # ClickHouse moex.futoi_iss (только ISS -> CH)
+    try:
+        client = get_ch()
+        client.insert(
+            "moex.futoi_iss", rows,
+            column_names=["ticker", "bt", "buy_fiz", "sell_fiz", "buy_yur", "sell_yur"],
+        )
+        client.close()
+    except Exception as e:
+        log.warning("CH futoi_iss write failed: %s", e)
 
-    # PostgreSQL futures.futoi
+    # PostgreSQL futures.futoi_iss (только ISS -> PG)
     try:
         pg_conn = psycopg2.connect(
             host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
@@ -123,14 +126,14 @@ def save_oi_records(ticker: str, records: list[dict]) -> int:
         )
         with pg_conn.cursor() as cur:
             execute_values(cur,
-                """INSERT INTO futures.futoi (ticker, bt, buy_fiz, sell_fiz, buy_yur, sell_yur)
+                """INSERT INTO futures.futoi_iss (ticker, bt, buy_fiz, sell_fiz, buy_yur, sell_yur)
                    VALUES %s
                    ON CONFLICT (ticker, bt)
                    DO UPDATE SET buy_fiz = EXCLUDED.buy_fiz, sell_fiz = EXCLUDED.sell_fiz,
                                  buy_yur = EXCLUDED.buy_yur, sell_yur = EXCLUDED.sell_yur""",
                 rows,
             )
-            cur.execute("DELETE FROM futures.futoi WHERE bt < now() - INTERVAL '2 months'")
+            cur.execute("DELETE FROM futures.futoi_iss WHERE bt < now() - INTERVAL '2 months'")
         pg_conn.commit()
         pg_conn.close()
     except Exception as e:

@@ -1,16 +1,32 @@
 # Архитектура проекта TQA-MOEX-futures
 
-## 🏗 PG структура
+## 🏗 Структура данных
 
-Одна БД `moex` на 10.0.0.60, все данные только в БД:
+### ClickHouse (10.0.0.64:8123, db=moex)
 
 ```
 moex
-├── futures
-│   ├── ticker_specs           ← справочник: ГО, лотность, шаг цены (64 tickers)
-│   └── portfolio              ← портфель: тикер × стратегия, параметры, трейлинг
-└── shared
-    └── calendar               ← макро-календарь (пусто)
+├── futoi_iss              ← ISS OI fiz/yur (13.9M rows, интрадей, 64 tickers)
+├── futoi_algopack         ← AlgoPack OI fiz/yur (1.4K rows, все tickers)
+├── tradestats_fo          ← AlgoPack OHLCV+vol_b/vol_s+oi (21M rows)
+├── openinterest           ← ISS EOD OI fiz/yur (18.8M rows, до 2026-06-19)
+├── bars                   ← 5-min bars (97K rows, c 2026-06-25)
+├── prices_5min            ← Цены из portfolio loader
+├── securities             ← ГО/лот/шаг (29 rows)
+└── futoi                  ← ⛔ legacy (9.6M, не пишется)
+```
+
+### PostgreSQL (10.0.0.64:5432, db=moex, schema futures)
+
+```
+futures
+├── futoi_iss              ← ISS OI fiz/yur (241K rows, 2 мес autopurge)
+├── futoi_algopack         ← AlgoPack OI fiz/yur (112 rows, 2 мес autopurge)
+├── prices                 ← 5-min цены портфеля (46K rows, 2 мес)
+├── portfolio              ← Конфиг портфеля (17 rows)
+├── paper_state            ← Состояние paper trader
+├── ticker_specs           ← Справочник: ГО, лот, шаг (64 tickers)
+└── futoi                  ← ⛔ legacy (241K, не пишется)
 ```
 
 ## 📁 Структура проекта

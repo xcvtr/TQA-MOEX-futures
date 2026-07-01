@@ -19,12 +19,28 @@ import moexalgo
 moexalgo.session.TOKEN = TOKEN
 import clickhouse_connect as cc
 
+# ── TOM → FUT normalization (asset_code → futures ticker) ──────────────────
+# Also normalises stock full names → MOEX short tickers.
+TOM_TO_FUT = {
+    'IMOEX': 'IMOEXF',
+    'SBER': 'SBERF',
+    'GAZP': 'GAZPF',
+}
+# Known 64 tickers (ISS) — keep as-is
+ISS_TICKERS = {
+    'HY','IB','IMOEXF','KC','LK','MC','ME','MG','MM','MN','MX','MY',
+    'NA','NG','NM','NR','OJ','PD','PT','RB','RI','RL','RM','RN',
+    'SBERF','SE','SF','Si','SN','SP','SR','SS','SV','TN','TT','UC',
+}
+
+def normalize_ticker(t: str) -> str:
+    """Map asset_code to futures ticker."""
+    if t in TOM_TO_FUT:
+        return TOM_TO_FUT[t]
+    return t
+
 def get_ch():
     return cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-
-def short_ticker(secid):
-    s = secid.rstrip('0123456789')
-    return s[:-1] if len(s) > 1 else s
 
 def get_portfolio():
     import psycopg2
@@ -54,52 +70,47 @@ def load_date(target_date):
     ensure_tables()
     dt_str = target_date.strftime('%Y-%m-%d')
     try:
-        raw = list(moexalgo.Market('forts').tradestats(date=dt_str, native=True))
+        raw = list(moexalgo.Market('forts').tradestats(date=dt_str, use_dataframe=False))
     except Exception as e:
         log.error("Fetch failed: %s", e)
         return 0
     log.info("  %d raw rows", len(raw))
-    
+
     # Also fetch FUTOI (OI by client groups)
     try:
-        futoi_raw = list(moexalgo.Market('forts').futoi(date=dt_str, native=True))
+        futoi_raw = list(moexalgo.Market('forts').futoi(date=dt_str, use_dataframe=False))
     except Exception:
         futoi_raw = []
     log.info("  %d futoi rows", len(futoi_raw))
-    # Group by short ticker, filter only true 5-min bars (not daily snapshots)
+
+    # ── TRADESTATS (bars) ────────────────────────────────────────────────
     groups = defaultdict(list)
     for r in raw:
-        # Keep only true 5-min bars at exact minute boundaries
-        td = r.get('tradetime')
-        if td is None:
+        ts = r.get('ts')
+        if ts is None:
             continue
-        minute = td.minute if hasattr(td, 'minute') else 0
-        second = td.second if hasattr(td, 'second') else 0
+        minute = ts.minute if hasattr(ts, 'minute') else 0
+        second = ts.second if hasattr(ts, 'second') else 0
         if minute % 5 != 0 or second != 0:
             continue
-        t = short_ticker(r.get('ticker', ''))
+        t = normalize_ticker(r.get('asset_code', ''))
         if t and r.get('pr_close') is not None:
             groups[t].append(r)
+
     ch = get_ch()
     import psycopg2
     pg = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
     pcur = pg.cursor()
     total = 0
+
     for ticker, rows in groups.items():
         ch_rows = []
         for r in rows:
-            td = r.get('tradetime', '')
-            dd = r.get('tradedate')
-            if not td or not dd:
+            ts = r.get('ts')
+            if ts is None:
                 continue
-            if isinstance(dd, str):
-                dd = datetime.strptime(dd, '%Y-%m-%d').date()
-            if isinstance(td, str):
-                bt = datetime.combine(dd, datetime.strptime(td, '%H:%M:%S').time())
-            else:
-                bt = td
             ch_rows.append((
-                ticker, bt,
+                ticker, ts,
                 float(r.get('pr_open', 0) or 0),
                 float(r.get('pr_high', 0) or 0),
                 float(r.get('pr_low', 0) or 0),
@@ -118,7 +129,7 @@ def load_date(target_date):
             log.warning("CH fail %s: %s", ticker, e)
         if ticker in portfolio:
             try:
-                pg_rows = [r[:] for r in ch_rows]  # same columns, same order
+                pg_rows = [r[:] for r in ch_rows]
                 execute_values(pcur,
                     "INSERT INTO futures.prices (ticker,bt,opn,hi,lo,prc,vol,vol_b,vol_s,oi) VALUES %s ON CONFLICT DO NOTHING",
                     pg_rows)
@@ -128,25 +139,18 @@ def load_date(target_date):
                 log.warning("PG fail %s: %s", ticker, e)
         total += len(ch_rows)
 
-    # Save FUTOI
+    # ── FUTOI (all tickers → CH futoi_algopack, portfolio → PG) ──────────
     if futoi_raw:
         futoi_groups = defaultdict(lambda: {'bf': 0, 'sf': 0, 'by': 0, 'sy': 0})
         for r in futoi_raw:
-            t = short_ticker(r.get('ticker', ''))
-            if not t or not r.get('tradedate'):
+            t = r.get('ticker', '')
+            ts = r.get('ts')
+            if not t or ts is None:
                 continue
-            td = r.get('tradetime', '')
-            dd = r.get('tradedate')
-            if isinstance(dd, str):
-                dd = datetime.strptime(dd, '%Y-%m-%d').date()
-            if isinstance(td, str):
-                bt = datetime.combine(dd, datetime.strptime(td, '%H:%M:%S').time())
-            else:
-                bt = td
             cl = r.get('clgroup', '')
             buy = int(r.get('pos_long', 0) or 0)
             sell = int(r.get('pos_short', 0) or 0)
-            key = (t, bt)
+            key = (t, ts)
             if str(cl) in ('FIZ', '0'):
                 futoi_groups[key]['bf'] += buy
                 futoi_groups[key]['sf'] += sell
@@ -157,20 +161,21 @@ def load_date(target_date):
         fo_rows = [(r[0], r[1], v['bf'], v['sf'], v['by'], v['sy']) for r, v in futoi_groups.items()]
         if fo_rows:
             try:
-                ch.insert('moex.futoi', fo_rows,
+                ch.insert('moex.futoi_algopack', fo_rows,
                           column_names=['ticker','bt','buy_fiz','sell_fiz','buy_yur','sell_yur'])
             except Exception as e:
-                log.warning("CH futoi fail: %s", e)
+                log.warning("CH futoi_algopack fail: %s", e)
+            # PG — только портфельные, autopurge 2 мес
             try:
                 fo_pg = [r for r in fo_rows if r[0] in portfolio]
                 if fo_pg:
                     execute_values(pcur,
-                        'INSERT INTO futures.futoi (ticker,bt,buy_fiz,sell_fiz,buy_yur,sell_yur) VALUES %s ON CONFLICT DO NOTHING',
+                        'INSERT INTO futures.futoi_algopack (ticker,bt,buy_fiz,sell_fiz,buy_yur,sell_yur) VALUES %s ON CONFLICT DO NOTHING',
                         fo_pg)
-                    pcur.execute("DELETE FROM futures.futoi WHERE bt < now() - INTERVAL '2 months'")
+                    pcur.execute("DELETE FROM futures.futoi_algopack WHERE bt < now() - INTERVAL '2 months'")
                     pg.commit()
             except Exception as e:
-                log.warning("PG futoi fail: %s", e)
+                log.warning("PG futoi_algopack fail: %s", e)
             log.info("  %d futoi rows", len(fo_rows))
 
     ch.close()
