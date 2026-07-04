@@ -205,7 +205,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
         # Timeout
         if bar_idx - p['entry_bar'] >= p.get('timeout_bars', 12):
-            pnl = (close - p['entry_price']) / ms * sp * lot * max(0.001, p.get('rem', 1)) - TRADE_COST
+            pnl = (close - p['entry_price']) / ms * sp * max(0.001, p.get('rem', 1)) - TRADE_COST
             pnl += p.get('part_pnl', 0)
             p['pnl'] = pnl
             p['exit_price'] = close
@@ -234,7 +234,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
             if exit_price:
                 rem = max(0.001, p.get('rem', 1))
-                pnl = (exit_price - p['entry_price']) / ms * sp * lot * rem - TRADE_COST
+                pnl = (exit_price - p['entry_price']) / ms * sp * rem - TRADE_COST
                 pnl += p.get('part_pnl', 0)
                 p['pnl'] = pnl
                 p['exit_price'] = exit_price
@@ -260,7 +260,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
             if exit_price:
                 rem = max(0.001, p.get('rem', 1))
-                pnl = (p['entry_price'] - exit_price) / ms * sp * lot * rem - TRADE_COST
+                pnl = (p['entry_price'] - exit_price) / ms * sp * rem - TRADE_COST
                 pnl += p.get('part_pnl', 0)
                 p['pnl'] = pnl
                 p['exit_price'] = exit_price
