@@ -1,3 +1,12 @@
+## [140] 2026-07-04
+### Changed
+- Final portfolio composition: GZ, Si, RN, GD (NG, W4, VB, SR disabled)
+- Stop Hunt scan completed: 60 tickers, top by Sharpe (RN 33.8, GD 24.7)
+- Answer: strategy is Stop Hunt — false breakout from MQL5 Excavator port
+### Fixed
+- bugs documented in paper_trader.py (entry lag, CVD dead, timeout, lot check)
+### Added
+- Checkpoint: checkpoint/140-stop-hunt-strategy-session.md
 # Changelog
 
 ## [137] 2026-07-04
