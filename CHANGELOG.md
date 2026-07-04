@@ -1,3 +1,15 @@
+## [141] 2026-07-04
+### Added
+- Stop Hunt COMBINED (SHORT+LONG) backtest: 5 tickers, 56.4% WR, 2.03 PF, +7.3M
+### Changed
+- Portfolio: GD (GOLD) and RN (ROSN) added — GD 59.3% WR best performer
+- LONG direction (60.5% WR) > SHORT (48.3%) — both kept for paper trader
+- CR (CNYRUBF) confirmed: no data in tradestats_fo
+### Fixed
+- bt_5t.py: lot_volume added to spec query (was KeyError)
+- bt_5t.py: CORRECT — PnL formula WITHOUT lot (step_price per contract only)
+- Paper trader bugs documented (entry lag, CVD dead, timeout broken)
+
 ## [140] 2026-07-04
 ### Changed
 - Final portfolio composition: GZ, Si, RN, GD (NG, W4, VB, SR disabled)
