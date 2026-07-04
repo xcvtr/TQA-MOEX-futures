@@ -122,7 +122,7 @@ def load_state():
                     'bar_idx': bi or 0, 'next_id': nid or 1}
     except Exception:
         pass
-    return {'capital': 100000.0, 'equity': 100000.0, 'positions': [], 'peak': 100000.0,
+    return {'capital': 200000.0, 'equity': 200000.0, 'positions': [], 'peak': 200000.0,
             'trades': [], 'bar_idx': 0, 'next_id': 1}
 
 
@@ -279,9 +279,9 @@ def run_tick():
     # Load state
     state = load_state()
     positions = state.get('positions', [])
-    equity = state.get('equity', 100000.0)
-    capital = state.get('capital', 100000.0)
-    peak = state.get('peak', 100000.0)
+    equity = state.get('equity', 200000.0)
+    capital = state.get('capital', 200000.0)
+    peak = state.get('peak', 200000.0)
     trades = state.get('trades', [])
     next_id = state.get('next_id', 1)
 
