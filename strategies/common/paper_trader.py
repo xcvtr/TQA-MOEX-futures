@@ -39,6 +39,17 @@ PG_PASS = os.getenv('MOEX_PG_PASSWORD', '')
 
 TRADE_COST = 4  # руб за сделку
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
+
+# PnL formula: (exit-entry)/ms*sp*contracts - TC*contracts
+# LOT is NOT a PnL multiplier — step_price from ISS is already per-contract.
+# Exception: RUB share futures (GZ, RN, SR, VB) need *lot because ISS returns
+# step_price per-share, not per-contract. For these: * lot * PCT where PCT=1.0.
+# Si/Eu step_price = 1 RUB per unit (user confirmed: internet says 1 RUB/contract).
+PCT = {
+    'GZ': 1.0, 'RN': 1.0, 'SR': 1.0, 'VB': 1.0, 'W4': 1.0,
+    'GD': 1.0, 'Si': 0.001, 'Eu': 0.001, 'ED': 0.001, 'CR': 0.001,
+    'BR': 0.001, 'NG': 0.00001,
+}
 log = logging.getLogger('paper_trader')
 
 
@@ -205,7 +216,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
         # Timeout
         if bar_idx - p['entry_bar'] >= p.get('timeout_bars', 12):
-            pnl = (close - p['entry_price']) / ms * sp * max(0.001, p.get('rem', 1)) - TRADE_COST
+            pnl = (close - p['entry_price']) / ms * sp * lot * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - TRADE_COST * p.get('contracts', 1)
             pnl += p.get('part_pnl', 0)
             p['pnl'] = pnl
             p['exit_price'] = close
@@ -234,7 +245,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
             if exit_price:
                 rem = max(0.001, p.get('rem', 1))
-                pnl = (exit_price - p['entry_price']) / ms * sp * rem - TRADE_COST
+                pnl = (exit_price - p['entry_price']) / ms * sp * lot * p.get('pct', 1.0) * rem - TRADE_COST * p.get('contracts', 1)
                 pnl += p.get('part_pnl', 0)
                 p['pnl'] = pnl
                 p['exit_price'] = exit_price
@@ -260,7 +271,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
             if exit_price:
                 rem = max(0.001, p.get('rem', 1))
-                pnl = (p['entry_price'] - exit_price) / ms * sp * rem - TRADE_COST
+                pnl = (p['entry_price'] - exit_price) / ms * sp * lot * p.get('pct', 1.0) * rem - TRADE_COST * p.get('contracts', 1)
                 pnl += p.get('part_pnl', 0)
                 p['pnl'] = pnl
                 p['exit_price'] = exit_price
@@ -395,6 +406,7 @@ def run_tick():
                 'trail': entry.get('trailing_trail', 0.003),
                 'stop_loss': 0.007,
                 'timeout_bars': entry.get('timeout_bars', 12),
+                'pct': PCT.get(ticker, 1.0),
             }
             next_id += 1
             positions.append(pos)
