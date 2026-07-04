@@ -40,16 +40,8 @@ PG_PASS = os.getenv('MOEX_PG_PASSWORD', '')
 TRADE_COST = 4  # руб за сделку
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
 
-# PnL formula: (exit-entry)/ms*sp*contracts - TC*contracts
-# LOT is NOT a PnL multiplier — step_price from ISS is already per-contract.
-# Exception: RUB share futures (GZ, RN, SR, VB) need *lot because ISS returns
-# step_price per-share, not per-contract. For these: * lot * PCT where PCT=1.0.
-# Si/Eu step_price = 1 RUB per unit (user confirmed: internet says 1 RUB/contract).
-PCT = {
-    'GZ': 1.0, 'RN': 1.0, 'SR': 1.0, 'VB': 1.0, 'W4': 1.0,
-    'GD': 1.0, 'Si': 0.001, 'Eu': 0.001, 'ED': 0.001, 'CR': 0.001,
-    'BR': 0.001, 'NG': 0.00001,
-}
+# PnL formula: (exit-entry)/ms*sp*lot*contracts - TC*contracts
+# LOT must always be in the formula. Spec in ticker_specs corrected.
 log = logging.getLogger('paper_trader')
 
 
@@ -406,7 +398,7 @@ def run_tick():
                 'trail': entry.get('trailing_trail', 0.003),
                 'stop_loss': 0.007,
                 'timeout_bars': entry.get('timeout_bars', 12),
-                'pct': PCT.get(ticker, 1.0),
+                'pct': 1.0,
             }
             next_id += 1
             positions.append(pos)
