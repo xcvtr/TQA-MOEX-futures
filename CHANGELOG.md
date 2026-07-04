@@ -1,3 +1,11 @@
+## [143] 2026-07-05
+### Changed
+- Backtest with Finam reduced GO (60% of exchange margin)
+- Reinvest backtest: mathematically correct, physically unrealistic
+- Paper trader PnL formula fixed: no `*lot` multiplier
+### Added
+- Checkpoint: checkpoint/143-reduced-go-backtest.md
+
 ## [141] 2026-07-04
 ### Added
 - Stop Hunt COMBINED (SHORT+LONG) backtest: 5 tickers, 56.4% WR, 2.03 PF, +7.3M
