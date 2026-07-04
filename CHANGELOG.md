@@ -1,5 +1,15 @@
 # Changelog
 
+## [137] 2026-07-04
+### Changed
+- VB and SR removed from portfolio (negative PnL, -35K total)
+- Stop Hunt partial exit tested — kills strategy (PnL goes negative)
+- CVD filter tested — improves PF but cuts trade count by 43%
+### Fixed
+- Portfolio: SR and VB disabled in PG futures.portfolio
+### Added
+- Checkpoint: checkpoint/137-strategy-improvements.md
+
 ## [136] 2026-07-04
 ### Fixed
 - CH cluster recovery: all stuck tables → ReplicatedReplacingMergeTree, 2 replicas
