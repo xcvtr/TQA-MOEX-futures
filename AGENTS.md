@@ -37,6 +37,7 @@ strategies/
     engine.py                   ← портфельный loop по барам
     executor.py                 ← управление позициями, капиталом, ГО
     broker.py                   ← BrokerSim + BrokerLive (заглушка)
+    paper_trader.py             ← ✅ универсальный paper trader (Stop Hunt + CVD)
     trailing_tp.py              ← параметры 0.5/0.3/12 bars
 
   stop_hunt/                    ← Stop Hunt (ложные пробои) ✅ prod

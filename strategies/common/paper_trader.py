@@ -1,501 +1,417 @@
-"""PaperTrader — циклический раннер для paper trading.
+#!/usr/bin/env python3
+"""Universal paper trader — runs every tick, reads portfolio from PG.
 
-На каждом тике:
-1. Загружает последние бары из PG
-2. Вычисляет индикаторы
-3. Запускает check_signal() всех стратегий
-4. Executor управляет позициями через BrokerSim
-5. Сохраняет состояние в PG (на случай рестарта)
-
-use_pg=True  — только PG (препрод/прод)
-use_pg=False — только CH (для отладки/тестов)
+Loads portfolio → loads latest bar → checks signals → manages positions.
+Works with any strategy that has check_signal(bar_data, ticker) -> dict|None.
 """
+import os, sys, json, time, logging
+from datetime import datetime, timezone
+from decimal import Decimal
+from collections import defaultdict
 
-import os
-import json
-import numpy as np
-import pandas as pd
-from datetime import datetime
+# ── Project root ──────────────────────────────────────────────────────────
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 
-try:
-    import clickhouse_connect as cc
-except ImportError:
-    cc = None
-
+import clickhouse_connect as cc
 import psycopg2
+from psycopg2.extras import execute_values
 
-from strategies.common.executor import Executor
-from strategies.common.broker import BrokerSim
+# ── Strategy imports ──────────────────────────────────────────────────────
+STRATEGY_MAP = {}
 
-PG_CONFIG = dict(
-    host=os.getenv('MOEX_PG_HOST', '10.0.0.60'),
-    port=int(os.getenv('MOEX_PG_PORT', '5432')),
-    dbname=os.getenv('MOEX_PG_DB', 'moex'),
-    user=os.getenv('MOEX_PG_USER', 'user'),
-)
+def _load_strategies():
+    """Lazy-import strategies — only when needed."""
+    from strategies.stop_hunt.prod.engine import check_signal as sh_check
+    from strategies.cvd.prod.engine import check_signal as cvd_check
+    STRATEGY_MAP['stop_hunt'] = sh_check
+    STRATEGY_MAP['cvd'] = cvd_check
 
-N_CONTEXT = 50  # баров контекста для индикаторов
+# ── Config ────────────────────────────────────────────────────────────────
+CH_HOST = os.getenv('MOEX_CH_HOST', '10.0.0.64')
+CH_PORT = 8123
+CH_DB = 'moex'
+
+PG_HOST = os.getenv('MOEX_PG_HOST', '10.0.0.64')
+PG_PORT = int(os.getenv('MOEX_PG_PORT', '5432'))
+PG_DB = os.getenv('MOEX_PG_DB', 'moex')
+PG_USER = os.getenv('MOEX_PG_USER', 'postgres')
+PG_PASS = os.getenv('MOEX_PG_PASSWORD', '')
+
+TRADE_COST = 4  # руб за сделку
+TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
+log = logging.getLogger('paper_trader')
 
 
-class PaperTrader:
-    """Paper trading runner. Синхронный цикл: загрузка → сигналы → управление."""
+# ── PG helpers ────────────────────────────────────────────────────────────
 
-    def __init__(self, strategies: list, executor: Executor = None, capital=100_000, use_pg=False):
-        """
-        strategies: [(name, check_signal_fn, tickers, params), ...]
-        executor: если None — создаётся с BrokerSim
-        use_pg: True = читать данные из PG (препрод), False = из CH
-        """
-        self.strategies = strategies
-        self.executor = executor or Executor(broker=BrokerSim(), initial_capital=capital)
-        self.use_pg = use_pg
-        if not use_pg and cc is not None:
-            self.ch = cc.get_client(host='10.0.0.60', port=8123, database='moex')
-        else:
-            self.ch = None
-        self._context = {}    # {ticker: DataFrame последних N_CONTEXT баров}
-        self._specs = {}      # {ticker: specs}
+def pg_conn():
+    return psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB,
+                            user=PG_USER, password=PG_PASS, connect_timeout=5)
 
-    # ── Инициализация ────────────────────────────────────────────────
+def load_portfolio():
+    """Load enabled portfolio entries from PG.
+    Returns {ticker: [(strategy_name, weight, contracts, trailing_params), ...]}
+    """
+    conn = pg_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT ticker, strategy, contracts, weight,
+               COALESCE(trailing_activation, 0.5), COALESCE(trailing_trail, 0.3),
+               COALESCE(timeout_bars, 12)
+        FROM futures.portfolio
+        WHERE enabled = true
+        ORDER BY ticker, strategy
+    """)
+    rows = cur.fetchall()
+    cur.close(); conn.close()
 
-    def init(self, pg_config=None):
-        """Загрузить портфель, specs, восстановить состояние."""
-        self._ensure_state_table()
-        self.executor.load_portfolio(pg_config or PG_CONFIG)
-        self._load_specs()
-        self._restore_state()
-        return self
+    portfolio = defaultdict(list)
+    asset_map = {}
+    for r in rows:
+        ticker, strategy = r[0], r[1]
+        portfolio[ticker].append({
+            'strategy': strategy,
+            'contracts': r[2],  # None = use fixed contract count from ticker_specs
+            'weight': float(r[3]) if r[3] else 1.0,
+            'trailing_activation': float(r[4]) if r[4] else 0.5,
+            'trailing_trail': float(r[5]) if r[5] else 0.3,
+            'timeout_bars': int(r[6]) if r[6] else 12,
+        })
+    return dict(portfolio)
 
-    def _ensure_state_table(self):
-        conn = psycopg2.connect(**PG_CONFIG, connect_timeout=5)
+
+def load_specs(tickers):
+    """Load ticker specs from PG."""
+    if not tickers:
+        return {}
+    conn = pg_conn()
+    cur = conn.cursor()
+    placeholders = ','.join(['%s'] * len(tickers))
+    cur.execute(f"""
+        SELECT ticker, go, step_price, min_step, lot_volume,
+               COALESCE(asset_code, ticker)
+        FROM futures.ticker_specs
+        WHERE ticker IN ({placeholders})
+    """, list(tickers))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return {
+        str(r[0]): {
+            'go': float(r[1]) if r[1] else 0,
+            'sp': float(r[2]) if r[2] else 1.0,
+            'ms': float(r[3]) if r[3] else 0.01,
+            'lot': int(r[4]) if r[4] else 1,
+            'asset': str(r[5]),
+        }
+        for r in rows
+    }
+
+
+def load_state():
+    """Load current paper trader state from PG."""
+    try:
+        conn = pg_conn()
         cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS futures.paper_state (
-                key   VARCHAR(50) PRIMARY KEY,
-                value TEXT
-            )
-        """)
+        cur.execute("SELECT capital, equity, peak, positions_json, bar_idx, next_id FROM futures.paper_state ORDER BY updated_at DESC LIMIT 1")
+        r = cur.fetchone()
+        cur.close(); conn.close()
+        if r:
+            cap, eq, pk, pos_json, bi, nid = r
+            return {'capital': float(cap), 'equity': float(eq), 'peak': float(pk),
+                    'positions': json.loads(pos_json) if pos_json else [],
+                    'bar_idx': bi or 0, 'next_id': nid or 1}
+    except Exception:
+        pass
+    return {'capital': 100000.0, 'equity': 100000.0, 'positions': [], 'peak': 100000.0,
+            'trades': [], 'bar_idx': 0, 'next_id': 1}
+
+
+def save_state(state):
+    """Save paper trader state to PG."""
+    try:
+        conn = pg_conn()
+        cur = conn.cursor()
+        max_pos = max((p['id'] for p in state.get('positions', [])), default=0)
+        for t in state.get('trades', []):
+            if t.get('saved', False):
+                continue
+            cur.execute("""
+                INSERT INTO futures.paper_trades
+                (ticker, strategy, direction, entry_price, exit_price, entry_time, exit_time,
+                 pnl_rub, signal_type, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'closed')
+            """, (t['ticker'], t.get('strategy', 'stop_hunt'), t['direction'], t['entry_price'], t.get('exit_price'),
+                  t.get('entry_time', datetime.now(timezone.utc)), t.get('exit_time'),
+                  t.get('pnl'), t.get('exit_reason', '')))
+            t['saved'] = True
         conn.commit()
-        cur.close()
-        conn.close()
+        # Delete old state, insert new
+        cur.execute("DELETE FROM futures.paper_state")
+        cur.execute("""
+            INSERT INTO futures.paper_state (capital, equity, peak, positions_json, bar_idx, next_id, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+        """, (round(state['capital'], 2), round(state['equity'], 2), round(state.get('peak', state['equity']), 2),
+              json.dumps(state['positions']), state['bar_idx'], state.get('next_id', 1)))
+        conn.commit()
+        cur.close(); conn.close()
+    except Exception as e:
+        log.warning("Save state failed: %s", e)
 
-    def _load_specs(self):
-        """Загрузить ticker_specs для всех тикеров портфеля."""
-        tickers = set()
-        for _, _, ts, _ in self.strategies:
-            tickers.update(ts)
-        if not tickers:
-            return
 
-        cfg = PG_CONFIG
-        conn = psycopg2.connect(**cfg, connect_timeout=5)
-        cur = conn.cursor()
-        placeholders = ','.join(['%s'] * len(tickers))
-        cur.execute(f"""
-            SELECT ticker, go, min_step, step_price, lot_volume
-            FROM futures.ticker_specs WHERE ticker IN ({placeholders})
-        """, list(tickers))
-        for r in cur.fetchall():
-            self._specs[str(r[0])] = {
-                'go': float(r[1]) if r[1] else 0,
-                'min_step': float(r[2]) if r[2] else 0.01,
-                'step_price': float(r[3]) if r[3] else 1.0,
-                'lot_volume': int(r[4]) if r[4] else 1,
-            }
-        cur.close()
-        conn.close()
+# ── CH helpers ────────────────────────────────────────────────────────────
 
-    # ── Данные из CH ─────────────────────────────────────────────────
-
-    def fetch_bars(self, asset_code: str, n_bars: int = N_CONTEXT):
-        """Загрузить последние n_bars 5-минутных баров из CH."""
-        return self.ch.query_df(f"""
-            SELECT toStartOfInterval(SYSTIME,INTERVAL 5 MINUTE) as bt,
-                   argMax(pr_open,SYSTIME) as opn,
-                   argMax(pr_high,SYSTIME) as hi,
-                   argMax(pr_low,SYSTIME) as lo,
-                   argMax(pr_close,SYSTIME) as prc,
+def get_latest_bars(ticker, asset, n_bars=50):
+    """Get last N 5-min bars for a ticker from CH."""
+    ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+    try:
+        df = ch.query_df(f"""
+            SELECT toStartOfInterval(SYSTIME, INTERVAL 5 MINUTE) as bt,
+                   argMax(pr_open, SYSTIME) as opn,
+                   argMax(pr_high, SYSTIME) as hi,
+                   argMax(pr_low, SYSTIME) as lo,
+                   argMax(pr_close, SYSTIME) as prc,
                    sum(vol_b) as vb, sum(vol_s) as vs
             FROM moex.tradestats_fo
-            WHERE asset_code = '{asset_code}'
-              AND SYSTIME > now() - INTERVAL {n_bars * 5 + 60} MINUTE
+            WHERE asset_code = '{asset}'
+              AND SYSTIME >= now() - INTERVAL {n_bars * 5 + 5} MINUTE
             GROUP BY bt ORDER BY bt
         """)
-
-    def fetch_bars_from_pg(self, ticker: str, n_bars: int = N_CONTEXT):
-        """Загрузить последние n_bars 5-минутных баров из PG futures.prices."""
-        conn = psycopg2.connect(**PG_CONFIG, connect_timeout=5)
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT bt, opn, hi, lo, prc, vol FROM futures.prices WHERE ticker=%s ORDER BY bt DESC LIMIT %s",
-            (ticker, n_bars),
-        )
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        if not rows:
-            return pd.DataFrame()
-        df = pd.DataFrame(rows, columns=['bt', 'opn', 'hi', 'lo', 'prc', 'vol'])
-        df = df.sort_values('bt').reset_index(drop=True)
-        df['vb'] = df['vol'].astype(float) * 0.5
-        df['vs'] = df['vol'].astype(float) * 0.5
-        df['oi_close'] = 0
+        ch.close()
         return df
+    except Exception as e:
+        log.error("CH error for %s: %s", ticker, e)
+        ch.close()
+        return None
 
-    def compute_indicators(self, ticker: str, df) -> dict:
-        """Вычислить индикаторы для сигналов. Вернуть bar_data для check_signal."""
-        n = len(df)
-        if n < 25:
-            return {}
 
-        prc = df['prc'].values.astype(float)
-        hi = df['hi'].values.astype(float)
-        lo = df['lo'].values.astype(float)
-        vb = df['vb'].values.astype(float).clip(0)
-        vs = df['vs'].values.astype(float).clip(0)
-        vol = np.maximum(vb + vs, 1)
+# ── Position management ──────────────────────────────────────────────────
 
-        # CVD z-score (period=20)
-        cvd_arr = vb - vs
-        dcvd = np.diff(cvd_arr, prepend=cvd_arr[0])
-        dcvd_z = np.full(n, np.nan)
-        for i in range(20, n):
-            s = dcvd[i - 20:i]
-            if s.std() > 0:
-                dcvd_z[i] = (dcvd[i] - s.mean()) / s.std()
+def manage_positions(positions, bar_data, specs, bar_idx):
+    """Update all open positions. Return closed trades."""
+    closed = []
+    for p in list(positions):
+        if p.get('closed', False):
+            continue
+        ticker = p['ticker']
+        bd = bar_data.get(ticker)
+        if not bd:
+            continue
+        s = specs.get(ticker, {})
+        sp, ms = s.get('sp', 1), s.get('ms', 0.01)
+        lot = s.get('lot', 1)
+        hi, lo, close = bd['hi'], bd['lo'], bd['prc']
+        if p['entry_bar'] >= bar_idx:
+            continue
 
-        # SMA(20), Vol MA(20)
-        sma20 = np.full(n, np.nan)
-        vol_ma20 = np.full(n, np.nan)
-        for i in range(20, n):
-            sma20[i] = np.mean(prc[i - 20:i])
-            vol_ma20[i] = np.mean(vol[i - 20:i])
+        # Timeout
+        if bar_idx - p['entry_bar'] >= p.get('timeout_bars', 12):
+            pnl = (close - p['entry_price']) / ms * sp * lot * max(0.001, p.get('rem', 1)) - TRADE_COST
+            pnl += p.get('part_pnl', 0)
+            p['pnl'] = pnl
+            p['exit_price'] = close
+            p['exit_reason'] = 'timeout'
+            p['closed'] = True
+            p['exit_bar'] = bar_idx
+            closed.append(p)
+            continue
 
+        # Trailing TP
+        if p['direction'] == 'long':
+            if not p.get('trailing_activated'):
+                if hi >= p['entry_price'] * (1 + p.get('activation', 0.005)):
+                    p['trailing_activated'] = True
+                    p['trailing_level'] = hi * (1 - p.get('trail', 0.003))
+            elif p['trailing_level'] and hi >= p['trailing_level'] / (1 - p.get('trail', 0.003)):
+                p['trailing_level'] = hi * (1 - p.get('trail', 0.003))
+
+            exit_price = None
+            if p.get('trailing_activated') and lo <= p.get('trailing_level', 0):
+                exit_price = p['trailing_level']
+                p['exit_reason'] = 'trailing_tp'
+            elif lo <= p['entry_price'] * (1 - p.get('stop_loss', 0.007)):
+                exit_price = lo
+                p['exit_reason'] = 'stop_loss'
+
+            if exit_price:
+                rem = max(0.001, p.get('rem', 1))
+                pnl = (exit_price - p['entry_price']) / ms * sp * lot * rem - TRADE_COST
+                pnl += p.get('part_pnl', 0)
+                p['pnl'] = pnl
+                p['exit_price'] = exit_price
+                p['closed'] = True
+                p['exit_bar'] = bar_idx
+                closed.append(p)
+
+        elif p['direction'] == 'short':
+            if not p.get('trailing_activated'):
+                if lo <= p['entry_price'] * (1 - p.get('activation', 0.005)):
+                    p['trailing_activated'] = True
+                    p['trailing_level'] = lo * (1 + p.get('trail', 0.003))
+            elif p['trailing_level'] and lo <= p['trailing_level'] / (1 + p.get('trail', 0.003)):
+                p['trailing_level'] = lo * (1 + p.get('trail', 0.003))
+
+            exit_price = None
+            if p.get('trailing_activated') and hi >= p.get('trailing_level', 0):
+                exit_price = p['trailing_level']
+                p['exit_reason'] = 'trailing_tp'
+            elif hi >= p['entry_price'] * (1 + p.get('stop_loss', 0.007)):
+                exit_price = hi
+                p['exit_reason'] = 'stop_loss'
+
+            if exit_price:
+                rem = max(0.001, p.get('rem', 1))
+                pnl = (p['entry_price'] - exit_price) / ms * sp * lot * rem - TRADE_COST
+                pnl += p.get('part_pnl', 0)
+                p['pnl'] = pnl
+                p['exit_price'] = exit_price
+                p['closed'] = True
+                p['exit_bar'] = bar_idx
+                closed.append(p)
+
+    return closed
+
+
+# ── Main tick ─────────────────────────────────────────────────────────────
+
+def run_tick():
+    _load_strategies()
+
+    # Load state
+    state = load_state()
+    positions = state.get('positions', [])
+    equity = state.get('equity', 100000.0)
+    capital = state.get('capital', 100000.0)
+    peak = state.get('peak', 100000.0)
+    trades = state.get('trades', [])
+    next_id = state.get('next_id', 1)
+
+    # Load portfolio
+    portfolio = load_portfolio()
+    if not portfolio:
+        log.warning("Empty portfolio")
+        return
+
+    tickers = list(portfolio.keys())
+    specs = load_specs(tickers)
+    if not specs:
+        log.warning("No specs loaded")
+        return
+
+    # Load latest bars for all tickers
+    bar_data = {}
+    max_bar_idx = 0
+    for ticker in tickers:
+        s = specs.get(ticker)
+        if not s:
+            continue
+        df = get_latest_bars(ticker, s['asset'])
+        if df is None or df.empty:
+            continue
+        bar_idx = len(df)  # последний бар
         last = df.iloc[-1]
-        bar_data = {
-            'prc': float(last['prc']),
+        second_last = df.iloc[-2] if len(df) >= 2 else last
+        bar_data[ticker] = {
+            'bt': last['bt'],
+            'opn': float(last['opn']),
             'hi': float(last['hi']),
             'lo': float(last['lo']),
-            'opn': float(last['opn']),
-            'vol': float(vol[-1]),
-            'vb': float(vb[-1]),
-            'vs': float(vs[-1]),
-            'dcvd_z': float(dcvd_z[-1]) if np.isfinite(dcvd_z[-1]) else 0,
-            'sma20': float(sma20[-1]) if np.isfinite(sma20[-1]) else float(last['prc']),
-            'vol_ma20': float(vol_ma20[-1]) if np.isfinite(vol_ma20[-1]) else 1,
-            'oi': float(last.get('oi_close', 0)),
+            'prc': float(last['prc']),
+            'prc_prev': float(second_last['prc']),
+            'vol': 100,
+            'dcvd_z': 0,
         }
+        # Build hi/lo history for signal check
+        hi_hist = [float(v) for v in df['hi'].iloc[-21:-1].values]
+        lo_hist = [float(v) for v in df['lo'].iloc[-21:-1].values]
+        bar_data[ticker]['hi_hist'] = hi_hist
+        bar_data[ticker]['lo_hist'] = lo_hist
+        max_bar_idx = max(max_bar_idx, bar_idx)
 
-        # Histories for Stop Hunt
-        if n >= 20:
-            bar_data['lo_hist'] = list(lo[-20:])
-            bar_data['hi_hist'] = list(hi[-20:])
-        bar_data['oi_5ago'] = float(df['oi_close'].iloc[-5]) if 'oi_close' in df.columns and n >= 5 else 0
+    state['bar_idx'] = max_bar_idx
 
-        # Lunch Reversal
-        bt = last.get('bt') or last.name
-        if hasattr(bt, 'hour'):
-            bar_data['hour'] = bt.hour
-            bar_data['minute'] = bt.minute
-        # Price at 10:00 MSK (bar 10:00 = index where hour=10, minute=0)
-        for j in range(n - 1, -1, -1):
-            row = df.iloc[j]
-            bt2 = row.get('bt') or row.name
-            if hasattr(bt2, 'hour') and bt2.hour == 10 and bt2.minute == 0:
-                bar_data['price_10'] = float(row['prc'])
-                break
-        else:
-            bar_data['price_10'] = 0
+    # Manage existing positions
+    closed = manage_positions(positions, bar_data, specs, max_bar_idx)
+    for c in closed:
+        c['exit_time'] = datetime.now(timezone.utc)
+        c['saved'] = False
+        c['id'] = next_id
+        next_id += 1
+        equity += c['pnl']
+        trades.append(c)
+        log.info("Closed %s %s PnL=%.0f (%s)", c['ticker'], c['direction'], c['pnl'], c.get('exit_reason', ''))
 
-        return bar_data
+    # Check for new signals
+    for ticker in tickers:
+        bd = bar_data.get(ticker)
+        if not bd:
+            continue
+        # Already have open position for this ticker?
+        if any(not p.get('closed', False) and p.get('ticker') == ticker for p in positions):
+            continue
+        s = specs.get(ticker, {})
+        ms = s.get('ms', 0.01)
+        sp = s.get('sp', 1)
+        lot = s.get('lot', 1)
 
-    # ── Основной цикл ────────────────────────────────────────────────
-
-    def tick(self, asset_map: dict = None):
-        """Один тик: загрузить данные → сигналы → управление позициями.
-
-        asset_map: {ticker: asset_code} для загрузки из CH.
-                   Если None — берётся из portfolio + ticker_specs.
-        """
-        if asset_map is None:
-            asset_map = self._build_asset_map()
-
-        # Загружаем данные для всех тикеров
-        bar_idx = datetime.now().timestamp()  # уникальный индекс для этого тика
-        for ticker, asset in asset_map.items():
-            if ticker not in self._specs:
-                continue
-            if self.use_pg:
-                df = self.fetch_bars_from_pg(ticker, N_CONTEXT)
-            else:
-                df = self.fetch_bars(asset, N_CONTEXT)
-            if df.empty or len(df) < 25:
-                continue
-            self._context[ticker] = df
-
-            # Индикаторы → bar_data
-            bar_data = self.compute_indicators(ticker, df)
-            if not bar_data:
+        for entry in portfolio[ticker]:
+            strategy_name = entry['strategy']
+            fn = STRATEGY_MAP.get(strategy_name)
+            if not fn:
                 continue
 
-            # Сигналы для всех стратегий этого тикера
-            specs = self._specs.get(ticker, {})
-            for name, check_fn, tickers, params in self.strategies:
-                if ticker not in tickers:
-                    continue
-                signal = check_fn(bar_data, ticker, params)
-                if signal:
-                    self.executor.process_signal(signal, int(bar_idx), specs, bar_data)
-
-            # Управление позициями — через broker напрямую
-            for p in list(self.executor.positions):
-                if p.closed:
-                    continue
-                pnl = self.executor.broker.update(
-                    p, int(bar_idx),
-                    float(df['hi'].iloc[-1]),
-                    float(df['lo'].iloc[-1]),
-                    float(df['prc'].iloc[-1]),
-                    float(bar_data.get('vol', 0)),
-                )
-                if p.closed:
-                    import numpy as np
-                    if np.isfinite(pnl):
-                        self.executor.equity += float(pnl)
-                    else:
-                        p.closed = False
-                        continue
-                    self.executor.trades.append(p)
-
-            # Cleanup + equity tracking
-            self.executor.positions = [p for p in self.executor.positions if not p.closed]
-            if self.executor.equity > self.executor.peak:
-                self.executor.peak = self.executor.equity
-            self.executor.rm.update(self.executor.equity)
-
-    def catch_up(self, asset_map: dict = None):
-        """Прогнать всю историю из PG через Backtester (один раз при старте)."""
-        # Build a simple backtest on PG data
-        import psycopg2
-        import clickhouse_connect as cc
-        import numpy as np
-        import pandas as pd
-        from datetime import datetime
-        
-        pg = psycopg2.connect(host='10.0.0.60', port=5432, dbname='moex', user='user')
-        cur = pg.cursor()
-        
-        bars_dict = {}
-        specs = {}
-        for ticker in self._specs:
-            cur.execute("""
-                SELECT bt, opn, hi, lo, prc, vol, vol_b, vol_s, oi
-                FROM futures.prices WHERE ticker=%s ORDER BY bt
-            """, (ticker,))
-            rows = cur.fetchall()
-            if len(rows) < 25:
-                continue
-            df = pd.DataFrame(rows, columns=['bt','opn','hi','lo','prc','vol','vb','vs','oi'])
-            df['vol'] = df['vol'].fillna(0).clip(0)
-            df['vb'] = df['vb'].fillna(0).clip(0)
-            df['vs'] = df['vs'].fillna(0).clip(0)
-            
-            n = len(df)
-            prc = df['prc'].values.astype(float)
-            hi = df['hi'].values.astype(float)
-            lo = df['lo'].values.astype(float)
-            vb = df['vb'].values.astype(float)
-            vs = df['vs'].values.astype(float)
-            
-            # CVD z-score
-            cvd_arr = vb - vs
-            dcvd = np.diff(cvd_arr, prepend=cvd_arr[0])
-            dcvd_z = np.full(n, np.nan)
-            for i in range(20, n):
-                s = dcvd[i-20:i]
-                if s.std() > 0:
-                    dcvd_z[i] = (dcvd[i] - s.mean()) / s.std()
-            
-            # SMA(20), Vol MA(20)
-            sma20 = np.full(n, np.nan)
-            vol_ma20 = np.full(n, np.nan)
-            for i in range(20, n):
-                sma20[i] = np.mean(prc[i-20:i])
-                vol_ma20[i] = np.mean(vb[i-20:i] + vs[i-20:i]) or 1
-            
-            df['dcvd_z'] = dcvd_z
-            df['sma20'] = sma20
-            df['vol_ma20'] = vol_ma20
-            df['hour'] = df['bt'].dt.hour
-            df['minute'] = df['bt'].dt.minute
-            
-            bars_dict[ticker] = df
-            specs[ticker] = self._specs[ticker]
-        
-        cur.close()
-        pg.close()
-        
-        if not bars_dict:
-            return
-        
-        # Run Engine
-        from strategies.common.engine import PortfolioEngine
-        from strategies.common.broker import BrokerSim
-        engine = PortfolioEngine(self.strategies, broker=BrokerSim(), capital=int(self.executor.equity))
-        engine.executor.rm = self.executor.rm
-        engine.run(bars_dict, specs)
-        
-        # Copy state
-        self.executor.equity = engine.executor.equity
-        self.executor.peak = engine.executor.peak
-        self.executor.positions = engine.executor.positions
-        self.executor.trades = engine.executor.trades
-        self.executor.eq_curve = engine.executor.eq_curve
-        self._save_state()
-
-    def run(self, n_ticks: int = None, asset_map: dict = None):
-        """Запустить N тиков (None = бесконечно)."""
-        tick_count = 0
-        while n_ticks is None or tick_count < n_ticks:
             try:
-                self.tick(asset_map)
-                tick_count += 1
-                self._save_state()
+                signal = fn(bd, ticker)
             except Exception as e:
-                print(f'[PaperTrader] tick {tick_count} error: {e}')
-                import traceback
-                traceback.print_exc()
-            if n_ticks is not None:
-                break
+                log.warning("Signal error %s/%s: %s", ticker, strategy_name, e)
+                continue
 
-    # ── Asset map ────────────────────────────────────────────────────
+            if not signal:
+                continue
 
-    def _build_asset_map(self) -> dict:
-        """Build {ticker: asset_code} from PG ticker_specs."""
-        tickers = set()
-        for _, _, ts, _ in self.strategies:
-            tickers.update(ts)
-        cfg = PG_CONFIG
-        conn = psycopg2.connect(**cfg, connect_timeout=5)
-        cur = conn.cursor()
-        placeholders = ','.join(['%s'] * len(tickers)) if tickers else ''
-        if not placeholders:
-            cur.close()
-            conn.close()
-            return {}
-        cur.execute(f"""
-            SELECT ticker, asset_code FROM futures.ticker_specs
-            WHERE ticker IN ({placeholders})
-        """, list(tickers))
-        am = {str(r[0]): str(r[1]) for r in cur.fetchall() if r[1]}
-        cur.close()
-        conn.close()
-        return am
+            # Entry on next bar's open + 1 tick
+            ms_val = ms
+            entry_price = float(bd.get('prc_prev', bd['prc'])) + ms_val
+            entry_price = round(entry_price / ms_val) * ms_val
 
-    # ── Сохранение/восстановление состояния ──────────────────────────
+            # Contract sizing
+            contracts = entry.get('contracts') or 1
 
-    def _save_state(self):
-        """Сохранить капитал и открытые позиции в PG."""
-        conn = psycopg2.connect(**PG_CONFIG, connect_timeout=5)
-        cur = conn.cursor()
+            pos = {
+                'id': next_id,
+                'ticker': ticker,
+                'strategy': strategy_name,
+                'direction': signal['direction'],
+                'entry_price': entry_price,
+                'entry_time': datetime.now(timezone.utc),
+                'entry_bar': max_bar_idx,
+                'contracts': contracts,
+                'pnl': 0,
+                'closed': False,
+                'trailing_activated': False,
+                'trailing_level': None,
+                'rem': 1,
+                'part_pnl': 0,
+                'activation': entry.get('trailing_activation', 0.005),
+                'trail': entry.get('trailing_trail', 0.003),
+                'stop_loss': 0.007,
+                'timeout_bars': entry.get('timeout_bars', 12),
+            }
+            next_id += 1
+            positions.append(pos)
+            log.info("New %s %s %s @ %.1f", ticker, strategy_name, signal['direction'], entry_price)
 
-        # Убедиться что таблица есть
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS futures.paper_state (
-                key   VARCHAR(50) PRIMARY KEY,
-                value TEXT
-            )
-        """)
+    # Save
+    state['positions'] = [p for p in positions if not p.get('closed', False)]
+    state['equity'] = equity
+    state['peak'] = max(peak, equity)
+    state['trades'] = trades
+    state['next_id'] = next_id
+    save_state(state)
 
-        # Капитал
-        cur.execute("""
-            INSERT INTO futures.paper_state (key, value)
-            VALUES ('capital', %s)
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-        """, (str(round(self.executor.equity, 2)),))
-        # Peak (для расчёта DD)
-        cur.execute("""
-            INSERT INTO futures.paper_state (key, value)
-            VALUES ('peak', %s)
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-        """, (str(round(self.executor.peak, 2)),))
+    log.info("Tick complete: equity=%.0f, open=%d, total_trades=%d",
+             equity, len(state['positions']), len(trades))
 
-        # Открытые позиции (сериализовать)
-        positions = []
-        for p in self.executor.positions:
-            if not p.closed:
-                positions.append({
-                    'ticker': p.ticker,
-                    'direction': p.direction,
-                    'entry_price': p.entry_price,
-                    'entry_bar': p.entry_bar,
-                    'shares': p.shares,
-                    'strategy': p.strategy,
-                    'go': p.go,
-                    'step_price': p.step_price,
-                    'min_step': p.min_step,
-                    'best_price': p.best_price,
-                    'best_abs': p.best_abs,
-                    'trail_activated': p.trail_activated,
-                })
-        cur.execute("""
-            INSERT INTO futures.paper_state (key, value)
-            VALUES ('positions', %s)
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-        """, (json.dumps(positions),))
 
-        conn.commit()
-        cur.close()
-        conn.close()
-
-    def _restore_state(self):
-        """Восстановить капитал и позиции из PG."""
-        conn = psycopg2.connect(**PG_CONFIG, connect_timeout=5)
-        cur = conn.cursor()
-        cur.execute("SELECT key, value FROM futures.paper_state")
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        state = {r[0]: r[1] for r in rows}
-
-        # Капитал
-        if 'capital' in state:
-            self.executor.equity = float(state['capital'])
-            self.executor.initial = self.executor.equity
-            self.executor.peak = self.executor.equity
-
-        # Позиции
-        if 'positions' in state:
-            import json
-            from strategies.common.broker import Position
-            positions = json.loads(state['positions'])
-            for pd in positions:
-                pos = Position(
-                    pd['ticker'], pd['direction'], pd['entry_price'],
-                    pd['entry_bar'], pd['shares'], pd['strategy'],
-                    pd['go'], pd['step_price'], pd['min_step'],
-                )
-                pos.best_price = pd.get('best_price', 0.0)
-                pos.best_abs = pd.get('best_abs', 0.0)
-                pos.trail_activated = pd.get('trail_activated', False)
-                self.executor.positions.append(pos)
-
-    # ── Статус ───────────────────────────────────────────────────────
-
-    def status(self) -> dict:
-        """Текущее состояние."""
-        open_positions = [p for p in self.executor.positions if not p.closed]
-        return {
-            'equity': round(self.executor.equity, 2),
-            'return_pct': round(self.executor.total_return_pct, 2),
-            'mdd_pct': round(self.executor.max_dd_pct, 2),
-            'open_positions': len(open_positions),
-            'total_trades': len(self.executor.trades),
-            'positions': [
-                {'ticker': p.ticker, 'direction': p.direction,
-                 'strategy': p.strategy, 'entry': p.entry_price,
-                 'shares': p.shares, 'pnl': round(p.pnl, 2)}
-                for p in open_positions
-            ],
-        }
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+    run_tick()
