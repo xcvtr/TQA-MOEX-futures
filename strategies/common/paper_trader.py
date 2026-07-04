@@ -92,6 +92,7 @@ def load_specs(tickers):
     placeholders = ','.join(['%s'] * len(tickers))
     cur.execute(f"""
         SELECT ticker, go, step_price, min_step, lot_volume,
+               COALESCE(pct, 1.0),
                COALESCE(asset_code, ticker)
         FROM futures.ticker_specs
         WHERE ticker IN ({placeholders})
@@ -104,7 +105,8 @@ def load_specs(tickers):
             'sp': float(r[2]) if r[2] else 1.0,
             'ms': float(r[3]) if r[3] else 0.01,
             'lot': int(r[4]) if r[4] else 1,
-            'asset': str(r[5]),
+            'pct': float(r[5]) if r[5] else 1.0,
+            'asset': str(r[6]),
         }
         for r in rows
     }
@@ -398,7 +400,7 @@ def run_tick():
                 'trail': entry.get('trailing_trail', 0.003),
                 'stop_loss': 0.007,
                 'timeout_bars': entry.get('timeout_bars', 12),
-                'pct': 1.0,
+                'pct': specs.get(ticker, {}).get('pct', 1.0),
             }
             next_id += 1
             positions.append(pos)
