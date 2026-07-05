@@ -80,10 +80,14 @@ wins = pnls[pnls > 0]; losses = pnls[pnls <= 0]
 n = len(pnls); wr = len(wins)/n*100 if n > 0 else 0
 pf = abs(sum(wins)/sum(losses)) if len(losses) > 0 and sum(losses) != 0 else float('inf')
 final_bal = balance[-1]; final_mtm = mtm[-1]
-peak_mtm = np.maximum.accumulate(mtm)
-dd_mtm = (peak_mtm - mtm) / peak_mtm * 100
-mdd_mtm = np.max(dd_mtm)
+peak_bal = np.maximum.accumulate(balance)
+dd_bal = (peak_bal - balance) / peak_bal * 100
+mdd_bal = np.max(dd_bal)
 ret_bal = (final_bal/CAPITAL - 1)*100
+
+# Floating PnL (MTM - Balance) — visible on its own scale
+floating = mtm - balance
+max_floating = np.max(np.abs(floating)) if len(floating) > 0 else 1
 
 # ── Plot ──
 fig = plt.figure(figsize=(16, 11))
@@ -106,7 +110,7 @@ stats = (
     f'Start: {CAPITAL:,.0f} ₽\n'
     f'Balance: {final_bal:,.0f} ₽  (+{ret_bal:,.0f}%)\n'
     f'MTM: {final_mtm:,.0f} ₽\n'
-    f'MTM MDD: {mdd_mtm:.2f}%\n'
+    f'Cash MDD: {mdd_bal:.2f}%\n'
     f'Trades: {n}  |  WR: {wr:.1f}%  |  PF: {pf:.3f}'
 )
 ax1.text(0.02, 0.97, stats, transform=ax1.transAxes, fontsize=9,
@@ -119,37 +123,26 @@ def fmt(x, p):
     return f'{x:.0f}'
 ax1.yaxis.set_major_formatter(plt.FuncFormatter(fmt))
 
-# ── Drawdown ──
+# ── Floating PnL (MTM - Balance) ──
 ax2 = fig.add_subplot(gs[1])
-ax2.fill_between(ts, dd_mtm, 0, color='#f44336', alpha=0.4)
-ax2.plot(ts, dd_mtm, color='#f44336', linewidth=1, alpha=0.7, label='Drawdown (MTM)')
-ax2.axhline(y=mdd_mtm, color='#f44336', linestyle=':', linewidth=0.8, alpha=0.5)
-ax2.set_ylabel('Drawdown (%)', fontsize=11)
-ax2.set_title(f'MTM Drawdown (Max: {mdd_mtm:.2f}%)', fontsize=11)
-ax2.legend(fontsize=9)
+ax2.plot(ts, floating, color='#FF9800', linewidth=1.5, alpha=0.85)
+ax2.fill_between(ts, floating, 0, where=(floating >= 0), color='#4CAF50', alpha=0.3)
+ax2.fill_between(ts, floating, 0, where=(floating < 0), color='#f44336', alpha=0.3)
+ax2.axhline(y=0, color='#333', linewidth=0.5)
+ax2.set_ylabel('Floating PnL (RUB)', fontsize=11)
+ax2.set_title(f'Floating PnL (MTM - Balance) — max ±{max_floating:,.0f} ₽', fontsize=11)
+ax2.yaxis.set_major_formatter(plt.FuncFormatter(fmt))
 ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
 ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
 plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
 
-# ── Trade markers ──
+# ── Cash Drawdown (Balance) ──
 ax3 = fig.add_subplot(gs[2])
-win_ts = []; win_pnl = []; loss_ts = []; loss_pnl = []
-# Get trade exit times (approximate from bar index)
-for t in trades[-500:]:  # show last 500 trades only
-    if t.entry_bar < n_bars:
-        bar_time = ts[min(t.entry_bar, len(ts)-1)]
-        val = t.pnl / final_mtm * 100 if final_mtm != 0 else 0
-        if t.pnl > 0:
-            win_ts.append(bar_time); win_pnl.append(val)
-        else:
-            loss_ts.append(bar_time); loss_pnl.append(val)
-
-ax3.scatter(win_ts, win_pnl, c='#4CAF50', s=8, alpha=0.5, label='Win')
-ax3.scatter(loss_ts, loss_pnl, c='#f44336', s=8, alpha=0.5, label='Loss')
-ax3.axhline(y=0, color='#333', linewidth=0.5)
-ax3.set_ylabel('Trade % of Equity', fontsize=11)
-ax3.set_title(f'Trade PnL (last {min(500, n)}) — % of final equity', fontsize=11)
-ax3.legend(fontsize=9, loc='upper left')
+ax3.fill_between(ts, dd_bal, 0, color='#f44336', alpha=0.4)
+ax3.plot(ts, dd_bal, color='#f44336', linewidth=1, alpha=0.7)
+ax3.axhline(y=mdd_bal, color='#f44336', linestyle=':', linewidth=0.8, alpha=0.5)
+ax3.set_ylabel('Drawdown (%)', fontsize=11)
+ax3.set_title(f'Cash Drawdown (Balance) — Max: {mdd_bal:.2f}%', fontsize=11)
 ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
 ax3.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
 plt.setp(ax3.xaxis.get_majorticklabels(), rotation=45, ha='right')
@@ -160,5 +153,5 @@ plt.savefig('/home/user/.hermes/image_cache/equity_mtm.png', dpi=150, bbox_inche
 plt.close()
 
 print(f'Image: /home/user/.hermes/image_cache/equity_mtm.png')
-print(f'Stats: balance={final_bal:,.0f} MTM={final_mtm:,.0f} ret={ret_bal:+.0f}% MDD={mdd_mtm:.2f}%')
+print(f'Stats: balance={final_bal:,.0f} MTM={final_mtm:,.0f} ret={ret_bal:+.0f}% Cash MDD={mdd_bal:.2f}%')
 print(f'Trades={n} WR={wr:.1f}% PF={pf:.3f}')
