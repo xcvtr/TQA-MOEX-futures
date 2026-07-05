@@ -25,10 +25,11 @@ pg = psycopg2.connect(host='10.0.0.64', port=5432, dbname='moex', user='postgres
 cur = pg.cursor()
 spe = {}
 for a, _ in assets:
-    cur.execute('SELECT ticker, step_price, min_step, go, lot_volume FROM futures.ticker_specs WHERE asset_code = %s', (a,))
+    cur.execute('SELECT ticker, step_price, min_step, go, lot_volume, pct FROM futures.ticker_specs WHERE asset_code = %s', (a,))
     r = cur.fetchone()
     if r:
-        spe[a] = {'tk': r[0], 'sp': float(r[1] or 1), 'ms': float(r[2] or 0.01), 'go': float(r[3] or 0), 'lot': int(r[4] or 1)}
+        pct = float(r[5]) if len(r) > 5 else 1.0
+        spe[a] = {'tk': r[0], 'sp': float(r[1] or 1), 'ms': float(r[2] or 0.01), 'go': float(r[3] or 0), 'lot': int(r[4] or 1), 'pct': pct}
 cur.close()
 pg.close()
 print(f'Found specs for {len(spe)} tickers', flush=True)
@@ -66,7 +67,7 @@ for i, (asset, tinfo) in enumerate(sorted(spe.items())):
             hi2 = float(df['hi'].iloc[bi])
             lo2 = float(df['lo'].iloc[bi])
             if bi - p['ebi'] >= TO:
-                p['pnl'] = (float(df['prc'].iloc[bi]) - p['ep']) / ms * sp - TC
+                p['pnl'] = (float(df['prc'].iloc[bi]) - p['ep']) / ms * sp * lot * pct - TC
                 p['cls'] = True
                 at.append(p)
                 continue
@@ -82,7 +83,7 @@ for i, (asset, tinfo) in enumerate(sorted(spe.items())):
             elif lo2 <= p['ep'] * 0.993:
                 ex = lo2
             if ex:
-                p['pnl'] = (ex - p['ep']) / ms * sp - TC
+                p['pnl'] = (ex - p['ep']) / ms * sp * lot * pct - TC
                 p['cls'] = True
                 at.append(p)
 

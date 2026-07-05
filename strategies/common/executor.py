@@ -101,6 +101,7 @@ class Executor:
                 return None
 
         # Risk Manager check
+        # Risk Manager check
         ok, reason = self.rm.can_open(ticker, self.positions)
         if not ok:
             return None
@@ -109,23 +110,29 @@ class Executor:
         step_price = float(specs.get('step_price', 1.0))
         min_step = float(specs.get('min_step', 0.01))
         lot = int(specs.get('lot_volume', 1))
+        pct = float(specs.get('pct', 1.0))
 
         if go <= 0:
             return None
 
-        # Sizing c weight
-        weight = float(self._portfolio.get((ticker, strategy), {}).get('weight', 1.0))
-        max_by_go = int(self.equity * RISK_PCT * weight / float(go))
-        cv = float(raw_price) * lot
-        if cv <= 0 or not np.isfinite(cv) or np.isinf(self.equity) or np.isnan(self.equity):
-            return None
+        # Сначала проверить фиксированное кол-во контрактов из портфеля
+        fixed = self.get_max_contracts(ticker, strategy)
+        if fixed is not None:
+            shares = int(fixed)
+        else:
+            # Sizing c weight
+            weight = float(self._portfolio.get((ticker, strategy), {}).get('weight', 1.0))
+            max_by_go = int(self.equity * RISK_PCT * weight / float(go))
+            cv = float(raw_price) * lot
+            if cv <= 0 or not np.isfinite(cv) or np.isinf(self.equity) or np.isnan(self.equity):
+                return None
 
-        try:
-            max_by_lev = max(1, int(self.equity * MAX_LEVERAGE / cv))
-        except (OverflowError, ValueError):
-            return None
+            try:
+                max_by_lev = max(1, int(self.equity * MAX_LEVERAGE / cv))
+            except (OverflowError, ValueError):
+                return None
 
-        shares = max(1, min(max_by_go, max_by_lev))
+            shares = max(1, min(max_by_go, max_by_lev))
 
         # Проверка ликвидности (vol — уже в контрактах)
         if bar_data:
@@ -143,7 +150,7 @@ class Executor:
 
         trailing_params = self.get_trailing(ticker, strategy)
         pos = Position(ticker, direction, entry_price, bar_idx, shares, strategy,
-                       go, step_price, min_step, trailing_params)
+                       go, step_price, min_step, lot, pct, trailing_params)
         self.positions.append(pos)
         return pos
 

@@ -29,6 +29,8 @@ DB_PASS = os.environ.get('MOEX_DB_PASSWORD', '')
 _TICKER_SPECS_CACHE = None
 TICK = {}          # {ticker: min_step} — lazy-loaded
 TICK_COST = {}     # {ticker: step_price} — lazy-loaded
+TICK_LOT = {}      # {ticker: lot_volume} — lazy-loaded
+TICK_PCT = {}      # {ticker: pct} — lazy-loaded
 GO = {}            # {ticker: go} — lazy-loaded
 SYMBOLS = ['NG', 'BR', 'Si', 'MXI']
 N_SYMS = len(SYMBOLS)
@@ -69,11 +71,13 @@ def load_ticker_specs(tickers=None):
 
         specs = {}
         for r in rows:
+            pct = float(r[5]) if len(r) > 5 else 1.0
             specs[str(r[0])] = {
                 'min_step': float(r[1]),
                 'step_price': float(r[2]),
                 'lot': int(r[3]),
                 'go': float(r[4]),
+                'pct': pct,
             }
 
         # If specific tickers were requested — fill missing with defaults
@@ -92,6 +96,10 @@ def load_ticker_specs(tickers=None):
         TICK.update({t: s['min_step'] for t, s in specs.items()})
         TICK_COST.clear()
         TICK_COST.update({t: s['step_price'] for t, s in specs.items()})
+        TICK_LOT.clear()
+        TICK_LOT.update({t: s['lot'] for t, s in specs.items()})
+        TICK_PCT.clear()
+        TICK_PCT.update({t: s['pct'] for t, s in specs.items()})
         GO.clear()
         GO.update({t: s['go'] for t, s in specs.items()})
 
@@ -142,6 +150,24 @@ def get_tick_cost(ticker):
     """
     _ensure_specs()
     return TICK_COST.get(ticker, 1.0)
+
+
+def get_tick_lot(ticker):
+    """Вернуть lot_volume (TICK_LOT) для тикера. Кеширует specs при первом вызове.
+
+    Если тикер не найден — возвращает 1.
+    """
+    _ensure_specs()
+    return TICK_LOT.get(ticker, 1)
+
+
+def get_tick_pct(ticker):
+    """Вернуть pct (TICK_PCT) для тикера. Кеширует specs при первом вызове.
+
+    Если тикер не найден — возвращает 1.0.
+    """
+    _ensure_specs()
+    return TICK_PCT.get(ticker, 1.0)
 
 
 def get_go(ticker):
@@ -357,15 +383,17 @@ def calc_pnl_rub(symbol, entry_price, exit_price, direction,
     
     pnl_ticks = (exit_price - entry_price) * direction / TICK[symbol]
     slippage_total = (slippage_in_ticks + slippage_out_ticks) * TICK_COST[symbol]
-    pnl_rub = pnl_ticks * TICK_COST[symbol] - slippage_total
+    pnl_rub = pnl_ticks * TICK_COST[symbol] * TICK_LOT[symbol] * TICK_PCT[symbol] - slippage_total
     
     Возвращает (pnl_rub, slippage_total).
     """
     tick = get_tick(symbol)
     tick_cost = get_tick_cost(symbol)
+    lot = get_tick_lot(symbol)
+    pct = get_tick_pct(symbol)
     pnl_ticks = (exit_price - entry_price) * direction / tick
     slippage_total = (slippage_in_ticks + slippage_out_ticks) * tick_cost
-    pnl_rub = pnl_ticks * tick_cost - slippage_total
+    pnl_rub = pnl_ticks * tick_cost * lot * pct - slippage_total
     return pnl_rub, slippage_total
 
 

@@ -400,7 +400,9 @@ def run_mtm_portfolio(data, oi_data, signals, tickers,
             exit_t = pd.Timestamp(pos['exit_time']).tz_localize(None)
             if exit_t <= bar_time:
                 exit_price = get_price_at(tkr, bar_time) or pos['entry_price']
-                mult = lot(tkr)
+                ms = tick_min_step(tkr)
+                sp = tick_step_price(tkr)
+                mult = sp / ms * lot(tkr)
                 tick_cost = TICK_COST.get(tkr, 1.0)
                 slippage_rub = (SLIPPAGE_IN_TICKS + SLIPPAGE_OUT_TICKS) * tick_cost * pos['lots']
                 pnl_rub = (exit_price - pos['entry_price']) * pos['direction'] * pos['lots'] * mult - slippage_rub
@@ -434,7 +436,9 @@ def run_mtm_portfolio(data, oi_data, signals, tickers,
         cur_floating = 0.0
         for tkr, pos in open_positions.items():
             cur_price = get_price_at(tkr, bar_time) or pos['entry_price']
-            mult = lot(tkr)
+            ms = tick_min_step(tkr)
+            sp = tick_step_price(tkr)
+            mult = sp / ms * lot(tkr)
             cur_floating += (cur_price - pos['entry_price']) * pos['direction'] * pos['lots'] * mult
         current_equity = free_cash + cur_floating
 
@@ -509,7 +513,9 @@ def run_mtm_portfolio(data, oi_data, signals, tickers,
         floating_pnl = 0.0
         for tkr, pos in open_positions.items():
             cur_price = get_price_at(tkr, bar_time) or pos['entry_price']
-            mult = lot(tkr)
+            ms = tick_min_step(tkr)
+            sp = tick_step_price(tkr)
+            mult = sp / ms * lot(tkr)
             floating_pnl += (cur_price - pos['entry_price']) * pos['direction'] * pos['lots'] * mult
 
         equity_records.append({
@@ -525,7 +531,9 @@ def run_mtm_portfolio(data, oi_data, signals, tickers,
         last_time = all_times[-1]
         for tkr, pos in list(open_positions.items()):
             exit_price = get_price_at(tkr, last_time) or pos['entry_price']
-            mult = lot(tkr)
+            ms = tick_min_step(tkr)
+            sp = tick_step_price(tkr)
+            mult = sp / ms * lot(tkr)
             tick_cost = TICK_COST.get(tkr, 1.0)
             slippage_rub = (SLIPPAGE_IN_TICKS + SLIPPAGE_OUT_TICKS) * tick_cost * pos['lots']
             pnl_rub = (exit_price - pos['entry_price']) * pos['direction'] * pos['lots'] * mult - slippage_rub

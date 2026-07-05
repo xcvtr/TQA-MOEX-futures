@@ -1,3 +1,13 @@
+## [146] 2026-07-06
+### Fixed
+- **PnL formula — critical bug in broker.py**: `BrokerSim._close_market` was missing `*lot* pct` multipliers. `gross = ticks * step_price * shares` → `gross = ticks * step_price * shares * lot * pct`. Affected all backtests using common Engine.
+- **PnL formula — mtm_portfolio.py**: `mult = lot(tkr)` → `mult = sp / ms * lot(tkr)`. Без `step_price / min_step` Si PnL был завышен в 1000× (10,000₽ вместо 10₽ за тик). Исправлено во всех 4 местах (close, floating×2, force-close).
+- **PnL formula — lib_cvd_divergence.py**: `calc_pnl_rub` теперь умножает на `TICK_LOT` и `TICK_PCT` из PG.
+- **scan_stop_hunt.py**: загружает `pct` из PG `futures.ticker_specs`. PnL формула: `(exit-entry)/ms*sp*lot*pct - TC`.
+- **scan_stop_hunt.py**: PnL формула на линиях 70 и 86 — добавлены `* lot * pct` (было без них).
+- **executor.py**: приоритет фиксированного кол-ва контрактов из `futures.portfolio.contracts` перед динамическим sizing.
+- **PG portfolio**: `contracts=1` для всех enabled стратегий (было NULL — динамический sizing убивал капитал на CR).
+
 ## [143] 2026-07-05
 ### Changed
 - Backtest with Finam reduced GO (60% of exchange margin)
