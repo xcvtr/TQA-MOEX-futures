@@ -40,8 +40,9 @@ PG_PASS = os.getenv('MOEX_PG_PASSWORD', '')
 TRADE_COST = 4  # руб за сделку
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
 
-# PnL formula: (exit-entry)/ms*sp*lot*contracts - TC*contracts
-# LOT must always be in the formula. Spec in ticker_specs corrected.
+# PnL formula: (exit-entry)/ms*sp*contracts - TC*contracts
+# MOEX STEPPRICE = RUB per tick per contract. NO *lot.
+# sp is per-contract. See CH moex.securities for reference.
 log = logging.getLogger('paper_trader')
 
 
@@ -210,7 +211,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
         # Timeout
         if bar_idx - p['entry_bar'] >= p.get('timeout_bars', 12):
-            pnl = (close - p['entry_price']) / ms * sp * lot * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - TRADE_COST * p.get('contracts', 1)
+            pnl = (close - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - TRADE_COST * p.get('contracts', 1)
             pnl += p.get('part_pnl', 0)
             p['pnl'] = pnl
             p['exit_price'] = close
@@ -239,7 +240,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
             if exit_price:
                 rem = max(0.001, p.get('rem', 1))
-                pnl = (exit_price - p['entry_price']) / ms * sp * lot * p.get('pct', 1.0) * rem - TRADE_COST * p.get('contracts', 1)
+                pnl = (exit_price - p['entry_price']) / ms * sp * p.get('pct', 1.0) * rem - TRADE_COST * p.get('contracts', 1)
                 pnl += p.get('part_pnl', 0)
                 p['pnl'] = pnl
                 p['exit_price'] = exit_price
@@ -265,7 +266,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
             if exit_price:
                 rem = max(0.001, p.get('rem', 1))
-                pnl = (p['entry_price'] - exit_price) / ms * sp * lot * p.get('pct', 1.0) * rem - TRADE_COST * p.get('contracts', 1)
+                pnl = (p['entry_price'] - exit_price) / ms * sp * p.get('pct', 1.0) * rem - TRADE_COST * p.get('contracts', 1)
                 pnl += p.get('part_pnl', 0)
                 p['pnl'] = pnl
                 p['exit_price'] = exit_price
