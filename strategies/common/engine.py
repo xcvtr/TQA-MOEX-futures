@@ -53,11 +53,12 @@ class PortfolioEngine:
             bar['price_10'] = price_10_arr[bar_idx]
         else:
             bar['price_10'] = 0
-        # Hour/minute from timestamp
+        # Hour/minute from timestamp — convert IRK→MSK
         bt = row.get('bt') if hasattr(row, 'bt') else row.name
         if hasattr(bt, 'hour'):
-            bar['hour'] = bt.hour
-            bar['minute'] = bt.minute
+            bt_msk = bt.tz_convert('Europe/Moscow') if hasattr(bt, 'tz_convert') else bt
+            bar['hour'] = bt_msk.hour
+            bar['minute'] = bt_msk.minute
         else:
             bar['hour'] = 0
             bar['minute'] = 0
@@ -72,8 +73,10 @@ class PortfolioEngine:
         price_10_cache = {}
         for ticker, df in bars_dict.items():
             if 'bt' in df:
-                hours = df['bt'].dt.hour
-                minutes = df['bt'].dt.minute
+                # CH data in Asia/Irkutsk (+08). Convert to MSK for time-based logic
+                bt_msk = df['bt'].dt.tz_convert('Europe/Moscow')
+                hours = bt_msk.dt.hour
+                minutes = bt_msk.dt.minute
                 at_10 = (hours == 10) & (minutes == 0)
                 prc_col = df['prc'].values.astype(float) if 'prc' in df else df['close'].values.astype(float)
                 p10 = np.where(at_10, prc_col, 0.0)
@@ -154,8 +157,24 @@ class PortfolioEngine:
             # Cleanup closed positions
             self.executor.positions = [p for p in self.executor.positions if not p.closed]
 
-            # Equity curve
-            self.executor.eq_curve.append(self.executor.equity)
+            # MTM: floating PnL of open positions
+            floating = 0.0
+            for p in self.executor.positions:
+                if p.closed:
+                    continue
+                df = bars_dict.get(p.ticker)
+                if df is None or bar_idx >= len(df):
+                    continue
+                bar = df.iloc[bar_idx]
+                prc = float(bar.get('prc', bar.get('close', 0)))
+                ticks = (prc - p.entry_price) / max(p.min_step, 0.0001)
+                if p.direction == 'short':
+                    ticks = -ticks
+                floating += ticks * p.step_price * p.shares * p.pct
+
+            self.executor.balance_curve.append(self.executor.equity)
+            self.executor.mtm_value = self.executor.equity + floating
+            self.executor.mtm_curve.append(self.executor.mtm_value)
             if self.executor.equity > self.executor.peak:
                 self.executor.peak = self.executor.equity
             self.executor.rm.update(self.executor.equity)

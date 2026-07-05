@@ -34,6 +34,9 @@ class Executor:
         self.positions = []
         self.trades = []
         self.eq_curve = []
+        self.balance_curve = []      # closed PnL only
+        self.mtm_curve = []          # balance + floating (MTM)
+        self.mtm_value = 0.0         # current MTM value
         self._portfolio = {}
 
     # ── Портфель из PG ──────────────────────────────────────────────
