@@ -1,8 +1,16 @@
+## [149] 2026-07-06
+### Fixed
+- **REVERT: Stock futures step_price ×lot.** MOEX stock futures цены в CH — per-contract, не per-share. STEPPRICE=1.0 правильный. PG revert: GZ, RN, SR и др. step_price обратно 1.0.
+- **Финальная формула:** `(exit-entry)/ms*sp*pct - TC`. Без `*lot`. Всегда.
+### Changed
+- **bt_5t.py:** hosts .60, CR asset CNY, PnL без `*lot` — сохранено (из 148).
+- checkpoint/148 помечен как ошибочный.
+
 ## [148] 2026-07-06
 ### Fixed
-- **CRITICAL: Stock futures STEPPRICE per-share, не per-contract.** GZ, RN, SR, VB и др. акционные фьючерсы имели step_price=1.0 (per-share), но формула не умножала на lot. PnL занижен в lot× (100× для GZ/RN).
-- **PG ticker_specs:** step_price × lot_volume для GZ, RN, SR, VB, AL, HY, LK, MC, ME, MG, NM, SN, SP, TT, AF. Теперь step_price per-contract для всех.
-- **bt_5t.py:** hosts 10.0.0.64 → 10.0.0.60; CR asset_code CNYRUBF→CNY; PnL без `*lot`.
+- **⚠️ ОШИБОЧНО: Stock futures STEPPRICE per-share.** На самом деле цены per-contract. step_price=1.0 правильный. Отменено в 149.
+- **PG ticker_specs:** step_price × lot_volume — отменено в 149.
+- **bt_5t.py:** hosts 10.0.0.64 → 10.0.0.60; CR asset_code CNYRUBF→CNY; PnL без `*lot` — хорошие изменения, сохранены.
 
 ## [147] 2026-07-06
 ### Fixed
