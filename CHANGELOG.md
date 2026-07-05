@@ -1,3 +1,9 @@
+## [148] 2026-07-06
+### Fixed
+- **CRITICAL: Stock futures STEPPRICE per-share, не per-contract.** GZ, RN, SR, VB и др. акционные фьючерсы имели step_price=1.0 (per-share), но формула не умножала на lot. PnL занижен в lot× (100× для GZ/RN).
+- **PG ticker_specs:** step_price × lot_volume для GZ, RN, SR, VB, AL, HY, LK, MC, ME, MG, NM, SN, SP, TT, AF. Теперь step_price per-contract для всех.
+- **bt_5t.py:** hosts 10.0.0.64 → 10.0.0.60; CR asset_code CNYRUBF→CNY; PnL без `*lot`.
+
 ## [147] 2026-07-06
 ### Fixed
 - **CRITICAL: MOEX STEPPRICE — per-contract, не per-unit.** `gross = ticks*sp*shares*pct` (без *lot). Завышало PnL для RN/GZ в 100×, для CR/Si в 1000×.

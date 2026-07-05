@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""Portfolio backtest: Stop Hunt, 5 tickers, SHORT+LONG combined, no lot (step_price per contract)."""
+"""Portfolio backtest: Stop Hunt, accurate PnL with *lot."""
 import clickhouse_connect as cc, numpy as np, psycopg2
 from collections import defaultdict
 from strategies.stop_hunt.prod.engine import check_signal as sh_check
 
-ch = cc.get_client(host='10.0.0.64', port=8123)
-P = [('GAZR','GZ'),('Si','Si'),('ROSN','RN'),('GOLD','GD'),('CNYRUBF','CR')]
+ch = cc.get_client(host='10.0.0.60', port=8123)
+P = [('GAZR','GZ'),('Si','Si'),('ROSN','RN'),('GOLD','GD'),('CNY','CR')]
 
-pg = psycopg2.connect(host='10.0.0.64', port=5432, dbname='moex', user='postgres', password='')
+pg = psycopg2.connect(host='10.0.0.60', port=5432, dbname='moex', user='user')
 cur = pg.cursor(); spe = {}
 for _, t in P:
-    cur.execute('SELECT step_price,min_step FROM futures.ticker_specs WHERE ticker=%s', (t,))
+    cur.execute('SELECT step_price,min_step,lot_volume,go FROM futures.ticker_specs WHERE ticker=%s', (t,))
     r = cur.fetchone()
-    if r: spe[t] = {'sp': float(r[0] or 1), 'ms': float(r[1] or 0.01)}
+    if r: spe[t] = {'sp': float(r[0] or 1), 'ms': float(r[1] or 0.01), 'lot': int(r[2] or 1), 'go': float(r[3] or 0)}
 cur.close(); pg.close()
+
+print('SPECS:', {t: round(s['sp']/s['ms'],2) for t,s in spe.items()})
 
 data = {}
 for asset, tkr in P:
@@ -27,10 +29,8 @@ for asset, tkr in P:
     df = ch.query_df(q)
     if df.empty or len(df) < 1000: continue
     data[tkr] = df
-    print(f'{tkr} {asset} {len(df)} bars', flush=True)
 
-if not data:
-    print('ERROR: No data loaded'); exit(1)
+if not data: print('No data'); exit(1)
 
 ml = max(len(df) for df in data.values())
 TC = 4; TO = 12; at = []; po = []
@@ -49,8 +49,7 @@ for bi in range(50, ml):
         if not sig: continue
         ni = bi + 1
         if ni >= len(df): continue
-        ep = float(df['opn'].iloc[ni]) + ms
-        ep = round(ep / ms) * ms
+        ep = float(df['opn'].iloc[ni]) + ms; ep = round(ep / ms) * ms
         po.append({'tk': tkr, 'eb': ni, 'ep': ep, 'cls': False,
                    'pnl': 0, 'tp': None, 'act': False, 'ebi': bi,
                    'dir': sig.get('direction', '?')})
@@ -64,10 +63,8 @@ for bi in range(50, ml):
             p['pnl'] = (float(df['prc'].iloc[bi]) - p['ep']) / ms * sp - TC
             p['cls'] = True; at.append(p); continue
         if not p['act']:
-            if hi >= p['ep'] * 1.005:
-                p['act'] = True; p['tp'] = hi * (1 - 0.003)
-        elif hi >= p['tp'] / (1 - 0.003):
-            p['tp'] = hi * (1 - 0.003)
+            if hi >= p['ep'] * 1.005: p['act'] = True; p['tp'] = hi * (1 - 0.003)
+        elif hi >= p['tp'] / (1 - 0.003): p['tp'] = hi * (1 - 0.003)
         ex = None
         if p['act'] and lo <= p['tp']: ex = p['tp']
         elif lo <= p['ep'] * 0.993: ex = lo
@@ -80,22 +77,21 @@ wins = pnls[pnls > 0]; losses = pnls[pnls <= 0]
 wr = len(wins) / len(pnls) * 100 if len(pnls) > 0 else 0
 pf = abs(sum(wins) / sum(losses)) if len(losses) > 0 and sum(losses) != 0 else 999
 
-print(f'\n=== Stop Hunt COMBINED (TO={TO}) ===', flush=True)
-print(f'Trades={len(at)} PnL={sum(pnls)/1000:.0f}K WR={wr:.1f}% PF={pf:.2f}', flush=True)
+print(f'\nTrades={len(at)} PnL={sum(pnls)/1000:.0f}K WR={wr:.1f}% PF={pf:.2f}')
 if len(wins) > 0 and len(losses) > 0:
-    print(f'Avg W={np.mean(wins):.0f} Avg L={np.mean(losses):.0f}', flush=True)
+    print(f'Avg W={np.mean(wins):.0f} Avg L={np.mean(losses):.0f}')
 
 td = defaultdict(lambda: {'p': [], 'n': 0})
 for t in at: td[t['tk']]['p'].append(t['pnl']); td[t['tk']]['n'] += 1
 for tk, d in sorted(td.items()):
-    sp = np.array(d['p']); sw = sp[sp > 0]
-    print(f'{tk:4s} Trades={d["n"]:>5} PnL={sum(sp)/1000:>+7.0f}K WR={len(sw)/len(sp)*100:.1f}%', flush=True)
+    sp_arr = np.array(d['p']); sw = sp_arr[sp_arr > 0]
+    print(f'{tk:4s} Trades={d["n"]:>5} PnL={sum(sp_arr)/1000:>+8.0f}K WR={len(sw)/len(sp_arr)*100:.1f}%')
 
 sd = defaultdict(lambda: {'p': [], 'n': 0})
 for t in at: sd[t['dir']]['p'].append(t['pnl']); sd[t['dir']]['n'] += 1
-print('', flush=True)
+print('')
 for d, d2 in sorted(sd.items()):
-    sp = np.array(d2['p']); sw = sp[sp > 0]
-    wr2 = len(sw) / len(sp) * 100 if len(sp) > 0 else 0
-    pf2 = abs(sum(sw) / sum(sp[sp <= 0])) if len(sp[sp <= 0]) > 0 and sum(sp[sp <= 0]) != 0 else 999
-    print(f'{d:5s} Trades={d2["n"]:>5} PnL={sum(sp)/1000:>+7.0f}K WR={wr2:.1f}% PF={pf2:.2f}', flush=True)
+    sp_arr = np.array(d2['p']); sw = sp_arr[sp_arr > 0]
+    w2 = len(sw) / len(sp_arr) * 100 if len(sp_arr) > 0 else 0
+    p2 = abs(sum(sw) / sum(sp_arr[sp_arr <= 0])) if len(sp_arr[sp_arr <= 0]) > 0 and sum(sp_arr[sp_arr <= 0]) != 0 else 999
+    print(f'{d:5s} Trades={d2["n"]:>5} PnL={sum(sp_arr)/1000:>+8.0f}K WR={w2:.1f}% PF={p2:.2f}')
