@@ -11,6 +11,7 @@
 DEFAULT_ACTIVATION = 0.5   # %
 DEFAULT_TRAIL = 0.3        # %
 DEFAULT_TIMEOUT = 12       # bars
+DEFAULT_STOP_LOSS = 0.7    # % hard stop loss from entry
 DEFAULT_COMMISSION = 4     # RUB per contract round-trip
 DEFAULT_SLIPPAGE_OUT = 1   # ticks on exit (market order)
 
@@ -45,6 +46,10 @@ class Position:
     @property
     def trail_pct(self):
         return float(self.trailing_params.get('trail', DEFAULT_TRAIL))
+
+    @property
+    def stop_loss_pct(self):
+        return float(self.trailing_params.get('stop_loss', DEFAULT_STOP_LOSS))
 
     @property
     def timeout_bars(self):
@@ -99,6 +104,19 @@ class BrokerSim:
         if fav_pct > pos.best_price:
             pos.best_price = fav_pct
             pos.best_abs = fav_abs
+
+        # 2b. Hard stop loss (против входа)
+        if direction == 'long':
+            loss_pct = (entry - lo) / entry * 100
+        else:
+            loss_pct = (hi - entry) / entry * 100
+        if loss_pct >= pos.stop_loss_pct:
+            if direction == 'long':
+                stop_px = entry * (1 - pos.stop_loss_pct / 100)
+            else:
+                stop_px = entry * (1 + pos.stop_loss_pct / 100)
+            return self._close_market(pos, stop_px, 'stop_loss', volume)
+            
 
         # 3. Активация трейлинга
         if not pos.trail_activated and fav_pct >= pos.activation_pct:
