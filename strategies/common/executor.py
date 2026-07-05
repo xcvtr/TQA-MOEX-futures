@@ -2,13 +2,12 @@
 
 import os
 import json
-import numpy as np
 import psycopg2
 from strategies.common.broker import Position, BrokerSim
 from strategies.common.risk import RiskManager
 
 RISK_PCT = 0.01          # доля капитала на 1 сделку (было 0.02)
-MAX_LEVERAGE = 10
+# MOEX: ограничение только по ГО (margin), не по leverage. GO check ниже.
 
 PG_CONFIG = dict(
     host=os.getenv('MOEX_PG_HOST', '10.0.0.60'),
@@ -123,19 +122,9 @@ class Executor:
         if fixed is not None:
             shares = int(fixed)
         else:
-            # Sizing c weight
+            # Sizing по ГО (margin) — 1% от капитала / GO
             weight = float(self._portfolio.get((ticker, strategy), {}).get('weight', 1.0))
-            max_by_go = int(self.equity * RISK_PCT * weight / float(go))
-            cv = float(raw_price) * lot
-            if cv <= 0 or not np.isfinite(cv) or np.isinf(self.equity) or np.isnan(self.equity):
-                return None
-
-            try:
-                max_by_lev = max(1, int(self.equity * MAX_LEVERAGE / cv))
-            except (OverflowError, ValueError):
-                return None
-
-            shares = max(1, min(max_by_go, max_by_lev))
+            shares = max(1, int(self.equity * RISK_PCT * weight / float(go)))
 
         # Проверка ликвидности (vol — уже в контрактах)
         if bar_data:
