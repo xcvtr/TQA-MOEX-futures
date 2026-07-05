@@ -67,8 +67,9 @@ ret_pct = (balance[-1]/CAPITAL - 1)*100
 pg = psycopg2.connect(host='10.0.0.60', port=5432, dbname='moex', user='postgres')
 cur = pg.cursor()
 
-# Generate run_id (based on parameters)
-run_id = f"sh_{CAPITAL//1000}k_{int(mdd*100)}_{int(balance[-1]/1000)}k"
+# Generate run_id
+from datetime import datetime
+run_id = f"sh_{CAPITAL//1000}k_{datetime.now().strftime('%Y%m%d_%H%M')}"
 
 # Clear previous same-run data
 for tbl in ['backtest.equity_curve', 'backtest.trades']:

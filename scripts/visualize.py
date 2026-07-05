@@ -88,6 +88,8 @@ else:
         ts = timestamps.tz_localize('Asia/Irkutsk').tz_convert('Europe/Moscow')
     ts = ts.tz_localize(None)
 
+CAP_FMT = f"{CAPITAL//1000}k"
+
 # ── Downsample for readability ──
 MAX_POINTS = 3000
 n_bars = len(balance)
@@ -115,33 +117,34 @@ ret_bal = (final_bal/CAPITAL - 1)*100
 floating = mtm - balance
 max_floating = np.max(np.abs(floating)) if len(floating) > 0 else 1
 
+# ── Convert to % ──
+bal_pct = (balance / CAPITAL - 1) * 100
+mtm_pct = (mtm / CAPITAL - 1) * 100
+
 # ── Plot ──
 fig = plt.figure(figsize=(16, 11))
 gs = fig.add_gridspec(3, 1, height_ratios=[2, 1, 0.8], hspace=0.3)
 
 ax1 = fig.add_subplot(gs[0])
-ax1.plot(ts, balance, color='#2196F3', linewidth=1.5, alpha=0.85, label='Balance (closed PnL)')
-ax1.plot(ts, mtm, color='#FF9800', linewidth=1.5, alpha=0.85, label='Equity (MTM = balance + floating)')
-ax1.axhline(y=CAPITAL, color='#666', linestyle='--', linewidth=0.8, alpha=0.4)
-ax1.set_ylabel('RUB', fontsize=11)
-ax1.set_title(f'Stop Hunt Portfolio — Balance vs Equity (MTM)', fontsize=13, fontweight='bold')
+ax1.plot(ts, bal_pct, color='#2196F3', linewidth=1.5, alpha=0.85, label='Balance (closed PnL)')
+ax1.plot(ts, mtm_pct, color='#FF9800', linewidth=1.5, alpha=0.85, label='Equity (MTM = balance + floating)')
+ax1.axhline(y=0, color='#666', linestyle='--', linewidth=0.8, alpha=0.4)
+ax1.set_ylabel('Return (%)', fontsize=11)
+ax1.set_title(f'Stop Hunt Portfolio — Return % ({CAP_FMT} start)', fontsize=13, fontweight='bold')
 ax1.legend(fontsize=10, loc='upper left')
-ax1.set_ylim(bottom=0)
-ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
-ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
-plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
 
 # Stats box
+final_pct = (balance[-1]/CAPITAL - 1)*100
 stats = (
-    f'Start: {CAPITAL:,.0f} ₽\n'
-    f'Balance: {final_bal:,.0f} ₽  (+{ret_bal:,.0f}%)\n'
-    f'MTM: {final_mtm:,.0f} ₽\n'
+    f'Start: {CAP_FMT}\n'
+    f'Return: {final_pct:+,.0f}%\n'
     f'Cash MDD: {mdd_bal:.2f}%\n'
     f'Trades: {n}  |  WR: {wr:.1f}%  |  PF: {pf:.3f}'
 )
 ax1.text(0.02, 0.97, stats, transform=ax1.transAxes, fontsize=9,
          verticalalignment='top', bbox=dict(boxstyle='round,pad=0.5',
          facecolor='wheat', alpha=0.85))
+
 
 def fmt(x, p):
     if abs(x) >= 1e6: return f'{x/1e6:.1f}M'
