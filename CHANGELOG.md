@@ -1,3 +1,12 @@
+## [147] 2026-07-06
+### Fixed
+- **CRITICAL: MOEX STEPPRICE — per-contract, не per-unit.** `gross = ticks*sp*shares*pct` (без *lot). Завышало PnL для RN/GZ в 100×, для CR/Si в 1000×.
+- **PG Si step_price:** 0.001 → 1.0 (MOEX standard). Был поделён на lot для компенсации бага.
+- **engine.py:** `_pending` теперь list (поддерживает несколько стратегий на тикер).
+### Changed
+- **lib_cvd_divergence.py, mtm_portfolio.py, scan_stop_hunt.py:** убран `* lot` из PnL.
+- **backtester.py:** добавлен `by_ticker` breakdown в метрики.
+
 ## [146] 2026-07-06
 ### Fixed
 - **PnL formula — critical bug in broker.py**: `BrokerSim._close_market` was missing `*lot* pct` multipliers. `gross = ticks * step_price * shares` → `gross = ticks * step_price * shares * lot * pct`. Affected all backtests using common Engine.

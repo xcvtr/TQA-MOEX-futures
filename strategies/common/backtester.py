@@ -235,15 +235,22 @@ class Backtester:
                 sharpe = np.mean(daily_ret) / np.std(daily_ret) * np.sqrt(252) if np.std(daily_ret) > 0 else 0
                 metrics['sharpe'] = round(float(sharpe), 3)
 
-            # По стратегиям
+            # По стратегиям и тикерам
             strat_pnl = Counter()
             strat_trades = Counter()
             strat_wins = Counter()
+            ticker_pnl = Counter()
+            ticker_trades = Counter()
+            ticker_wins = Counter()
             for t in trades:
                 strat_pnl[t.strategy] += t.pnl
                 strat_trades[t.strategy] += 1
                 if t.pnl > 0:
                     strat_wins[t.strategy] += 1
+                ticker_pnl[t.ticker] += t.pnl
+                ticker_trades[t.ticker] += 1
+                if t.pnl > 0:
+                    ticker_wins[t.ticker] += 1
             metrics['by_strategy'] = {
                 s: {
                     'trades': strat_trades[s],
@@ -252,6 +259,16 @@ class Backtester:
                     'pnl': round(strat_pnl[s], 2),
                 }
                 for s in sorted(strat_pnl)
+            }
+            metrics['by_ticker'] = {
+                t: {
+                    'trades': ticker_trades[t],
+                    'wins': ticker_wins[t],
+                    'wr': round(ticker_wins[t] / ticker_trades[t] * 100, 1) if ticker_trades[t] > 0 else 0,
+                    'pnl': round(ticker_pnl[t], 2),
+                    'avg_pnl': round(ticker_pnl[t] / ticker_trades[t], 2) if ticker_trades[t] > 0 else 0,
+                }
+                for t in sorted(ticker_pnl)
             }
 
         return metrics

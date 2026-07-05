@@ -383,7 +383,7 @@ def calc_pnl_rub(symbol, entry_price, exit_price, direction,
     
     pnl_ticks = (exit_price - entry_price) * direction / TICK[symbol]
     slippage_total = (slippage_in_ticks + slippage_out_ticks) * TICK_COST[symbol]
-    pnl_rub = pnl_ticks * TICK_COST[symbol] * TICK_LOT[symbol] * TICK_PCT[symbol] - slippage_total
+    pnl_rub = pnl_ticks * TICK_COST[symbol] * TICK_PCT[symbol] - slippage_total
     
     Возвращает (pnl_rub, slippage_total).
     """
@@ -393,7 +393,7 @@ def calc_pnl_rub(symbol, entry_price, exit_price, direction,
     pct = get_tick_pct(symbol)
     pnl_ticks = (exit_price - entry_price) * direction / tick
     slippage_total = (slippage_in_ticks + slippage_out_ticks) * tick_cost
-    pnl_rub = pnl_ticks * tick_cost * lot * pct - slippage_total
+    pnl_rub = pnl_ticks * tick_cost * pct - slippage_total
     return pnl_rub, slippage_total
 
 

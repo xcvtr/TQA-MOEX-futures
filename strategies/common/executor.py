@@ -150,7 +150,7 @@ class Executor:
 
         trailing_params = self.get_trailing(ticker, strategy)
         pos = Position(ticker, direction, entry_price, bar_idx, shares, strategy,
-                       go, step_price, min_step, lot, pct, trailing_params)
+                       go, step_price, min_step, pct, trailing_params)
         self.positions.append(pos)
         return pos
 

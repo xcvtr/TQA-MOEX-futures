@@ -17,7 +17,7 @@ DEFAULT_SLIPPAGE_OUT = 1   # ticks on exit (market order)
 
 class Position:
     def __init__(self, ticker, direction, entry_price, entry_bar, shares, strategy,
-                 go=0, step_price=1.0, min_step=0.01, lot=1, pct=1.0, trailing_params=None):
+                 go=0, step_price=1.0, min_step=0.01, pct=1.0, trailing_params=None):
         self.ticker = ticker
         self.direction = direction
         self.entry_price = entry_price
@@ -27,7 +27,6 @@ class Position:
         self.go = go
         self.step_price = step_price
         self.min_step = min_step
-        self.lot = lot
         self.pct = pct
         self.trailing_params = trailing_params or {}
         self.best_price = 0.0          # макс fav % (движение в нашу сторону)
@@ -141,7 +140,7 @@ class BrokerSim:
         ticks = (exit_px - pos.entry_price) / max(pos.min_step, 0.0001)
         if pos.direction == 'short':
             ticks = -ticks
-        gross = ticks * pos.step_price * pos.shares * pos.lot * pos.pct
+        gross = ticks * pos.step_price * pos.shares * pos.pct
         pnl = gross - self.commission * pos.shares
         pos.pnl = round(pnl, 2)
         pos.exit_price = round(exit_px, 4)

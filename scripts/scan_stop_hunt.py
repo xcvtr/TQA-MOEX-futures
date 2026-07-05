@@ -67,7 +67,7 @@ for i, (asset, tinfo) in enumerate(sorted(spe.items())):
             hi2 = float(df['hi'].iloc[bi])
             lo2 = float(df['lo'].iloc[bi])
             if bi - p['ebi'] >= TO:
-                p['pnl'] = (float(df['prc'].iloc[bi]) - p['ep']) / ms * sp * lot * pct - TC
+                p['pnl'] = (float(df['prc'].iloc[bi]) - p['ep']) / ms * sp * pct - TC
                 p['cls'] = True
                 at.append(p)
                 continue
@@ -83,7 +83,7 @@ for i, (asset, tinfo) in enumerate(sorted(spe.items())):
             elif lo2 <= p['ep'] * 0.993:
                 ex = lo2
             if ex:
-                p['pnl'] = (ex - p['ep']) / ms * sp * lot * pct - TC
+                p['pnl'] = (ex - p['ep']) / ms * sp * pct - TC
                 p['cls'] = True
                 at.append(p)
 

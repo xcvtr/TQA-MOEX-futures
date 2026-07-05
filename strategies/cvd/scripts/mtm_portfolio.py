@@ -402,7 +402,7 @@ def run_mtm_portfolio(data, oi_data, signals, tickers,
                 exit_price = get_price_at(tkr, bar_time) or pos['entry_price']
                 ms = tick_min_step(tkr)
                 sp = tick_step_price(tkr)
-                mult = sp / ms * lot(tkr)
+                mult = sp / ms
                 tick_cost = TICK_COST.get(tkr, 1.0)
                 slippage_rub = (SLIPPAGE_IN_TICKS + SLIPPAGE_OUT_TICKS) * tick_cost * pos['lots']
                 pnl_rub = (exit_price - pos['entry_price']) * pos['direction'] * pos['lots'] * mult - slippage_rub

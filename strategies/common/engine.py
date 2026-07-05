@@ -14,7 +14,7 @@ class PortfolioEngine:
     def __init__(self, strategies: list, broker=None, capital=100_000):
         self.strategies = strategies
         self.executor = Executor(broker=broker or BrokerSim(), initial_capital=capital)
-        self._pending = {}  # {ticker: signal_dict} — сигналы, ждущие исполнения на open следующего бара
+        self._pending = {}  # {ticker: [signal_dict, ...]} — сигналы, ждущие исполнения на open следующего бара
 
     def _build_bar(self, df, bar_idx, price_10_arr=None):
         """Собрать bar_data с контекстом для всех стратегий."""
@@ -96,19 +96,23 @@ class PortfolioEngine:
                 bars_for_ticker[ticker] = self._build_bar(df, bar_idx, p10_arr)
 
             # Исполнить pending сигналы на open этого бара
-            for ticker, pending in list(self._pending.items()):
+            for ticker, pending_list in list(self._pending.items()):
                 bar = bars_for_ticker.get(ticker)
                 if bar is None:
                     continue
                 specs = (ticker_specs or {}).get(ticker, {})
-                # entry_price = open бара + slippage 1 tick (market order при открытии)
                 min_step = float(specs.get('min_step', 0.01))
-                direction = pending['direction']
-                if direction == 'long':
-                    pending['entry_price'] = float(bar['opn']) + 1.0 * min_step
-                else:
-                    pending['entry_price'] = float(bar['opn']) - 1.0 * min_step
-                self.executor.process_signal(pending, bar_idx, specs, bar)
+                # Пробуем сигналы по очереди, пока один не откроется
+                for pending in pending_list:
+                    if ticker in [p.ticker for p in self.executor.positions if not p.closed]:
+                        break  # уже есть позиция по этому тикеру
+                    direction = pending['direction']
+                    if direction == 'long':
+                        pending['entry_price'] = float(bar['opn']) + 1.0 * min_step
+                    else:
+                        pending['entry_price'] = float(bar['opn']) - 1.0 * min_step
+                    if self.executor.process_signal(pending, bar_idx, specs, bar):
+                        break  # первая успешная стратегия заняла тикер
                 del self._pending[ticker]
 
             # Сигналы — становятся pending для исполнения на следующем баре
@@ -119,12 +123,12 @@ class PortfolioEngine:
                         continue
                     signal = check_fn(bar, ticker, params)
                     if signal:
-                        # Не перезаписывать существующий pending
-                        if ticker not in self._pending:
-                            # Проверка: нет ли уже открытой позиции по этому тикеру
-                            has_pos = any(not p.closed and p.ticker == ticker for p in self.executor.positions)
-                            if not has_pos:
-                                self._pending[ticker] = signal
+                        # Проверка: нет ли уже открытой позиции по этому тикеру
+                        has_pos = any(not p.closed and p.ticker == ticker for p in self.executor.positions)
+                        if not has_pos:
+                            if ticker not in self._pending:
+                                self._pending[ticker] = []
+                            self._pending[ticker].append(signal)
 
             # Управление позициями — передаём бары ТОЛЬКО своего тикера
             for p in list(self.executor.positions):
@@ -157,16 +161,18 @@ class PortfolioEngine:
             self.executor.rm.update(self.executor.equity)
 
         # Cleanup pending signals at end of data
-        for ticker, pending in list(self._pending.items()):
+        for ticker, pending_list in list(self._pending.items()):
             df = bars_dict.get(ticker)
             if df is not None:
                 bar = df.iloc[-1]
                 specs = (ticker_specs or {}).get(ticker, {})
                 min_step = float(specs.get('min_step', 0.01))
-                if pending['direction'] == 'long':
+                for pending in pending_list:
+                    if ticker in [p.ticker for p in self.executor.positions if not p.closed]:
+                        break
+                    direction = pending['direction']
                     pending['entry_price'] = float(bar.get('prc', bar.get('close', 0)))
-                else:
-                    pending['entry_price'] = float(bar.get('prc', bar.get('close', 0)))
-                self.executor.process_signal(pending, max_len - 1, specs, {})
+                    if self.executor.process_signal(pending, max_len - 1, specs, {}):
+                        break
 
         return self.executor
