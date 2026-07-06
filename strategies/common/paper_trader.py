@@ -27,11 +27,11 @@ def _load_strategies():
     STRATEGY_MAP['cvd'] = cvd_check
 
 # ── Config ────────────────────────────────────────────────────────────────
-CH_HOST = os.getenv('MOEX_CH_HOST', '10.0.0.64')
+CH_HOST = os.getenv('MOEX_CH_HOST', '10.0.0.60')
 CH_PORT = 8123
 CH_DB = 'moex'
 
-PG_HOST = os.getenv('MOEX_PG_HOST', '10.0.0.64')
+PG_HOST = os.getenv('MOEX_PG_HOST', '10.0.0.60')
 PG_PORT = int(os.getenv('MOEX_PG_PORT', '5432'))
 PG_DB = os.getenv('MOEX_PG_DB', 'moex')
 PG_USER = os.getenv('MOEX_PG_USER', 'postgres')
@@ -167,21 +167,24 @@ def save_state(state):
 # ── CH helpers ────────────────────────────────────────────────────────────
 
 def get_latest_bars(ticker, asset, n_bars=50):
-    """Get last N 5-min bars for a ticker from CH."""
+    """Get last N 5-min bars, properly aggregated from prices_5min snapshots."""
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     try:
         df = ch.query_df(f"""
-            SELECT toStartOfInterval(SYSTIME, INTERVAL 5 MINUTE) as bt,
-                   argMax(pr_open, SYSTIME) as opn,
-                   argMax(pr_high, SYSTIME) as hi,
-                   argMax(pr_low, SYSTIME) as lo,
-                   argMax(pr_close, SYSTIME) as prc,
-                   sum(vol_b) as vb, sum(vol_s) as vs
-            FROM moex.tradestats_fo
-            WHERE asset_code = '{asset}'
-              AND SYSTIME >= now() - INTERVAL {n_bars * 5 + 5} MINUTE
-            GROUP BY bt ORDER BY bt
+            SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
+                   argMax(opn, bt) as opn,
+                   max(hi) as hi,
+                   min(lo) as lo,
+                   argMax(prc, bt) as prc
+            FROM moex.prices_5min
+            WHERE ticker = '{ticker}'
+            GROUP BY bt5
+            ORDER BY bt5 DESC
+            LIMIT {n_bars + 5}
         """)
+        if not df.empty:
+            df = df.sort_values('bt5').reset_index(drop=True)
+            df.rename(columns={'bt5': 'bt'}, inplace=True)
         ch.close()
         return df
     except Exception as e:
@@ -376,7 +379,7 @@ def run_tick():
 
             # Entry on next bar's open + 1 tick
             ms_val = ms
-            entry_price = float(bd.get('prc_prev', bd['prc'])) + ms_val
+            entry_price = float(bd['prc']) + ms_val  # latest close + 1 tick slippage
             entry_price = round(entry_price / ms_val) * ms_val
 
             # Contract sizing
