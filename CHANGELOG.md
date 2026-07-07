@@ -1,3 +1,13 @@
+## [154] 2026-07-07
+### Added
+- **CVD Momentum from DOM:** 1-min bars + CVD from order book (`moex.dom_min1`, 11.1M rows)
+- **DOM data loaded:** 22 MOEX futures, 11.4B rows (2024-01 — 2026-07)
+- **Bars backfilled:** `moex.bars` 2024-01-08 → 2026-06-19 (1.9M 5-min bars)
+- **CVD Momentum backtester:** `strategies/cvd_momentum/backtest.py`
+### Results
+- Champions: **MIX** (56.5% WR, +1.9M), **TATN** (58.1%, +638K), **SNGP** (57.1%, +421K), **ROSN** (57.0%, +431K), **MTSI** (55.4%, +112K)
+- Checkpoint: 154-cvd-momentum-dom-full-screen.md
+
 ## [149] 2026-07-06
 ### Fixed
 - **REVERT: Stock futures step_price ×lot.** MOEX stock futures цены в CH — per-contract, не per-share. STEPPRICE=1.0 правильный. PG revert: GZ, RN, SR и др. step_price обратно 1.0.
