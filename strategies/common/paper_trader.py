@@ -167,15 +167,19 @@ def save_state(state):
 # ── CH helpers ────────────────────────────────────────────────────────────
 
 def get_latest_bars(ticker, asset, n_bars=50):
-    """Get last N 5-min bars, properly aggregated from prices_5min snapshots (real-time)."""
+    """Get last N 5-min OHLC bars from ISS snapshots.
+    
+    ISS returns daily hi/lo for each snapshot — can't use those.
+    Build OHLC from prc (close) values within each 5-min window.
+    """
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     try:
         df = ch.query_df(f"""
             SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
-                   argMax(opn, bt) as opn,
-                   max(hi) as hi,
-                   min(lo) as lo,
-                   argMax(prc, bt) as prc
+                   argMin(prc, bt) as opn,
+                   max(prc) as hi,
+                   min(prc) as lo,
+                   argMax(prc, bt) as prc_close
             FROM moex.prices_5min
             WHERE ticker = '{ticker}'
             GROUP BY bt5
@@ -184,7 +188,7 @@ def get_latest_bars(ticker, asset, n_bars=50):
         """)
         if not df.empty:
             df = df.sort_values('bt5').reset_index(drop=True)
-            df.rename(columns={'bt5': 'bt'}, inplace=True)
+            df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
         ch.close()
         return df
     except Exception as e:
