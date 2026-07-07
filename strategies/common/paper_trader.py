@@ -167,7 +167,7 @@ def save_state(state):
 # ── CH helpers ────────────────────────────────────────────────────────────
 
 def get_latest_bars(ticker, asset, n_bars=50):
-    """Get last N 5-min bars, properly aggregated from prices_5min snapshots."""
+    """Get last N 5-min bars, properly aggregated from prices_5min snapshots (real-time)."""
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     try:
         df = ch.query_df(f"""
