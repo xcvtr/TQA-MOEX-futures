@@ -5,7 +5,7 @@
 ### Added
 - `~/.hermes/scripts/run_moex_futures_paper.sh` — no_agent cron wrapper
 ### Changed
-- **AGENTS.md** — добавлена секция checkpoint 156, обновлён статус paper trader
+- **AGENTS.md** — добавлена секция «🚨 Правила работы» (линтер + double-check)
 - **CHANGELOG.md** — добавлен [156]
 ### Checkpoint
 - checkpoint/156-paper-trader-recovery.md

@@ -81,3 +81,8 @@ ImportError: cannot import name 'PaperTrader' from 'strategies/common/paper_trad
 - При появлении сигналов cron будет писать сюда
 - `python3 run_paper_trader.py --stdout` для диагностики
 - `strategies/common/paper_trader.py` — ядро, не менять без проверки всех потребителей
+
+### 🚨 Правила работы (добавлены в AGENTS.md)
+1. **Линтер обязателен** — write_file/patch авто-линтуют .py/.json/.yaml/.toml. Не подавлять ошибки.
+2. **Дважды проверять перед отчётом** — файл создан, скрипт работает, данные свежие, cron `last_status=ok`, нет мусора в git.
+3. **Не гадать** — верифицировать через прямой запрос (SQL/CURL) перед докладом.
