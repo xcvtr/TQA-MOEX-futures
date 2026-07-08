@@ -23,8 +23,10 @@ def _load_strategies():
     """Lazy-import strategies — only when needed."""
     from strategies.stop_hunt.prod.engine import check_signal as sh_check
     from strategies.cvd.prod.engine import check_signal as cvd_check
+    from strategies.impulse_return.prod.engine import check_signal as imp_check
     STRATEGY_MAP['stop_hunt'] = sh_check
     STRATEGY_MAP['cvd'] = cvd_check
+    STRATEGY_MAP['impulse_return'] = imp_check
 
 # ── Config ────────────────────────────────────────────────────────────────
 CH_HOST = os.getenv('MOEX_CH_HOST', '10.0.0.60')
@@ -286,7 +288,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
 # ── Main tick ─────────────────────────────────────────────────────────────
 
-def run_tick():
+def run_tick(strategy_filter=None):
     _load_strategies()
 
     # Load state
@@ -303,6 +305,15 @@ def run_tick():
     if not portfolio:
         log.warning("Empty portfolio")
         return
+    
+    # Filter by strategy if specified
+    if strategy_filter:
+        portfolio = {t: {s: v for s, v in strats.items() if s == strategy_filter}
+                     for t, strats in portfolio.items()}
+        portfolio = {t: s for t, s in portfolio.items() if s}
+        if not portfolio:
+            log.warning(f"No portfolio entries for strategy '{strategy_filter}'")
+            return
 
     tickers = list(portfolio.keys())
     specs = load_specs(tickers)
@@ -427,5 +438,15 @@ def run_tick():
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--strategy', type=str, default=None, help='Strategy name filter (e.g. impulse_return)')
+    parser.add_argument('--state-key', type=str, default=None, help='State key suffix for separate instance')
+    args = parser.parse_args()
+    
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
-    run_tick()
+    
+    if args.state_key:
+        STATE_KEY = args.state_key
+    
+    run_tick(strategy_filter=args.strategy)
