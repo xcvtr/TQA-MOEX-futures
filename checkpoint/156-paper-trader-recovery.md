@@ -47,28 +47,36 @@ ImportError: cannot import name 'PaperTrader' from 'strategies/common/paper_trad
 
 ## Текущее состояние
 
-| Метрика | Значение |
-|---------|:--------:|
-| Capital | 200,000₽ |
-| Equity | 200,000₽ |
-| Peak | 200,000₽ |
-| Сделок | 0 |
-| Открыто позиций | 0 |
-| DD | 0.0% |
+| Метрика | stop_hunt | impulse_return | portfolio |
+|:--------|:---------:|:--------------:|:---------:|
+| Capital | 200,000₽ | 200,000₽ | 200,000₽ |
+| Equity | 200,000₽ | 200,000₽ | 200,000₽ |
+| DD | 0.0% | 0.0% | 0.0% |
+| Сделок | 0 | 0 | 0 |
+| Открыто | 0 | 0 | 0 |
 
 ### Активный портфель (PG futures.portfolio WHERE enabled=true)
 
 | Тикер | Стратегии |
-|:-----:|:---------:|
-| GZ | stop_hunt, cvd |
-| Si | stop_hunt, cvd |
-| CR | stop_hunt, cvd |
-| RN | stop_hunt, cvd |
-| GD | stop_hunt, cvd |
+|:-----:|:---------|
+| Si | stop_hunt, cvd, impulse_return |
+| GZ | stop_hunt, cvd, impulse_return |
+| CR | stop_hunt, cvd, impulse_return |
+| RN | stop_hunt, cvd, impulse_return |
+| GD | stop_hunt, cvd, impulse_return |
+
+### Cron jobs (3 инстанса)
+
+| Job | Стратегия | state-key | Скрипт | Статус |
+|:----|:---------:|:---------:|:-------|:------:|
+| TQA-MOEX-futures paper trader (stop_hunt) | stop_hunt | stop_hunt | `run_moex_futures_paper.sh` | ✅ ok |
+| impulse-return-paper-trader | impulse_return | impulse_return | `pt_impulse_return.sh` | ✅ ok |
+| moex-futures-portfolio-paper-trader | все (без фильтра) | portfolio | `pt_portfolio.sh` | ✅ ok |
 
 ### Данные
-- CH `prices_5min` на 10.0.0.60 — свежие (последний бар 10:00+)
-- Сигналов нет (stop_hunt и cvd возвращают None — рынок не даёт)
+- CH `prices_5min` на 10.0.0.60 — свежие (01:00 IRK 9 июля, после вечерней сессии)
+- CH `tradestats_fo` — 2026-07-07 (AlgoPack, обновляется раз в день)
+- Сигналов нет (рынок закрыт, MOEX откроется в 15:00 IRK)
 
 ## Изменённые файлы
 
