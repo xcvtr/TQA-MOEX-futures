@@ -28,11 +28,13 @@ HTML = '''<!DOCTYPE html>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',sans-serif;background:#0d1117;color:#e6edf3;padding:16px}
 h1{font-size:1.3rem;margin-bottom:12px;color:#58a6ff}
-.dashboard{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px}
-.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px}
-.card h3{font-size:.75rem;color:#8b949e;margin-bottom:4px}
-.card .val{font-size:1.6rem;font-weight:700}
-.card .sub{font-size:.75rem;color:#8b949e;margin-top:2px}
+.dashboard{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px}
+.card h3{font-size:.7rem;color:#8b949e;margin-bottom:3px}
+.card .val{font-size:1.3rem;font-weight:700}
+.card .sub{font-size:.7rem;color:#8b949e;margin-top:2px}
+.col{flex:1;background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:12px}
+.col h2{font-size:.85rem;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #21262d}
 .positive{color:#3fb950};.negative{color:#f85149}
 .chart-box{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;margin-bottom:12px}
 #equity-chart{width:100%;height:350px}
@@ -44,10 +46,10 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 </head>
 <body>
 <h1>📊 MOEX Futures</h1>
-<div style="display:flex;gap:10px;margin-bottom:16px">
-  <div style="flex:1"><h2 style="font-size:.9rem;color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div></div>
-  <div style="flex:1"><h2 style="font-size:.9rem;color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div></div>
-  <div style="flex:1"><h2 style="font-size:.9rem;color:#3fb950">🔷 Portfolio SH+IR</h2><div class="dashboard" id="stats-pf"></div></div>
+<div style="display:flex;gap:10px;margin-bottom:12px">
+  <div class="col"><h2 style="color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div></div>
+  <div class="col"><h2 style="color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div></div>
+  <div class="col"><h2 style="color:#3fb950">🔷 Portfolio SH+IR</h2><div class="dashboard" id="stats-pf"></div></div>
 </div>
 <div class="chart-box"><div id="equity-chart"></div></div>
 <div style="display:flex;gap:20px">
