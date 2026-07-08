@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Simple dashboard for Stop Hunt paper trader."""
-import os, json, http.server, psycopg2
+import os, json, http.server, psycopg2, clickhouse_connect as cc
 from datetime import datetime, timezone
 
 HOST = '0.0.0.0'
 PORT = 8087
 PG = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres')
+CH_HOST = '10.0.0.60'
+CH_DB = 'moex'
 
 def query(q, params=None):
     pg = psycopg2.connect(**PG)
@@ -295,13 +297,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except: sh=ir=pf=None
         try:
             ch = cc.get_client(host=CH_HOST, port=8123, database=CH_DB)
-            r = ch.query("SELECT toString(max(bt)) FROM moex.prices_5min WHERE ticker='Si'")
-            lb = r.result_rows[0][0] if r.result_rows else None
-            r = ch.query("SELECT now()")
-            nw = r.result_rows[0][0]
+            r = ch.query("SELECT max(bt) as max_bt, now() FROM moex.prices_5min WHERE ticker='Si'")
+            lb = r.result_rows[0][0]
+            nw = r.result_rows[0][1]
             ch.close()
         except: lb=None; nw=None
-        age = round((nw - datetime.strptime(lb.split('+')[0],'%Y-%m-%d %H:%M:%S')).total_seconds()/60,1) if nw and lb else None
+        age = round((nw - lb).total_seconds()/60,1) if nw and lb else None
         self._json({'strategies':{'stop_hunt':sh,'impulse_return':ir,'portfolio':pf},
                      'last_bar':str(lb)[:19] if lb else None,'now':str(nw)[:19] if nw else None,'bar_age_min':age})
     
