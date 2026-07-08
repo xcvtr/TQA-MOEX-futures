@@ -1,8 +1,11 @@
 ## [156] 2026-07-08
 ### Fixed
-- **run_paper_trader.py:** Полностью переписан — убран мёртвый импорт `PaperTrader` (класс не существует), заменён на `run_tick()` с silent-till-event паттерном
+- **run_paper_trader.py:** Полностью переписан — убран мёртвый импорт `PaperTrader` (класс не существует), заменён на `run_tick()` с silent-till-event паттерном. Добавлена поддержка `--strategy` и `--state-key`.
 - **Cron TQA-MOEX-futures paper trader** — unpaused (был на паузе с 4 июля), расписание `*/5 0-4,11-23`
+- **save_state()** — сделки теперь пишутся в `paper_trades_{state_key}`, а не хардкод в `futures.paper_trades` (4 бага: mismatched tables + dead code + missing table + orphan scripts)
+- **`pt_stop_hunt.sh`** — удалён (дублировал run_moex_futures_paper.sh)
 ### Added
+- `futures.paper_trades_stop_hunt` таблица в PG (создана)
 - `~/.hermes/scripts/run_moex_futures_paper.sh` — no_agent cron wrapper
 ### Changed
 - **AGENTS.md** — добавлена секция «🚨 Правила работы» (линтер + double-check)

@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 """Paper trader runner for MOEX futures — silent-till-event.
 
-Запускается по cron каждые 5 мин. Использует стратегии из PG portfolio.
-Выводит только события: открытие/закрытие сделок, просадку >20%.
-Тишина = всё ОК, сигналов нет.
+Запускается по cron каждые 5 мин. Использует strategies/common/paper_trader.py.
+Поддерживает --strategy и --state-key для раздельных инстансов.
 
 Usage:
-    python3 run_paper_trader.py                          # обычный run
-    python3 run_paper_trader.py --stdout                 # принудительный вывод статуса
+    python3 run_paper_trader.py [--strategy stop_hunt] [--state-key stop_hunt]
+    python3 run_paper_trader.py --stdout
 """
-import sys, os, json
+import sys, os, json, argparse
 from datetime import datetime, timezone
 
-# Project root
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import psycopg2
 
-from strategies.common.paper_trader import run_tick
-
-# ── PG config (same as paper_trader.py) ──────────────────────────────────
+# ── PG config ──────────────────────────────────────────────────────────────
 PG_HOST = os.getenv('MOEX_PG_HOST', '10.0.0.60')
 PG_PORT = int(os.getenv('MOEX_PG_PORT', '5432'))
 PG_DB = os.getenv('MOEX_PG_DB', 'moex')
@@ -34,23 +30,34 @@ def pg_conn():
                             user=PG_USER, password=PG_PASS, connect_timeout=5)
 
 
-def get_trades_count():
-    """Количество закрытых сделок в PG."""
+def get_trades_count(state_key):
+    """Количество закрытых сделок в PG для данного state-key."""
+    tbl = 'futures.paper_trades' + ('' if not state_key else '_' + state_key)
     conn = pg_conn()
     cur = conn.cursor()
-    cur.execute("SELECT count(*) FROM futures.paper_trades")
-    r = cur.fetchone()[0] or 0
+    # Проверить что таблица существует
+    cur.execute(f"""
+        SELECT count(*) FROM information_schema.tables
+        WHERE table_schema='futures' AND table_name='{tbl.split('.')[1]}'
+    """)
+    exists = cur.fetchone()[0]
+    if not exists:
+        cur.close(); conn.close()
+        return 0
+    cur.execute(f"SELECT count(*) FROM {tbl}")
+    r = cur.fetchone()
     cur.close(); conn.close()
-    return r
+    return r[0] or 0
 
 
-def get_last_trades(n=5):
+def get_last_trades(state_key, n=5):
     """Последние n закрытых сделок."""
+    tbl = 'futures.paper_trades' + ('' if not state_key else '_' + state_key)
     conn = pg_conn()
     cur = conn.cursor()
-    cur.execute("""
+    cur.execute(f"""
         SELECT ticker, strategy, direction, pnl_rub, exit_reason, exit_time
-        FROM futures.paper_trades
+        FROM {tbl}
         ORDER BY exit_time DESC NULLS LAST
         LIMIT %s
     """, (n,))
@@ -59,13 +66,14 @@ def get_last_trades(n=5):
     return rows
 
 
-def get_state():
+def get_state(state_key):
     """Текущее состояние бумажного трейдера."""
+    tbl = 'futures.paper_state' + ('' if not state_key else '_' + state_key)
     conn = pg_conn()
     cur = conn.cursor()
-    cur.execute("""
+    cur.execute(f"""
         SELECT capital, equity, peak, updated_at
-        FROM futures.paper_state
+        FROM {tbl}
         ORDER BY updated_at DESC LIMIT 1
     """)
     r = cur.fetchone()
@@ -77,13 +85,13 @@ def get_state():
             'peak': INITIAL_CAPITAL, 'updated_at': None}
 
 
-def get_position_count():
+def get_position_count(state_key):
     """Количество открытых позиций из JSON-поля."""
+    tbl = 'futures.paper_state' + ('' if not state_key else '_' + state_key)
     conn = pg_conn()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT positions_json
-        FROM futures.paper_state
+    cur.execute(f"""
+        SELECT positions_json FROM {tbl}
         ORDER BY updated_at DESC LIMIT 1
     """)
     r = cur.fetchone()
@@ -97,32 +105,47 @@ def get_position_count():
 
 
 def main():
-    force_stdout = '--stdout' in sys.argv
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--strategy', type=str, default=None,
+                        help='Strategy name filter (e.g. stop_hunt)')
+    parser.add_argument('--state-key', type=str, default=None,
+                        help='State key suffix for separate instance (e.g. stop_hunt)')
+    parser.add_argument('--stdout', action='store_true',
+                        help='Принудительный вывод статуса')
+    args = parser.parse_args()
 
-    # ── Before ────────────────────────────────────────────────────────────
-    old_trades = get_trades_count()
-    old_state = get_state()
-    old_positions = get_position_count()
+    state_key = args.state_key
 
-    # ── Run tick ──────────────────────────────────────────────────────────
-    try:
-        run_tick()
-    except Exception as e:
-        import traceback
-        print(f"❌ PaperTrader ошибка: {e}")
-        traceback.print_exc()
+    # Build CLI args for paper_trader.py
+    pt_args = []
+    if args.strategy:
+        pt_args.extend(['--strategy', args.strategy])
+    if args.state_key:
+        pt_args.extend(['--state-key', args.state_key])
+
+    # ── Before ──────────────────────────────────────────────────────────
+    old_trades = get_trades_count(state_key)
+    old_state = get_state(state_key)
+    old_positions = get_position_count(state_key)
+
+    # ── Run tick ────────────────────────────────────────────────────────
+    import subprocess
+    cmd = [sys.executable, 'strategies/common/paper_trader.py'] + pt_args
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        print(f"❌ PaperTrader ошибка (exit={result.returncode}): {result.stderr.strip() or result.stdout.strip()}")
         sys.exit(1)
 
-    # ── After ─────────────────────────────────────────────────────────────
-    new_trades = get_trades_count()
-    new_state = get_state()
-    new_positions = get_position_count()
+    # ── After ───────────────────────────────────────────────────────────
+    new_trades = get_trades_count(state_key)
+    new_state = get_state(state_key)
+    new_positions = get_position_count(state_key)
 
     lines = []
 
     # Новые закрытые сделки
     if new_trades > old_trades:
-        last_trades = get_last_trades(new_trades - old_trades)
+        last_trades = get_last_trades(state_key, new_trades - old_trades)
         for t in reversed(last_trades):
             ticker, strategy, direction, pnl, reason, ts = t
             if pnl is None:
@@ -143,7 +166,6 @@ def main():
     eq = new_state.get('equity', INITIAL_CAPITAL)
     pk = new_state.get('peak', INITIAL_CAPITAL)
     dd = (pk - eq) / pk * 100 if pk > 0 else 0
-    cap = new_state.get('capital', INITIAL_CAPITAL)
     total_pnl = eq - INITIAL_CAPITAL
     ret = total_pnl / INITIAL_CAPITAL * 100
 
@@ -151,11 +173,10 @@ def main():
     if dd >= 20:
         lines.append(f"⚠️ Просадка {dd:.1f}% — капитал {eq:>.0f}₽ из {pk:>.0f}₽ пик")
 
-    # Если флаг --stdout — показать статус в любом случае
-    if force_stdout:
+    # Если флаг --stdout — показать статус
+    if args.stdout:
         lines.append(f"📊 Eq={eq:>.0f}₽ (+{ret:.1f}%) DD={dd:.1f}% | Открыто={new_positions} | Сделок={new_trades}")
 
-    # Вывод
     if lines:
         print("\n".join(lines))
 

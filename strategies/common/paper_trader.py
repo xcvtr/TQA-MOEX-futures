@@ -138,7 +138,8 @@ def load_state():
 
 def save_state(state):
     """Save paper trader state to PG."""
-    tbl = 'futures.paper_state' + ('' if not STATE_KEY else '_' + STATE_KEY)
+    tbl_state = 'futures.paper_state' + ('' if not STATE_KEY else '_' + STATE_KEY)
+    tbl_trades = 'futures.paper_trades' + ('' if not STATE_KEY else '_' + STATE_KEY)
     try:
         conn = pg_conn()
         cur = conn.cursor()
@@ -146,8 +147,8 @@ def save_state(state):
         for t in state.get('trades', []):
             if t.get('saved', False):
                 continue
-            cur.execute("""
-                INSERT INTO futures.paper_trades
+            cur.execute(f"""
+                INSERT INTO {tbl_trades}
                 (ticker, strategy, direction, entry_price, exit_price, entry_time, exit_time,
                  pnl_rub, signal_type, status)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'closed')
@@ -157,9 +158,9 @@ def save_state(state):
             t['saved'] = True
         conn.commit()
         # Delete old state, insert new
-        cur.execute(f"DELETE FROM {tbl}")
+        cur.execute(f"DELETE FROM {tbl_state}")
         cur.execute(f"""
-            INSERT INTO {tbl} (capital, equity, peak, positions_json, bar_idx, next_id, updated_at)
+            INSERT INTO {tbl_state} (capital, equity, peak, positions_json, bar_idx, next_id, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, NOW())
         """, (round(state['capital'], 2), round(state['equity'], 2), round(state.get('peak', state['equity']), 2),
               json.dumps(state['positions']), state['bar_idx'], state.get('next_id', 1)))

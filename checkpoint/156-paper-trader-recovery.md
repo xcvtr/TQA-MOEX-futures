@@ -74,8 +74,19 @@ ImportError: cannot import name 'PaperTrader' from 'strategies/common/paper_trad
 
 | Файл | Изменение |
 |:----|:----------|
-| `run_paper_trader.py` | Полностью переписан (ImportError → silent-till-event) |
-| `~/.hermes/scripts/run_moex_futures_paper.sh` | Создан (cron wrapper, no_agent) |
+| `strategies/common/paper_trader.py` | `save_state()` — сделки теперь в `paper_trades_{state_key}`, не хардкод `futures.paper_trades` |
+| `run_paper_trader.py` | Полностью переписан: subprocess → `paper_trader.py` с `--state-key`, читает из правильных таблиц |
+| `~/.hermes/scripts/run_moex_futures_paper.sh` | Переписан: запускает `run_paper_trader.py --strategy stop_hunt --state-key stop_hunt` |
+| `~/.hermes/scripts/pt_stop_hunt.sh` | Удалён (дублировал функционал) |
+
+### 🐛 Найденные и исправленные баги
+
+| # | Баг | Фикс |
+|:-:|:----|:------|
+| 1 | `save_state()` хардкодил `INSERT INTO futures.paper_trades` — сделки не разделялись по state-key | Динамическая таблица: `tbl_trades = 'paper_trades_' + STATE_KEY` |
+| 2 | `run_paper_trader.py` читал из `futures.paper_state` (без суффикса) — таблица не существует | Читает из `paper_state_{state_key}` |
+| 3 | Cron запускал `pt_stop_hunt.sh` вместо `run_moex_futures_paper.sh` — мёртвый код | Удалён pt_stop_hunt.sh, cron обновлён |
+| 4 | `paper_trades_stop_hunt` не существовала в PG | Создана `LIKE paper_trades` |
 
 ## Для продолжения
 - При появлении сигналов cron будет писать сюда
