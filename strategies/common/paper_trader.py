@@ -311,7 +311,7 @@ def run_tick(strategy_filter=None):
     
     # Filter by strategy if specified
     if strategy_filter:
-        portfolio = {t: {s: v for s, v in strats.items() if s == strategy_filter}
+        portfolio = {t: [s for s in strats if s.get('strategy') == strategy_filter]
                      for t, strats in portfolio.items()}
         portfolio = {t: s for t, s in portfolio.items() if s}
         if not portfolio:
