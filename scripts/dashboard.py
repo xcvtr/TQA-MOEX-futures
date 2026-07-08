@@ -51,6 +51,7 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
   <div class="col"><h2 style="color:#3fb950">🔷 Portfolio SH+IR</h2><div class="dashboard" id="stats-pf"></div><div id="chart-pf" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-pf" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-pf" style="font-size:.7rem;color:#484f58">—</div></div>
 </div>
 <div class="refresh-info" id="refresh-info"></div>
+<div id="health-bar" style="font-size:.65rem;color:#484f58;margin-top:4px;display:flex;gap:16px"></div>
 
 <script>
 async function load() {
@@ -159,6 +160,22 @@ async function load() {
     renderChart('chart-sh', d.equity_curve, '#58a6ff');
     renderChart('chart-ir', d2.equity_curve, '#d29922');
     renderChart('chart-pf', d3.equity_curve, '#3fb950');
+    
+    // Health info
+    try {
+      const hr = await fetch('/api/health');
+      const h = await hr.json();
+      const hh = h.strategies || {};
+      const tick = (s) => s && s.tick ? s.tick.slice(11,19) : '—';
+      const age = h.bar_age_min !== null && h.bar_age_min !== undefined ? h.bar_age_min + 'm' : '—';
+      const barColor = h.bar_age_min !== null && h.bar_age_min < 10 ? '#3fb950' : h.bar_age_min < 60 ? '#d29922' : '#f85149';
+      document.getElementById('health-bar').innerHTML = [
+        `🕐 SH: ${tick(hh.stop_hunt)}`,
+        `🕐 IR: ${tick(hh.impulse_return)}`,
+        `🕐 PF: ${tick(hh.portfolio)}`,
+        `<span style="color:${barColor}">📊 data: ${age} ago</span>`,
+      ].join(' | ');
+    } catch(e) {}
   } catch(e) {
     document.getElementById('stats').innerHTML = `<div class="card"><h3>Error</h3><div class="val negative">${e.message}</div></div>`;
   }
@@ -179,6 +196,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(HTML.encode('utf-8'))
         elif self.path.startswith('/api/state'):
             self._state()
+        elif self.path == '/api/health':
+            self._health()
         else:
             self.send_response(404)
             self.end_headers()
@@ -258,6 +277,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         self.wfile.write(json.dumps(data, default=str).encode())
+    
+    def _health(self):
+        try:
+            pg = psycopg2.connect(**PG, connect_timeout=5)
+            cur = pg.cursor()
+            def get_tick(tbl):
+                try:
+                    cur.execute(f"SELECT updated_at FROM futures.{tbl} ORDER BY updated_at DESC LIMIT 1")
+                    r = cur.fetchone()
+                    return str(r[0])[:19] if r and r[0] else None
+                except: return None
+            sh = get_tick('paper_state_stop_hunt')
+            ir = get_tick('paper_state_impulse_return')
+            pf = get_tick('paper_state_portfolio')
+            cur.close(); pg.close()
+        except: sh=ir=pf=None
+        try:
+            ch = cc.get_client(host=CH_HOST, port=8123, database=CH_DB)
+            r = ch.query("SELECT toString(max(bt)) FROM moex.prices_5min WHERE ticker='Si'")
+            lb = r.result_rows[0][0] if r.result_rows else None
+            r = ch.query("SELECT now()")
+            nw = r.result_rows[0][0]
+            ch.close()
+        except: lb=None; nw=None
+        age = round((nw - datetime.strptime(lb.split('+')[0],'%Y-%m-%d %H:%M:%S')).total_seconds()/60,1) if nw and lb else None
+        self._json({'strategies':{'stop_hunt':sh,'impulse_return':ir,'portfolio':pf},
+                     'last_bar':str(lb)[:19] if lb else None,'now':str(nw)[:19] if nw else None,'bar_age_min':age})
     
     def log_message(self, *a): pass
 
