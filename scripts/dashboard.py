@@ -55,6 +55,7 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 <div style="display:flex;gap:20px">
   <div style="flex:1"><div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Stop Hunt позиции</h3><div id="positions-sh">—</div></div></div>
   <div style="flex:1"><div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Impulse Return позиции</h3><div id="positions-ir">—</div></div></div>
+  <div style="flex:1"><div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Portfolio SH+IR позиции</h3><div id="positions-pf">—</div></div></div>
 </div>
 <div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Сделки</h3><table id="trades"><tr><th>Время</th><th>Тикер</th><th>Стратегия</th><th>Направление</th><th>PnL</th></tr></table></div>
 <div class="refresh-info" id="refresh-info"></div>
@@ -114,6 +115,7 @@ async function load() {
     };
     renderPos('positions-sh', d.positions);
     renderPos('positions-ir', d2.positions);
+    renderPos('positions-pf', d3.positions);
     
     // Portfolio cards
     const eq3 = d3.equity || init;
