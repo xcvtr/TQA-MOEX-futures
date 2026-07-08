@@ -1,5 +1,7 @@
 # Архитектура проекта TQA-MOEX-futures
 
+**Последний чекпойнт: 156 (2026-07-08)** — paper trader восстановлен (fix ImportError, cron resumed)
+
 ## 🏗 Структура данных
 
 ### ClickHouse (10.0.0.64:8123, db=moex)

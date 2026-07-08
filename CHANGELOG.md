@@ -1,3 +1,15 @@
+## [156] 2026-07-08
+### Fixed
+- **run_paper_trader.py:** Полностью переписан — убран мёртвый импорт `PaperTrader` (класс не существует), заменён на `run_tick()` с silent-till-event паттерном
+- **Cron TQA-MOEX-futures paper trader** — unpaused (был на паузе с 4 июля), расписание `*/5 0-4,11-23`
+### Added
+- `~/.hermes/scripts/run_moex_futures_paper.sh` — no_agent cron wrapper
+### Changed
+- **AGENTS.md** — добавлена секция checkpoint 156, обновлён статус paper trader
+- **CHANGELOG.md** — добавлен [156]
+### Checkpoint
+- checkpoint/156-paper-trader-recovery.md
+
 ## [154] 2026-07-07
 ### Added
 - **CVD Momentum from DOM:** 1-min bars + CVD from order book (`moex.dom_min1`, 11.1M rows)
