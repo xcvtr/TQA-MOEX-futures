@@ -44,9 +44,10 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 </head>
 <body>
 <h1>📊 MOEX Futures</h1>
-<div style="display:flex;gap:20px;margin-bottom:16px">
-  <div style="flex:1"><h2 style="font-size:1rem;color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div></div>
-  <div style="flex:1"><h2 style="font-size:1rem;color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div></div>
+<div style="display:flex;gap:10px;margin-bottom:16px">
+  <div style="flex:1"><h2 style="font-size:.9rem;color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div></div>
+  <div style="flex:1"><h2 style="font-size:.9rem;color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div></div>
+  <div style="flex:1"><h2 style="font-size:.9rem;color:#3fb950">🔷 Portfolio SH+IR</h2><div class="dashboard" id="stats-pf"></div></div>
 </div>
 <div class="chart-box"><div id="equity-chart"></div></div>
 <div style="display:flex;gap:20px">
@@ -59,12 +60,14 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 <script>
 async function load() {
   try {
-    const [r1, r2] = await Promise.all([
+    const [r1, r2, r3] = await Promise.all([
       fetch('/api/state'),
-      fetch('/api/state?strategy=impulse_return')
+      fetch('/api/state?strategy=impulse_return'),
+      fetch('/api/state?strategy=portfolio')
     ]);
     const d = await r1.json();
     const d2 = await r2.json();
+    const d3 = await r3.json();
     
     // Stop Hunt cards
     const eq = d.equity;
@@ -109,6 +112,19 @@ async function load() {
     };
     renderPos('positions-sh', d.positions);
     renderPos('positions-ir', d2.positions);
+    
+    // Portfolio cards
+    const eq3 = d3.equity || init;
+    const ret3 = ((eq3/init)-1)*100;
+    const eq3Cls = ret3 >= 0 ? 'positive' : 'negative';
+    const pos3Count = d3.positions ? d3.positions.length : 0;
+    
+    document.getElementById('stats-pf').innerHTML = [
+      `<div class="card"><h3>Equity</h3><div class="val ${eq3Cls}">${eq3.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
+      `<div class="card"><h3>Return</h3><div class="val ${eq3Cls}">${ret3 >= 0 ? '+' : ''}${ret3.toFixed(2)}%</div><div class="sub">peak: ${d3.peak.toLocaleString()} ₽</div></div>`,
+      `<div class="card"><h3>MDD</h3><div class="val">${d3.mdd_pct.toFixed(2)}%</div><div class="sub">drawdown from peak</div></div>`,
+      `<div class="card"><h3>Positions</h3><div class="val">${pos3Count}</div><div class="sub">open / ${d3.n_trades || 0} total</div></div>`,
+    ].join('');
     
     // Trades table
     const allTrades = [...(d.trades || []), ...(d2.trades || [])];
