@@ -46,18 +46,12 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 </head>
 <body>
 <h1>📊 MOEX Futures</h1>
-<div style="display:flex;gap:10px;margin-bottom:12px">
-  <div class="col"><h2 style="color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div></div>
-  <div class="col"><h2 style="color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div></div>
-  <div class="col"><h2 style="color:#3fb950">🔷 Portfolio SH+IR</h2><div class="dashboard" id="stats-pf"></div></div>
+<div style="display:flex;gap:10px;margin-bottom:12px;align-items:stretch">
+  <div class="col"><h2 style="color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-sh" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-sh" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-ir" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-ir" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#3fb950">🔷 Portfolio SH+IR</h2><div class="dashboard" id="stats-pf"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-pf" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-pf" style="font-size:.7rem;color:#484f58">—</div></div>
 </div>
 <div class="chart-box"><div id="equity-chart"></div></div>
-<div style="display:flex;gap:20px">
-  <div style="flex:1"><div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Stop Hunt позиции</h3><div id="positions-sh">—</div></div></div>
-  <div style="flex:1"><div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Impulse Return позиции</h3><div id="positions-ir">—</div></div></div>
-  <div style="flex:1"><div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Portfolio SH+IR позиции</h3><div id="positions-pf">—</div></div></div>
-</div>
-<div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Сделки</h3><table id="trades"><tr><th>Время</th><th>Тикер</th><th>Стратегия</th><th>Направление</th><th>PnL</th></tr></table></div>
 <div class="refresh-info" id="refresh-info"></div>
 
 <script>
@@ -117,6 +111,20 @@ async function load() {
     renderPos('positions-ir', d2.positions);
     renderPos('positions-pf', d3.positions);
     
+    // Trades per column
+    const renderTrades = (id, trades) => {
+      if (trades && trades.length > 0) {
+        document.getElementById(id).innerHTML = trades.slice(0,5).map(t => {
+          const c = t.pnl >= 0 ? 'positive' : 'negative';
+          const s = t.pnl >= 0 ? '+' + t.pnl.toFixed(0) : t.pnl.toFixed(0);
+          return `<div style="border-bottom:1px solid #21262d;padding:2px 0">${t.ticker} ${t.direction} <span class="${c}">${s}₽</span></div>`;
+        }).join('');
+      }
+    };
+    renderTrades('trades-sh', d.trades);
+    renderTrades('trades-ir', d2.trades);
+    renderTrades('trades-pf', d3.trades);
+    
     // Portfolio cards
     const eq3 = d3.equity || init;
     const ret3 = ((eq3/init)-1)*100;
@@ -130,17 +138,6 @@ async function load() {
       `<div class="card"><h3>Positions</h3><div class="val">${pos3Count}</div><div class="sub">open / ${d3.n_trades || 0} total</div></div>`,
     ].join('');
     
-    // Trades table
-    const allTrades = [...(d.trades || []), ...(d2.trades || [])];
-    allTrades.sort((a,b) => (b.time||'').localeCompare(a.time||''));
-    if (allTrades.length > 0) {
-      document.getElementById('trades').innerHTML = '<tr><th>Время</th><th>Тикер</th><th>Стратегия</th><th>Направление</th><th>PnL</th></tr>' +
-        allTrades.slice(0,50).map(t => {
-          const pnlCls = t.pnl >= 0 ? 'positive' : 'negative';
-          const pnlStr = t.pnl >= 0 ? '+' + t.pnl.toFixed(0) : t.pnl.toFixed(0);
-          return `<tr><td>${t.time || ''}</td><td>${t.ticker}</td><td>${t.strategy || 'sh'}</td><td>${t.direction}</td><td class="${pnlCls}">${pnlStr} ₽</td></tr>`;
-        }).join('');
-    }
     document.getElementById('refresh-info').textContent = 'updated: ' + (d.updated_at || '—');
     // Equity chart
     if (d.equity_curve && d.equity_curve.length > 1) {
@@ -168,7 +165,6 @@ async function load() {
       });
     }
     
-    document.getElementById('refresh-info').textContent = 'updated: ' + (d.updated_at || '—');
   } catch(e) {
     document.getElementById('stats').innerHTML = `<div class="card"><h3>Error</h3><div class="val negative">${e.message}</div></div>`;
   }
