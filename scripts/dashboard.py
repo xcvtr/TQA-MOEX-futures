@@ -22,7 +22,7 @@ HTML = '''<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Stop Hunt Dashboard</title>
+<title>MOEX Futures Dashboard</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -43,56 +43,85 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 </style>
 </head>
 <body>
-<h1>📊 Stop Hunt MOEX Futures</h1>
-<div class="dashboard" id="stats"></div>
+<h1>📊 MOEX Futures</h1>
+<div style="display:flex;gap:20px;margin-bottom:16px">
+  <div style="flex:1"><h2 style="font-size:1rem;color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div></div>
+  <div style="flex:1"><h2 style="font-size:1rem;color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div></div>
+</div>
 <div class="chart-box"><div id="equity-chart"></div></div>
-<div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Текущие позиции</h3><div id="positions">—</div></div>
-<div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">История сделок</h3><table id="trades"><tr><th>Время</th><th>Тикер</th><th>Направление</th><th>Цена</th><th>PnL</th><th>Причина</th></tr></table></div>
+<div style="display:flex;gap:20px">
+  <div style="flex:1"><div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Stop Hunt позиции</h3><div id="positions-sh">—</div></div></div>
+  <div style="flex:1"><div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Impulse Return позиции</h3><div id="positions-ir">—</div></div></div>
+</div>
+<div class="chart-box"><h3 style="margin-bottom:8px;color:#8b949e">Сделки</h3><table id="trades"><tr><th>Время</th><th>Тикер</th><th>Стратегия</th><th>Направление</th><th>PnL</th></tr></table></div>
 <div class="refresh-info" id="refresh-info"></div>
 
 <script>
 async function load() {
   try {
-    const r = await fetch('/api/state');
-    const d = await r.json();
+    const [r1, r2] = await Promise.all([
+      fetch('/api/state'),
+      fetch('/api/state?strategy=impulse_return')
+    ]);
+    const d = await r1.json();
+    const d2 = await r2.json();
     
-    // Stats cards
+    // Stop Hunt cards
     const eq = d.equity;
     const init = d.capital;
     const ret = ((eq/init)-1)*100;
     const eqCls = ret >= 0 ? 'positive' : 'negative';
     const posCount = d.positions ? d.positions.length : 0;
     
-    document.getElementById('stats').innerHTML = [
+    document.getElementById('stats-sh').innerHTML = [
       `<div class="card"><h3>Equity</h3><div class="val ${eqCls}">${eq.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
       `<div class="card"><h3>Return</h3><div class="val ${eqCls}">${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%</div><div class="sub">peak: ${d.peak.toLocaleString()} ₽</div></div>`,
       `<div class="card"><h3>MDD</h3><div class="val">${d.mdd_pct.toFixed(2)}%</div><div class="sub">drawdown from peak</div></div>`,
       `<div class="card"><h3>Positions</h3><div class="val">${posCount}</div><div class="sub">open / ${d.n_trades || 0} total</div></div>`,
     ].join('');
     
+    // Impulse Return cards
+    const eq2 = d2.equity || init;
+    const ret2 = ((eq2/init)-1)*100;
+    const eq2Cls = ret2 >= 0 ? 'positive' : 'negative';
+    const pos2Count = d2.positions ? d2.positions.length : 0;
+    
+    document.getElementById('stats-ir').innerHTML = [
+      `<div class="card"><h3>Equity</h3><div class="val ${eq2Cls}">${eq2.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
+      `<div class="card"><h3>Return</h3><div class="val ${eq2Cls}">${ret2 >= 0 ? '+' : ''}${ret2.toFixed(2)}%</div><div class="sub">peak: ${d2.peak.toLocaleString()} ₽</div></div>`,
+      `<div class="card"><h3>MDD</h3><div class="val">${d2.mdd_pct.toFixed(2)}%</div><div class="sub">drawdown from peak</div></div>`,
+      `<div class="card"><h3>Positions</h3><div class="val">${pos2Count}</div><div class="sub">open / ${d2.n_trades || 0} total</div></div>`,
+    ].join('');
+    
     // Positions
-    if (d.positions && d.positions.length > 0) {
-      document.getElementById('positions').innerHTML = d.positions.map(p => 
-        `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #21262d">
-          <span><b>${p.ticker}</b> ${p.direction}</span>
-          <span>entry: ${p.entry_price}</span>
-          <span>bars: ${p.bars_held}</span>
-        </div>`
-      ).join('');
-    } else {
-      document.getElementById('positions').innerHTML = '<span style="color:#484f58">— нет открытых позиций</span>';
-    }
+    const renderPos = (id, data) => {
+      if (data && data.length > 0) {
+        document.getElementById(id).innerHTML = data.map(p => 
+          `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #21262d">
+            <span><b>${p.ticker}</b> ${p.direction}</span>
+            <span>entry: ${p.entry_price}</span>
+            <span>bars: ${p.bars_held}</span>
+          </div>`
+        ).join('');
+      } else {
+        document.getElementById(id).innerHTML = '<span style="color:#484f58">— нет открытых позиций</span>';
+      }
+    };
+    renderPos('positions-sh', d.positions);
+    renderPos('positions-ir', d2.positions);
     
     // Trades table
-    if (d.trades && d.trades.length > 0) {
-      document.getElementById('trades').innerHTML = '<tr><th>Время</th><th>Тикер</th><th>Направление</th><th>Цена</th><th>PnL</th><th>Причина</th></tr>' +
-        d.trades.map(t => {
+    const allTrades = [...(d.trades || []), ...(d2.trades || [])];
+    allTrades.sort((a,b) => (b.time||'').localeCompare(a.time||''));
+    if (allTrades.length > 0) {
+      document.getElementById('trades').innerHTML = '<tr><th>Время</th><th>Тикер</th><th>Стратегия</th><th>Направление</th><th>PnL</th></tr>' +
+        allTrades.slice(0,50).map(t => {
           const pnlCls = t.pnl >= 0 ? 'positive' : 'negative';
           const pnlStr = t.pnl >= 0 ? '+' + t.pnl.toFixed(0) : t.pnl.toFixed(0);
-          return `<tr><td>${t.time || ''}</td><td>${t.ticker}</td><td>${t.direction}</td><td>${t.price || ''}</td><td class="${pnlCls}">${pnlStr} ₽</td><td>${t.reason || ''}</td></tr>`;
+          return `<tr><td>${t.time || ''}</td><td>${t.ticker}</td><td>${t.strategy || 'sh'}</td><td>${t.direction}</td><td class="${pnlCls}">${pnlStr} ₽</td></tr>`;
         }).join('');
     }
-    
+    document.getElementById('refresh-info').textContent = 'updated: ' + (d.updated_at || '—');
     // Equity chart
     if (d.equity_curve && d.equity_curve.length > 1) {
       Plotly.react('equity-chart', [{
@@ -138,7 +167,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.end_headers()
             self.wfile.write(HTML.encode('utf-8'))
-        elif self.path == '/api/state':
+        elif self.path.startswith('/api/state'):
             self._state()
         else:
             self.send_response(404)
@@ -146,7 +175,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
     
     def _state(self):
         try:
-            cols, rows = query("SELECT capital, equity, peak, positions_json, updated_at FROM futures.paper_state")
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            strategy = qs.get('strategy', [None])[0]
+            tbl = 'futures.paper_state' + ('' if not strategy else '_' + strategy)
+            cols, rows = query(f"SELECT capital, equity, peak, positions_json, updated_at FROM {tbl}")
             if not rows:
                 self._json({'error': 'no data'})
                 return

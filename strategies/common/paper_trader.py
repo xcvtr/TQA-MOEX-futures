@@ -41,6 +41,7 @@ PG_PASS = os.getenv('MOEX_PG_PASSWORD', '')
 
 TRADE_COST = 4  # руб за сделку
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
+STATE_KEY = ''  # модульный уровень — задаётся в __main__ или run_paper_trader.py
 
 # PnL formula: (exit-entry)/ms*sp*contracts - TC*contracts
 # MOEX STEPPRICE = RUB per tick per contract. NO *lot.
@@ -117,10 +118,11 @@ def load_specs(tickers):
 
 def load_state():
     """Load current paper trader state from PG."""
+    tbl = 'futures.paper_state' + ('' if not STATE_KEY else '_' + STATE_KEY)
     try:
         conn = pg_conn()
         cur = conn.cursor()
-        cur.execute("SELECT capital, equity, peak, positions_json, bar_idx, next_id FROM futures.paper_state ORDER BY updated_at DESC LIMIT 1")
+        cur.execute(f"SELECT capital, equity, peak, positions_json, bar_idx, next_id FROM {tbl} ORDER BY updated_at DESC LIMIT 1")
         r = cur.fetchone()
         cur.close(); conn.close()
         if r:
@@ -136,6 +138,7 @@ def load_state():
 
 def save_state(state):
     """Save paper trader state to PG."""
+    tbl = 'futures.paper_state' + ('' if not STATE_KEY else '_' + STATE_KEY)
     try:
         conn = pg_conn()
         cur = conn.cursor()
@@ -154,9 +157,9 @@ def save_state(state):
             t['saved'] = True
         conn.commit()
         # Delete old state, insert new
-        cur.execute("DELETE FROM futures.paper_state")
-        cur.execute("""
-            INSERT INTO futures.paper_state (capital, equity, peak, positions_json, bar_idx, next_id, updated_at)
+        cur.execute(f"DELETE FROM {tbl}")
+        cur.execute(f"""
+            INSERT INTO {tbl} (capital, equity, peak, positions_json, bar_idx, next_id, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, NOW())
         """, (round(state['capital'], 2), round(state['equity'], 2), round(state.get('peak', state['equity']), 2),
               json.dumps(state['positions']), state['bar_idx'], state.get('next_id', 1)))
