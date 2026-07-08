@@ -14,6 +14,7 @@ from strategies.stop_hunt.prod.engine import check_signal as sh_check
 from strategies.cvd.prod.engine import check_signal as cvd_check
 from strategies.churn.prod.engine import check_signal as churn_check
 from strategies.lunch_rev.prod.engine import check_signal as lunch_check
+from strategies.impulse_return.prod.engine import check_signal as impulse_check
 
 CH_CONFIG = dict(host=os.getenv('MOEX_CH_HOST', '10.0.0.60'), port=8123, database='moex')
 PG_CONFIG = dict(
@@ -28,6 +29,7 @@ STRATEGY_MAP = {
     'cvd': cvd_check,
     'churn': churn_check,
     'lunch_rev': lunch_check,
+    'impulse_return': impulse_check,
 }
 
 # ── Asset → ticker mapping (from PG ticker_specs, и fallback) ────────
@@ -131,8 +133,14 @@ class Backtester:
             df['dcvd_z'] = dcvd_z
             df['sma20'] = sma20
             df['vol_ma20'] = vol_ma20
+            # Timezone: CH в Asia/Irkutsk (+08). MOEX торгует 10:00-18:45 MSK = 15:00-23:45 IRK
             df['hour'] = df['bt'].dt.hour
             df['minute'] = df['bt'].dt.minute
+            # Фильтр: только MOEX основная + вечерняя сессия (убираем овернайт 05:00-14:00 IRK)
+            trading_mask = (df['hour'] >= 15) | (df['hour'] <= 4)
+            before = len(df)
+            df = df[trading_mask].copy()
+            print(f"  {ticker}: {before} → {len(df)} bars (filtered off-hours)", flush=True)
 
             data[ticker] = df
 

@@ -43,6 +43,14 @@ class PortfolioEngine:
         else:
             bar['lo_hist'] = []
             bar['hi_hist'] = []
+        # Impulse Return: close_hist (10 bars), vol_hist (10 bars)
+        prc_col = 'prc' if 'prc' in df else 'close'
+        if n >= 10:
+            bar['close_hist'] = list(df[prc_col].iloc[bar_idx-10:bar_idx].values.astype(float))
+            bar['vol_hist'] = list(df['vol'].iloc[bar_idx-10:bar_idx].values.astype(float))
+        else:
+            bar['close_hist'] = list(df[prc_col].iloc[:bar_idx].values.astype(float)) if bar_idx > 0 else []
+            bar['vol_hist'] = list(df['vol'].iloc[:bar_idx].values.astype(float)) if bar_idx > 0 else []
 
         # Churn: OI 5 bars ago
         if n >= 5 and 'oi' in df:
