@@ -37,7 +37,6 @@ h1{font-size:1.3rem;margin-bottom:12px;color:#58a6ff}
 .col h2{font-size:.85rem;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #21262d}
 .positive{color:#3fb950};.negative{color:#f85149}
 .chart-box{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;margin-bottom:12px}
-#equity-chart{width:100%;height:350px}
 table{width:100%;border-collapse:collapse;font-size:.8rem}
 th{text-align:left;padding:6px 8px;color:#8b949e;border-bottom:1px solid #30363d}
 td{padding:6px 8px;border-bottom:1px solid #21262d}
@@ -47,11 +46,10 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 <body>
 <h1>📊 MOEX Futures</h1>
 <div style="display:flex;gap:10px;margin-bottom:12px;align-items:stretch">
-  <div class="col"><h2 style="color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-sh" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-sh" style="font-size:.7rem;color:#484f58">—</div></div>
-  <div class="col"><h2 style="color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-ir" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-ir" style="font-size:.7rem;color:#484f58">—</div></div>
-  <div class="col"><h2 style="color:#3fb950">🔷 Portfolio SH+IR</h2><div class="dashboard" id="stats-pf"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-pf" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-pf" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div><div id="chart-sh" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-sh" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-sh" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div><div id="chart-ir" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-ir" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-ir" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#3fb950">🔷 Portfolio SH+IR</h2><div class="dashboard" id="stats-pf"></div><div id="chart-pf" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-pf" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-pf" style="font-size:.7rem;color:#484f58">—</div></div>
 </div>
-<div class="chart-box"><div id="equity-chart"></div></div>
 <div class="refresh-info" id="refresh-info"></div>
 
 <script>
@@ -139,32 +137,28 @@ async function load() {
     ].join('');
     
     document.getElementById('refresh-info').textContent = 'updated: ' + (d.updated_at || '—');
-    // Equity chart
-    if (d.equity_curve && d.equity_curve.length > 1) {
-      Plotly.react('equity-chart', [{
-        x: d.equity_curve.map(p => p.t),
-        y: d.equity_curve.map(p => p.e),
-        type: 'scatter', mode: 'lines',
-        line: {color: '#58a6ff', width: 2},
-        fill: 'tozeroy', fillcolor: 'rgba(88,166,255,0.08)',
-        name: 'Equity'
-      }, {
-        x: d.equity_curve.map(p => p.t),
-        y: d.equity_curve.map(p => p.m),
-        type: 'scatter', mode: 'lines',
-        line: {color: '#d29922', width: 2, dash: 'dot'},
-        name: 'MTM'
-      }], {
-        paper_bgcolor: '#161b22', plot_bgcolor: '#0d1117',
-        font: {color: '#8b949e', size: 10},
-        margin: {l:50, r:15, t:15, b:30},
-        xaxis: {type: 'date', gridcolor: '#21262d'},
-        yaxis: {gridcolor: '#21262d', tickprefix: ''},
-        hovermode: 'x unified',
-        legend: {orientation: 'h', y: 1.1},
-      });
-    }
-    
+    // Mini equity charts per column
+    const renderChart = (elId, curve, color) => {
+      if (curve && curve.length > 1) {
+        Plotly.react(elId, [{
+          x: curve.map(p => p.t), y: curve.map(p => p.e),
+          type: 'scatter', mode: 'lines',
+          line: {color, width: 1.5},
+          fill: 'tozeroy', fillcolor: color + '18',
+        }], {
+          paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+          font: {color: '#484f58', size: 8},
+          margin: {l:0, r:0, t:0, b:0},
+          xaxis: {showgrid:false, visible:false},
+          yaxis: {showgrid:false, visible:false},
+          hovermode: false,
+          showlegend: false,
+        });
+      }
+    };
+    renderChart('chart-sh', d.equity_curve, '#58a6ff');
+    renderChart('chart-ir', d2.equity_curve, '#d29922');
+    renderChart('chart-pf', d3.equity_curve, '#3fb950');
   } catch(e) {
     document.getElementById('stats').innerHTML = `<div class="card"><h3>Error</h3><div class="val negative">${e.message}</div></div>`;
   }
