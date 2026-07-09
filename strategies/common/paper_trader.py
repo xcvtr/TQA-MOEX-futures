@@ -163,11 +163,22 @@ def save_state(state):
             INSERT INTO {tbl_state} (capital, equity, peak, positions_json, bar_idx, next_id, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, NOW())
         """, (round(state['capital'], 2), round(state['equity'], 2), round(state.get('peak', state['equity']), 2),
-              json.dumps(state['positions']), state['bar_idx'], state.get('next_id', 1)))
+              json.dumps(_json_safe(state['positions'])), state['bar_idx'], state.get('next_id', 1)))
         conn.commit()
         cur.close(); conn.close()
     except Exception as e:
         log.warning("Save state failed: %s", e)
+
+
+def _json_safe(obj):
+    """Convert non-serializable objects for JSON dump."""
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    return obj
 
 
 # ── CH helpers ────────────────────────────────────────────────────────────
@@ -177,6 +188,7 @@ def get_latest_bars(ticker, asset, n_bars=50):
     
     ISS returns daily hi/lo for each snapshot — can't use those.
     Build OHLC from prc (close) values within each 5-min window.
+    Returns DataFrame or None.
     """
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     try:
@@ -201,6 +213,52 @@ def get_latest_bars(ticker, asset, n_bars=50):
         log.error("CH error for %s: %s", ticker, e)
         ch.close()
         return None
+
+
+def get_volume_data(ticker, n_bars=55):
+    """Get volume data (vol_b, vol_s) from tradestats_fo for CVD calculation.
+    Returns (vol_hist, vol_b_hist, vol_s_hist) or ([], [], []) if no data.
+    """
+    try:
+        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+        rows = ch.query(f"""
+            SELECT SYSTIME, vol, vol_b, vol_s
+            FROM moex.tradestats_fo
+            WHERE asset_code = '{ticker}'
+            ORDER BY SYSTIME DESC
+            LIMIT {n_bars + 10}
+        """).result_rows
+        ch.close()
+        if not rows:
+            return [], [], []
+        # Sort chronologically
+        rows = list(reversed(rows))
+        vol = [float(r[1]) for r in rows if r[1] is not None]
+        vol_b = [float(r[2]) for r in rows if r[2] is not None]
+        vol_s = [float(r[3]) for r in rows if r[3] is not None]
+        return vol, vol_b, vol_s
+    except Exception as e:
+        log.warning("Volume data error for %s: %s", ticker, e)
+        return [], [], []
+
+
+def calc_dcvd_z(vol_b_hist, vol_s_hist, period=20):
+    """Calculate CVD z-score from vol_b/vol_s history.
+    Returns z-score (float) or 0 if insufficient data.
+    """
+    if len(vol_b_hist) < period + 1 or len(vol_s_hist) < period + 1:
+        return 0.0
+    cvd = [vol_b_hist[i] - vol_s_hist[i] for i in range(len(vol_b_hist))]
+    # z-score of last value relative to recent history
+    recent = cvd[-(period+1):-1]
+    if not recent:
+        return 0.0
+    mean = sum(recent) / len(recent)
+    var = sum((x - mean) ** 2 for x in recent) / len(recent)
+    std = var ** 0.5
+    if std < 0.001:
+        return 0.0
+    return (cvd[-1] - mean) / std
 
 
 # ── Position management ──────────────────────────────────────────────────
@@ -338,6 +396,20 @@ def run_tick(strategy_filter=None):
         bar_idx = len(df)  # последний бар
         last = df.iloc[-1]
         second_last = df.iloc[-2] if len(df) >= 2 else last
+        
+        # Close history (for impulse_return)
+        close_hist = [float(v) for v in df['prc'].iloc[:-1].values]
+        
+        # Volume data (for CVD + impulse_return)
+        vol, vol_b, vol_s = get_volume_data(s.get('asset', ticker))
+        
+        # CVD z-score
+        dcvd_z = calc_dcvd_z(vol_b, vol_s) if vol_b else 0.0
+        
+        # Volume history for impulse_return
+        vol_hist = vol[:-1] if len(vol) > 1 else []
+        current_vol = vol[-1] if vol else 100
+        
         bar_data[ticker] = {
             'bt': last['bt'],
             'opn': float(last['opn']),
@@ -345,8 +417,10 @@ def run_tick(strategy_filter=None):
             'lo': float(last['lo']),
             'prc': float(last['prc']),
             'prc_prev': float(second_last['prc']),
-            'vol': 100,
-            'dcvd_z': 0,
+            'vol': current_vol,
+            'dcvd_z': dcvd_z,
+            'close_hist': close_hist,
+            'vol_hist': vol_hist,
         }
         # Build hi/lo history for signal check
         hi_hist = [float(v) for v in df['hi'].iloc[-21:-1].values]
