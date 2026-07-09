@@ -383,6 +383,19 @@ def run_tick(strategy_filter=None):
         log.warning("No specs loaded")
         return
 
+    # ── Freshness check ────────────────────────────────────────────────────
+    now = datetime.now(timezone.utc)
+    MARKET_OPEN_IRK = 15  # MOEX открывается в 10:00 MSK = 15:00 IRK
+    MARKET_CLOSE_IRK = 0  # 23:45 MSK следующий день = 00:00 IRK следующего дня
+    
+    # Проверка: рынок открыт? (MOEX: 15:00-23:45 IRK = 10:00-18:45 MSK)
+    irk_hour = now.hour + 8  # UTC → IRK
+    if irk_hour >= 24:
+        irk_hour -= 24
+    market_open = (irk_hour >= MARKET_OPEN_IRK or irk_hour < MARKET_CLOSE_IRK)
+    if not market_open:
+        log.info("MOEX market closed (IRK hour=%d). Skipping new signals.", irk_hour)
+    
     # Load latest bars for all tickers
     bar_data = {}
     max_bar_idx = 0
@@ -403,8 +416,22 @@ def run_tick(strategy_filter=None):
         # Volume data (for CVD + impulse_return)
         vol, vol_b, vol_s = get_volume_data(s.get('asset', ticker))
         
-        # CVD z-score
-        dcvd_z = calc_dcvd_z(vol_b, vol_s) if vol_b else 0.0
+        # CVD z-score — отключить если tradestats_fo stale (>30ч)
+        vol_age_hours = 0
+        if vol:
+            try:
+                ch_tmp = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+                r = ch_tmp.query(f"SELECT max(SYSTIME) FROM moex.tradestats_fo WHERE asset_code='{s.get('asset', ticker)}'").result_rows
+                ch_tmp.close()
+                if r and r[0][0]:
+                    vol_age_hours = (datetime.now(timezone.utc) - r[0][0].replace(tzinfo=timezone.utc)).total_seconds() / 3600
+            except Exception:
+                pass
+        
+        if vol_age_hours > 30:
+            dcvd_z = 0.0  # stale volume — отключаем CVD
+        else:
+            dcvd_z = calc_dcvd_z(vol_b, vol_s) if vol_b else 0.0
         
         # Volume history for impulse_return
         vol_hist = vol[:-1] if len(vol) > 1 else []
@@ -442,48 +469,49 @@ def run_tick(strategy_filter=None):
         trades.append(c)
         log.info("Closed %s %s PnL=%.0f (%s)", c['ticker'], c['direction'], c['pnl'], c.get('exit_reason', ''))
 
-    # Check for new signals
-    for ticker in tickers:
-        bd = bar_data.get(ticker)
-        if not bd:
-            continue
-        # Already have open position for this ticker?
-        if any(not p.get('closed', False) and p.get('ticker') == ticker for p in positions):
-            continue
-        s = specs.get(ticker, {})
-        ms = s.get('ms', 0.01)
-        sp = s.get('sp', 1)
-        lot = s.get('lot', 1)
-
-        for entry in portfolio[ticker]:
-            strategy_name = entry['strategy']
-            fn = STRATEGY_MAP.get(strategy_name)
-            if not fn:
+    # Check for new signals (only when market is open)
+    if market_open:
+        for ticker in tickers:
+            bd = bar_data.get(ticker)
+            if not bd:
                 continue
-
-            try:
-                signal = fn(bd, ticker)
-            except Exception as e:
-                log.warning("Signal error %s/%s: %s", ticker, strategy_name, e)
+            # Already have open position for this ticker?
+            if any(not p.get('closed', False) and p.get('ticker') == ticker for p in positions):
                 continue
+            s = specs.get(ticker, {})
+            ms = s.get('ms', 0.01)
+            sp = s.get('sp', 1)
+            lot = s.get('lot', 1)
 
-            if not signal:
-                continue
+            for entry in portfolio[ticker]:
+                strategy_name = entry['strategy']
+                fn = STRATEGY_MAP.get(strategy_name)
+                if not fn:
+                    continue
 
-            # Entry on next bar's open + 1 tick
-            ms_val = ms
-            entry_price = float(bd['prc']) + ms_val  # latest close + 1 tick slippage
-            entry_price = round(entry_price / ms_val) * ms_val
+                try:
+                    signal = fn(bd, ticker)
+                except Exception as e:
+                    log.warning("Signal error %s/%s: %s", ticker, strategy_name, e)
+                    continue
 
-            # Contract sizing
-            contracts = entry.get('contracts') or 1
+                if not signal:
+                    continue
 
-            pos = {
-                'id': next_id,
-                'ticker': ticker,
-                'strategy': strategy_name,
-                'direction': signal['direction'],
-                'entry_price': entry_price,
+                # Entry on next bar's open + 1 tick
+                ms_val = ms
+                entry_price = float(bd['prc']) + ms_val  # latest close + 1 tick slippage
+                entry_price = round(entry_price / ms_val) * ms_val
+
+                # Contract sizing
+                contracts = entry.get('contracts') or 1
+
+                pos = {
+                    'id': next_id,
+                    'ticker': ticker,
+                    'strategy': strategy_name,
+                    'direction': signal['direction'],
+                    'entry_price': entry_price,
                 'entry_time': datetime.now(timezone.utc),
                 'entry_bar': max_bar_idx,
                 'contracts': contracts,
