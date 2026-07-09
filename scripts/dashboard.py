@@ -77,7 +77,8 @@ async function load() {
     document.getElementById('stats-sh').innerHTML = [
       `<div class="card"><h3>Equity</h3><div class="val ${eqCls}">${eq.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
       `<div class="card"><h3>Return</h3><div class="val ${eqCls}">${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%</div><div class="sub">peak: ${d.peak.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>MDD</h3><div class="val">${d.mdd_pct.toFixed(2)}%</div><div class="sub">drawdown from peak</div></div>`,
+      `<div class="card"><h3>MDD</h3><div class="val">${d.mdd_pct.toFixed(2)}%</div><div class="sub">cash DD</div></div>`,
+      `<div class="card"><h3>MTM DD</h3><div class="val">${(d.mtm_dd_pct || 0).toFixed(2)}%</div><div class="sub">mark-to-market</div></div>`,
       `<div class="card"><h3>Positions</h3><div class="val">${posCount}</div><div class="sub">open / ${d.n_trades || 0} total</div></div>`,
     ].join('');
     
@@ -90,7 +91,8 @@ async function load() {
     document.getElementById('stats-ir').innerHTML = [
       `<div class="card"><h3>Equity</h3><div class="val ${eq2Cls}">${eq2.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
       `<div class="card"><h3>Return</h3><div class="val ${eq2Cls}">${ret2 >= 0 ? '+' : ''}${ret2.toFixed(2)}%</div><div class="sub">peak: ${d2.peak.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>MDD</h3><div class="val">${d2.mdd_pct.toFixed(2)}%</div><div class="sub">drawdown from peak</div></div>`,
+      `<div class="card"><h3>MTM DD</h3><div class="val">${(d2.mtm_dd_pct || 0).toFixed(2)}%</div><div class="sub">mark-to-market</div></div>`,
+      `<div class="card"><h3>MDD</h3><div class="val">${d2.mdd_pct.toFixed(2)}%</div><div class="sub">cash DD</div></div>`,
       `<div class="card"><h3>Positions</h3><div class="val">${pos2Count}</div><div class="sub">open / ${d2.n_trades || 0} total</div></div>`,
     ].join('');
     
@@ -101,7 +103,8 @@ async function load() {
           `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #21262d">
             <span><b>${p.ticker}</b> ${p.direction}</span>
             <span>entry: ${p.entry_price}</span>
-            <span>bars: ${p.bars_held}</span>
+            <span>bars: ${p.bars_held !== undefined ? p.bars_held : '—'}</span>
+            <span>MTM DD: ${(d.mtm_dd_pct || 0).toFixed(2)}%</span>
           </div>`
         ).join('');
       } else {
@@ -133,9 +136,10 @@ async function load() {
     const pos3Count = d3.positions ? d3.positions.length : 0;
     
     document.getElementById('stats-pf').innerHTML = [
+      `<div class="card"><h3>MTM DD</h3><div class="val">${(d3.mtm_dd_pct || 0).toFixed(2)}%</div><div class="sub">mark-to-market</div></div>`,
       `<div class="card"><h3>Equity</h3><div class="val ${eq3Cls}">${eq3.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
       `<div class="card"><h3>Return</h3><div class="val ${eq3Cls}">${ret3 >= 0 ? '+' : ''}${ret3.toFixed(2)}%</div><div class="sub">peak: ${d3.peak.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>MDD</h3><div class="val">${d3.mdd_pct.toFixed(2)}%</div><div class="sub">drawdown from peak</div></div>`,
+      `<div class="card"><h3>MDD</h3><div class="val">${d3.mdd_pct.toFixed(2)}%</div><div class="sub">cash DD</div></div>`,
       `<div class="card"><h3>Positions</h3><div class="val">${pos3Count}</div><div class="sub">open / ${d3.n_trades || 0} total</div></div>`,
     ].join('');
     
@@ -210,7 +214,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             qs = parse_qs(urlparse(self.path).query)
             strategy = qs.get('strategy', [None])[0]
             tbl = 'futures.paper_state' + ('' if not strategy else '_' + strategy)
-            cols, rows = query(f"SELECT capital, equity, peak, positions_json, updated_at FROM {tbl}")
+            cols, rows = query(f"SELECT capital, equity, peak, mtm_equity, mtm_peak, positions_json, updated_at FROM {tbl}")
             if not rows:
                 self._json({'error': 'no data'})
                 return
@@ -221,14 +225,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
             equity = float(d['equity'])
             peak = float(d['peak'])
             capital = float(d['capital'])
+            mtm_eq = float(d.get('mtm_equity', equity))
+            mtm_pk = float(d.get('mtm_peak', peak))
             mdd_pct = (peak - equity) / peak * 100 if peak > 0 else 0
+            mtm_dd = (mtm_pk - mtm_eq) / mtm_pk * 100 if mtm_pk > 0 else 0
             
             # Trades from equity_curve (all time)
             result = {
                 'capital': capital,
                 'equity': equity,
                 'peak': peak,
+                'mtm_equity': mtm_eq,
+                'mtm_peak': mtm_pk,
                 'mdd_pct': round(mdd_pct, 2),
+                'mtm_dd_pct': round(mtm_dd, 2),
                 'positions': positions,
                 'n_trades': len(positions),
                 'updated_at': str(d.get('updated_at', '')),
