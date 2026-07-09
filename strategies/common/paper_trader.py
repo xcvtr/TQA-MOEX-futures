@@ -160,9 +160,10 @@ def save_state(state):
         # Delete old state, insert new
         cur.execute(f"DELETE FROM {tbl_state}")
         cur.execute(f"""
-            INSERT INTO {tbl_state} (capital, equity, peak, positions_json, bar_idx, next_id, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            INSERT INTO {tbl_state} (capital, equity, peak, mtm_equity, mtm_peak, positions_json, bar_idx, next_id, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
         """, (round(state['capital'], 2), round(state['equity'], 2), round(state.get('peak', state['equity']), 2),
+              round(state.get('mtm_equity', state['equity']), 2), round(state.get('mtm_peak', state['equity']), 2),
               json.dumps(_json_safe(state['positions'])), state['bar_idx'], state.get('next_id', 1)))
         conn.commit()
         cur.close(); conn.close()
@@ -179,6 +180,34 @@ def _json_safe(obj):
     elif isinstance(obj, datetime):
         return obj.isoformat()
     return obj
+
+
+def calc_mtm_equity(capital, positions, bar_data, specs):
+    """Calculate MTM equity = capital + unrealized PnL of open positions."""
+    mtm_pnl = 0.0
+    for p in positions:
+        if p.get('closed', False):
+            continue
+        ticker = p['ticker']
+        bd = bar_data.get(ticker)
+        s = specs.get(ticker, {})
+        if not bd:
+            continue
+        sp = s.get('sp', 1)
+        ms = s.get('ms', 0.01)
+        entry = p['entry_price']
+        prc = bd['prc']
+        contracts = p.get('contracts', 1)
+        pct = p.get('pct', 1.0)
+        rem = max(0.001, p.get('rem', 1))
+        trade_cost = TRADE_COST * contracts
+        
+        if p['direction'] == 'long':
+            pnl = (prc - entry) / ms * sp * pct * rem - trade_cost
+        else:  # short
+            pnl = (entry - prc) / ms * sp * pct * rem - trade_cost
+        mtm_pnl += pnl
+    return capital + mtm_pnl
 
 
 # ── CH helpers ────────────────────────────────────────────────────────────
@@ -526,21 +555,27 @@ def run_tick(strategy_filter=None):
                 'stop_loss': 0.007,
                 'timeout_bars': entry.get('timeout_bars', 12),
                 'pct': specs.get(ticker, {}).get('pct', 1.0),
-            }
-            next_id += 1
-            positions.append(pos)
-            log.info("New %s %s %s @ %.1f", ticker, strategy_name, signal['direction'], entry_price)
+                }
+                next_id += 1
+                positions.append(pos)
+                log.info("New %s %s %s @ %.1f", ticker, strategy_name, signal['direction'], entry_price)
 
     # Save
     state['positions'] = [p for p in positions if not p.get('closed', False)]
     state['equity'] = equity
     state['peak'] = max(peak, equity)
+    
+    # MTM equity с учётом открытых позиций
+    mtm_eq = calc_mtm_equity(equity, state['positions'], bar_data, specs)
+    state['mtm_equity'] = mtm_eq
+    state['mtm_peak'] = max(state.get('mtm_peak', mtm_eq), mtm_eq)
+    
     state['trades'] = trades
     state['next_id'] = next_id
     save_state(state)
 
-    log.info("Tick complete: equity=%.0f, open=%d, total_trades=%d",
-             equity, len(state['positions']), len(trades))
+    log.info("Tick complete: equity=%.0f, open=%d, trades=%d, mtm_eq=%.0f",
+             equity, len(state['positions']), len(trades), mtm_eq)
 
 
 if __name__ == '__main__':

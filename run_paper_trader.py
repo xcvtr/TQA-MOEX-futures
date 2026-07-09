@@ -72,7 +72,7 @@ def get_state(state_key):
     conn = pg_conn()
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT capital, equity, peak, updated_at
+        SELECT capital, equity, peak, mtm_equity, mtm_peak, updated_at
         FROM {tbl}
         ORDER BY updated_at DESC LIMIT 1
     """)
@@ -80,9 +80,12 @@ def get_state(state_key):
     cur.close(); conn.close()
     if r:
         return {'capital': float(r[0]), 'equity': float(r[1]),
-                'peak': float(r[2]), 'updated_at': r[3]}
+                'peak': float(r[2]), 'mtm_equity': float(r[3]) if r[3] else float(r[1]),
+                'mtm_peak': float(r[4]) if r[4] else float(r[2]),
+                'updated_at': r[5]}
     return {'capital': INITIAL_CAPITAL, 'equity': INITIAL_CAPITAL,
-            'peak': INITIAL_CAPITAL, 'updated_at': None}
+            'peak': INITIAL_CAPITAL, 'mtm_equity': INITIAL_CAPITAL,
+            'mtm_peak': INITIAL_CAPITAL, 'updated_at': None}
 
 
 def get_position_count(state_key):
@@ -165,17 +168,23 @@ def main():
     # Equity & DD
     eq = new_state.get('equity', INITIAL_CAPITAL)
     pk = new_state.get('peak', INITIAL_CAPITAL)
+    mtm_eq = new_state.get('mtm_equity', eq)
+    mtm_pk = new_state.get('mtm_peak', pk)
     dd = (pk - eq) / pk * 100 if pk > 0 else 0
+    mtm_dd = (mtm_pk - mtm_eq) / mtm_pk * 100 if mtm_pk > 0 else 0
     total_pnl = eq - INITIAL_CAPITAL
     ret = total_pnl / INITIAL_CAPITAL * 100
 
-    # Просадка >20%
+    # Просадка >20% (cash или MTM)
     if dd >= 20:
         lines.append(f"⚠️ Просадка {dd:.1f}% — капитал {eq:>.0f}₽ из {pk:>.0f}₽ пик")
+    if mtm_dd >= 20:
+        lines.append(f"⚠️ MTM просадка {mtm_dd:.1f}% — MTM equity {mtm_eq:>.0f}₽ из {mtm_pk:>.0f}₽ пик")
 
     # Если флаг --stdout — показать статус
     if args.stdout:
-        lines.append(f"📊 Eq={eq:>.0f}₽ (+{ret:.1f}%) DD={dd:.1f}% | Открыто={new_positions} | Сделок={new_trades}")
+        mtm_info = f" MTM DD={mtm_dd:.1f}%" if mtm_dd != dd else ""
+        lines.append(f"📊 Eq={eq:>.0f}₽ (+{ret:.1f}%) DD={dd:.1f}%{mtm_info} | Открыто={new_positions} | Сделок={new_trades}")
 
     if lines:
         print("\n".join(lines))
