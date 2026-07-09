@@ -1,6 +1,6 @@
 # Архитектура проекта TQA-MOEX-futures
 
-**Последний чекпойнт: 156 (2026-07-08)** — paper trader восстановлен (fix ImportError, cron resumed)
+**Последний чекпойнт: 159 (2026-07-10)** — cron portfolio paper trader fix
 
 ## 🚨 Правила работы
 
