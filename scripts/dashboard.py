@@ -58,14 +58,15 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 <script>
 async function load() {
   try {
-    const [r1, r2, r3] = await Promise.all([
-      fetch('/api/state?strategy=stop_hunt'),
-      fetch('/api/state?strategy=impulse_return'),
-      fetch('/api/state?strategy=portfolio')
+    const [r] = await Promise.all([
+      fetch('/api/state?strategy=portfolio'),
     ]);
-    const d = await r1.json();
-    const d2 = await r2.json();
-    const d3 = await r3.json();
+    const d = await r.json();
+    
+    // Filter positions by strategy
+    const shPositions = (d.positions || []).filter(p => p.strategy === 'stop_hunt');
+    const irPositions = (d.positions || []).filter(p => p.strategy === 'impulse_return');
+    const pfPositions = d.positions || [];
     
     // Stop Hunt cards
     const eq = d.equity;
@@ -86,14 +87,14 @@ async function load() {
     const eq2 = d2.equity || init;
     const ret2 = ((eq2/init)-1)*100;
     const eq2Cls = ret2 >= 0 ? 'positive' : 'negative';
-    const pos2Count = d2.positions ? d2.positions.length : 0;
+    const pos2Count = irPositions.length;
     
     document.getElementById('stats-ir').innerHTML = [
       `<div class="card"><h3>Equity</h3><div class="val ${eq2Cls}">${eq2.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>Return</h3><div class="val ${eq2Cls}">${ret2 >= 0 ? '+' : ''}${ret2.toFixed(2)}%</div><div class="sub">peak: ${d2.peak.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>MTM DD</h3><div class="val">${(d2.mtm_dd_pct || 0).toFixed(2)}%</div><div class="sub">mark-to-market</div></div>`,
-      `<div class="card"><h3>MDD</h3><div class="val">${d2.mdd_pct.toFixed(2)}%</div><div class="sub">cash DD</div></div>`,
-      `<div class="card"><h3>Positions</h3><div class="val">${pos2Count}</div><div class="sub">open / ${d2.n_trades || 0} total</div></div>`,
+      `<div class="card"><h3>Return</h3><div class="val ${eq2Cls}">${ret2 >= 0 ? '+' : ''}${ret2.toFixed(2)}%</div><div class="sub">peak: ${d.peak.toLocaleString()} ₽</div></div>`,
+      `<div class="card"><h3>MTM DD</h3><div class="val">${(d.mtm_dd_pct || 0).toFixed(2)}%</div><div class="sub">mark-to-market</div></div>`,
+      `<div class="card"><h3>MDD</h3><div class="val">${d.mdd_pct.toFixed(2)}%</div><div class="sub">cash DD</div></div>`,
+      `<div class="card"><h3>Positions</h3><div class="val">${pos2Count}</div><div class="sub">open / ${d.n_trades || 0} total</div></div>`,
     ].join('');
     
     // Positions
@@ -112,9 +113,9 @@ async function load() {
         document.getElementById(id).innerHTML = '<span style="color:#484f58">— нет открытых позиций</span>';
       }
     };
-    renderPos('positions-sh', d.positions);
-    renderPos('positions-ir', d2.positions);
-    renderPos('positions-pf', d3.positions);
+    renderPos('positions-sh', shPositions);
+    renderPos('positions-ir', irPositions);
+    renderPos('positions-pf', pfPositions);
     
     // Trades per column
     const renderTrades = (id, trades) => {
@@ -127,21 +128,21 @@ async function load() {
       }
     };
     renderTrades('trades-sh', d.trades);
-    renderTrades('trades-ir', d2.trades);
-    renderTrades('trades-pf', d3.trades);
+    renderTrades('trades-ir', d.trades);
+    renderTrades('trades-pf', d.trades);
     
     // Portfolio cards
     const eq3 = d3.equity || init;
     const ret3 = ((eq3/init)-1)*100;
     const eq3Cls = ret3 >= 0 ? 'positive' : 'negative';
-    const pos3Count = d3.positions ? d3.positions.length : 0;
+    const pos3Count = pfPositions.length;
     
     document.getElementById('stats-pf').innerHTML = [
-      `<div class="card"><h3>MTM DD</h3><div class="val">${(d3.mtm_dd_pct || 0).toFixed(2)}%</div><div class="sub">mark-to-market</div></div>`,
+      `<div class="card"><h3>MTM DD</h3><div class="val">${(d.mtm_dd_pct || 0).toFixed(2)}%</div><div class="sub">mark-to-market</div></div>`,
       `<div class="card"><h3>Equity</h3><div class="val ${eq3Cls}">${eq3.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>Return</h3><div class="val ${eq3Cls}">${ret3 >= 0 ? '+' : ''}${ret3.toFixed(2)}%</div><div class="sub">peak: ${d3.peak.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>MDD</h3><div class="val">${d3.mdd_pct.toFixed(2)}%</div><div class="sub">cash DD</div></div>`,
-      `<div class="card"><h3>Positions</h3><div class="val">${pos3Count}</div><div class="sub">open / ${d3.n_trades || 0} total</div></div>`,
+      `<div class="card"><h3>Return</h3><div class="val ${eq3Cls}">${ret3 >= 0 ? '+' : ''}${ret3.toFixed(2)}%</div><div class="sub">peak: ${d.peak.toLocaleString()} ₽</div></div>`,
+      `<div class="card"><h3>MDD</h3><div class="val">${d.mdd_pct.toFixed(2)}%</div><div class="sub">cash DD</div></div>`,
+      `<div class="card"><h3>Positions</h3><div class="val">${pos3Count}</div><div class="sub">open / ${d.n_trades || 0} total</div></div>`,
     ].join('');
     
     document.getElementById('refresh-info').textContent = 'updated: ' + (d.updated_at || '—');
@@ -165,8 +166,8 @@ async function load() {
       }
     };
     renderChart('chart-sh', d.equity_curve, '#58a6ff');
-    renderChart('chart-ir', d2.equity_curve, '#d29922');
-    renderChart('chart-pf', d3.equity_curve, '#3fb950');
+    renderChart('chart-ir', d.equity_curve, '#d29922');
+    renderChart('chart-pf', d.equity_curve, '#3fb950');
     
     // Health info
     try {
