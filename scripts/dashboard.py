@@ -103,6 +103,7 @@ async function load() {
           `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #21262d">
             <span><b>${p.ticker}</b> ${p.direction}</span>
             <span>entry: ${p.entry_price}</span>
+            <span class=\"${p.unrealized_pnl >= 0 ? 'positive' : 'negative'}\">${p.unrealized_pnl >= 0 ? '+' : ''}${p.unrealized_pnl.toFixed(0)}₽</span>
             <span>bars: ${p.bars_held !== undefined ? p.bars_held : '—'}</span>
             <span>MTM DD: ${(d.mtm_dd_pct || 0).toFixed(2)}%</span>
           </div>`
@@ -222,6 +223,55 @@ class Handler(http.server.BaseHTTPRequestHandler):
             
             # Parse positions
             positions = json.loads(d.get('positions_json', '[]') or '[]')
+            
+            # Calculate unrealized PnL for open positions
+            open_positions = [p for p in positions if not p.get('closed', False)]
+            if open_positions:
+                tickers = list(set(p['ticker'] for p in open_positions))
+                try:
+                    ch = cc.get_client(host='10.0.0.60', port=8123, database='moex')
+                    prices = {}
+                    for ticker in tickers:
+                        row = ch.query(f"SELECT argMax(prc, bt) FROM moex.prices_5min WHERE ticker='{ticker}'").result_rows
+                        if row and row[0][0]:
+                            prices[ticker] = float(row[0][0])
+                    ch.close()
+                    
+                    # Load ticker specs for PnL calc
+                    specs = {}
+                    pg2 = psycopg2.connect(**PG)
+                    cur2 = pg2.cursor()
+                    placeholders = ','.join(['%s'] * len(tickers))
+                    cur2.execute(f"SELECT ticker, min_step, step_price FROM futures.ticker_specs WHERE ticker IN ({placeholders})", tickers)
+                    for r in cur2.fetchall():
+                        specs[r[0]] = {'ms': float(r[1]) if r[1] else 0.01, 'sp': float(r[2]) if r[2] else 1.0}
+                    cur2.close(); pg2.close()
+                    
+                    for p in positions:
+                        if p.get('closed', False):
+                            p['unrealized_pnl'] = 0
+                            continue
+                        ticker = p['ticker']
+                        prc = prices.get(ticker)
+                        if not prc:
+                            p['unrealized_pnl'] = 0
+                            continue
+                        s = specs.get(ticker, {'ms': 0.01, 'sp': 1.0})
+                        ms, sp = s['ms'], s['sp']
+                        entry = p['entry_price']
+                        contracts = p.get('contracts', 1)
+                        pct = p.get('pct', 1.0)
+                        rem = max(0.001, p.get('rem', 1))
+                        tc = 4 * contracts
+                        if p['direction'] == 'long':
+                            pnl = (prc - entry) / ms * sp * pct * rem - tc
+                        else:
+                            pnl = (entry - prc) / ms * sp * pct * rem - tc
+                        p['unrealized_pnl'] = round(pnl, 2)
+                except Exception as e:
+                    for p in positions:
+                        p['unrealized_pnl'] = 0
+            
             equity = float(d['equity'])
             peak = float(d['peak'])
             capital = float(d['capital'])
