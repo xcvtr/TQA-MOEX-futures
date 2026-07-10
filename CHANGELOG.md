@@ -1,3 +1,19 @@
+## [160] 2026-07-09
+### Added
+- **MTM Drawdown** — `calc_mtm_equity()`, колонки mtm_equity/mtm_peak в PG, отображение в дашборде и run_paper_trader.py
+- **Market Hours Gate** — paper trader не открывает позиции вне MOEX сессии (15:00-23:45 IRK)
+- **Stale CVD Guard** — отключение CVD если tradestats_fo старше 30ч
+- **Unrealized PnL per position** — дашборд показывает текущий PnL по каждой открытой позиции
+### Fixed
+- **CVD** — убран хардкод `dcvd_z=0`, расчёт из vol_b/vol_s (была мертва)
+- **Impulse Return** — добавлены `close_hist`, `vol_hist` в bar_data (была мертва)
+- **JSON serialization** — `_json_safe()` для datetime в save_state
+- **Dashboard** — undefined bars_held, отсутствие mtm_equity/mtm_peak в API
+### Changed
+- **CHANGELOG.md** — добавлен [160]
+### Checkpoint
+- checkpoint/160-mtm-dd-market-hours-dashboard.md
+
 ## [156] 2026-07-08
 ### Fixed
 - **run_paper_trader.py:** Полностью переписан — убран мёртвый импорт `PaperTrader` (класс не существует), заменён на `run_tick()` с silent-till-event паттерном. Добавлена поддержка `--strategy` и `--state-key`.
