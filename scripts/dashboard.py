@@ -59,7 +59,7 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 async function load() {
   try {
     const [r1, r2, r3] = await Promise.all([
-      fetch('/api/state'),
+      fetch('/api/state?strategy=stop_hunt'),
       fetch('/api/state?strategy=impulse_return'),
       fetch('/api/state?strategy=portfolio')
     ]);
