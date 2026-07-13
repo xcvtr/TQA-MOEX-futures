@@ -511,7 +511,6 @@ def run_tick(strategy_filter=None):
             bd = bar_data.get(ticker)
             if not bd:
                 continue
-            # Already have open position for this ticker?
             if any(not p.get('closed', False) and p.get('ticker') == ticker for p in positions):
                 continue
             s = specs.get(ticker, {})
