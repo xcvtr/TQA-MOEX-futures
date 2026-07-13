@@ -215,10 +215,10 @@ def calc_mtm_equity(capital, positions, bar_data, specs):
 # ── CH helpers ────────────────────────────────────────────────────────────
 
 def get_latest_bars(ticker, asset, n_bars=50):
-    """Get last N 5-min OHLC bars from tradestats_fo.
+    """Get last N 5-min OHLC bars.
     
-    Uses real OHLC columns (pr_open, pr_high, pr_low, pr_close)
-    grouped into 5-minute intervals.
+    Primary: tradestats_fo (real OHLC). Если данные старше 60 мин — 
+    fallback на prices_5min (ISS snapshots, актуальная цена).
     Returns DataFrame or None.
     """
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
@@ -238,10 +238,43 @@ def get_latest_bars(ticker, asset, n_bars=50):
         if not df.empty:
             df = df.sort_values('bt5').reset_index(drop=True)
             df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
+            # Check freshness
+            last_ts = df.iloc[-1]['bt']
+            if isinstance(last_ts, datetime):
+                age = (datetime.now(timezone.utc) - last_ts).total_seconds()
+            else:
+                age = 99999
+            if age < 3600:  # < 1 hour — свежие данные
+                ch.close()
+                return df
+            log.info("tradestats_fo stale (age=%.0fm), fallback to prices_5min", age / 60)
+        ch.close()
+    except Exception as e:
+        log.warning("tradestats_fo error for %s/%s: %s, fallback to prices_5min", ticker, asset, e)
+        ch.close()
+    
+    # Fallback: prices_5min
+    try:
+        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+        df = ch.query_df(f"""
+            SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
+                   argMin(prc, bt) as opn,
+                   max(prc) as hi,
+                   min(prc) as lo,
+                   argMax(prc, bt) as prc_close
+            FROM moex.prices_5min
+            WHERE ticker = '{ticker}'
+            GROUP BY bt5
+            ORDER BY bt5 DESC
+            LIMIT {n_bars + 5}
+        """)
+        if not df.empty:
+            df = df.sort_values('bt5').reset_index(drop=True)
+            df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
         ch.close()
         return df
     except Exception as e:
-        log.error("CH error for %s/%s: %s", ticker, asset, e)
+        log.error("CH error for %s/%s (fallback): %s", ticker, asset, e)
         ch.close()
         return None
 
