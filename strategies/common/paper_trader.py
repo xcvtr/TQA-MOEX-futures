@@ -24,9 +24,11 @@ def _load_strategies():
     from strategies.stop_hunt.prod.engine import check_signal as sh_check
     from strategies.cvd.prod.engine import check_signal as cvd_check
     from strategies.impulse_return.prod.engine import check_signal as imp_check
+    from strategies.dragon.prod.engine import check_signal as dragon_check
     STRATEGY_MAP['stop_hunt'] = sh_check
     STRATEGY_MAP['cvd'] = cvd_check
     STRATEGY_MAP['impulse_return'] = imp_check
+    STRATEGY_MAP['dragon'] = dragon_check
 
 # ── Config ────────────────────────────────────────────────────────────────
 CH_HOST = os.getenv('MOEX_CH_HOST', '10.0.0.60')
@@ -477,6 +479,11 @@ def run_tick(strategy_filter=None):
             'dcvd_z': dcvd_z,
             'close_hist': close_hist,
             'vol_hist': vol_hist,
+            'bars_list': [
+                {'opn': float(r['opn']), 'hi': float(r['hi']),
+                 'lo': float(r['lo']), 'prc': float(r['prc'])}
+                for _, r in df.iterrows()
+            ],
         }
         # Build hi/lo history for signal check
         hi_hist = [float(v) for v in df['hi'].iloc[-21:-1].values]
