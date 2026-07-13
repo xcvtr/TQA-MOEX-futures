@@ -48,10 +48,10 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 <body>
 <h1>📊 MOEX Futures</h1>
 <div style="display:flex;gap:10px;margin-bottom:12px;align-items:stretch">
-  <div class="col"><h2 style="color:#58a6ff">🔹 Stop Hunt</h2><div class="dashboard" id="stats-sh"></div><div id="chart-sh" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-sh" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-sh" style="font-size:.7rem;color:#484f58">—</div></div>
-  <div class="col"><h2 style="color:#d29922">🔸 Impulse Return</h2><div class="dashboard" id="stats-ir"></div><div id="chart-ir" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-ir" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-ir" style="font-size:.7rem;color:#484f58">—</div></div>
-  <div class="col"><h2 style="color:#3fb950">🔷 Portfolio SH+IR</h2><div class="dashboard" id="stats-pf"></div><div id="chart-pf" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-pf" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-pf" style="font-size:.7rem;color:#484f58">—</div></div>
-  <div class="col"><h2 style="color:#bf7fff">🐉 Dragon</h2><div class="dashboard" id="stats-dr"></div><div id="chart-dr" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-dr" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-dr" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#58a6ff">🔹 Stop Hunt</h2><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-sh" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-sh" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#d29922">🔸 Impulse Return</h2><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-ir" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-ir" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#3fb950">🔷 Portfolio All</h2><div class="dashboard" id="stats-pf"></div><div id="chart-pf" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-pf" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-pf" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#bf7fff">🐉 Dragon</h2><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-dr" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-dr" style="font-size:.7rem;color:#484f58">—</div></div>
 </div>
 <div class="refresh-info" id="refresh-info"></div>
 <div id="health-bar" style="font-size:.65rem;color:#484f58;margin-top:4px;display:flex;gap:16px"></div>
@@ -135,13 +135,7 @@ async function load() {
     renderTrades('trades-dr', d.trades);
     renderTrades('trades-pf', d.trades);
     
-    // Dragon cards
-    const eq4 = d.equity;
-    const ret4 = ((eq4/init)-1)*100;
-    const eq4Cls = ret4 >= 0 ? 'positive' : 'negative';
-    const pos4Count = drPositions.length;
-    
-    document.getElementById('stats-dr').innerHTML = [
+        document.getElementById('stats-dr').innerHTML = [
       `<div class=\"card\"><h3>MTM DD</h3><div class=\"val\">${(d.mtm_dd_pct || 0).toFixed(2)}%</div><div class=\"sub\">mark-to-market</div></div>`,
       `<div class=\"card\"><h3>Equity</h3><div class=\"val ${eq4Cls}\">${eq4.toLocaleString()} ₽</div><div class=\"sub\">start: ${init.toLocaleString()} ₽</div></div>`,
       `<div class=\"card\"><h3>Return</h3><div class=\"val ${eq4Cls}\">${ret4 >= 0 ? '+' : ''}${ret4.toFixed(2)}%</div><div class=\"sub\">peak: ${d.peak.toLocaleString()} ₽</div></div>`,
@@ -183,10 +177,7 @@ async function load() {
         });
       }
     };
-    renderChart('chart-sh', d.equity_curve, '#58a6ff');
-    renderChart('chart-ir', d.equity_curve, '#d29922');
-    renderChart('chart-dr', d.equity_curve, '#bf7fff');
-    renderChart('chart-pf', d.equity_curve, '#3fb950');
+        renderChart('chart-pf', d.equity_curve, '#3fb950');
     
     // Health info
     try {
