@@ -1,3 +1,20 @@
+## [161] 2026-07-13
+### Added
+- **Dragon стратегия** (🐉) — адаптирована из TQA-crypto для MOEX futures
+- **Sweep** по 64 тикерам — отобраны NG, MM, GZ (Score PnL/MDD)
+- **Backtest** с MTM DD, реинвестом, комиссией 4₽, КНУР ×0.5
+- **Paper trader** — Dragon запущен с contracts=2 на NG, MM, GZ (MTM DD ~19%)
+### Fixed
+- **Paper trader** — market hours gate (15:00-23:45 IRK)
+- **CVD** — реальный расчёт dcvd_z из vol_b/vol_s (был хардкод 0)
+- **Impulse Return** — добавлены close_hist, vol_hist (была мертва)
+- **Дашборд** — MTM DD, unrealized PnL, фильтр по strategy
+### Changed
+- **Cron** — один portfolio вместо трёх, расписание `*/5 15-23 * * 1-5`
+- **CHANGELOG.md** — добавлен [161]
+### Checkpoint
+- checkpoint/161-dragon-moex-strategy.md
+
 ## [160] 2026-07-09
 ### Added
 - **MTM Drawdown** — `calc_mtm_equity()`, колонки mtm_equity/mtm_peak в PG, отображение в дашборде и run_paper_trader.py
