@@ -215,22 +215,22 @@ def calc_mtm_equity(capital, positions, bar_data, specs):
 # ── CH helpers ────────────────────────────────────────────────────────────
 
 def get_latest_bars(ticker, asset, n_bars=50):
-    """Get last N 5-min OHLC bars from ISS snapshots.
+    """Get last N 5-min OHLC bars from tradestats_fo.
     
-    ISS returns daily hi/lo for each snapshot — can't use those.
-    Build OHLC from prc (close) values within each 5-min window.
+    Uses real OHLC columns (pr_open, pr_high, pr_low, pr_close)
+    grouped into 5-minute intervals.
     Returns DataFrame or None.
     """
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     try:
         df = ch.query_df(f"""
-            SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
-                   argMin(prc, bt) as opn,
-                   max(prc) as hi,
-                   min(prc) as lo,
-                   argMax(prc, bt) as prc_close
-            FROM moex.prices_5min
-            WHERE ticker = '{ticker}'
+            SELECT toStartOfInterval(SYSTIME, INTERVAL 5 MINUTE) as bt5,
+                   argMin(pr_open, SYSTIME) as opn,
+                   max(pr_high) as hi,
+                   min(pr_low) as lo,
+                   argMax(pr_close, SYSTIME) as prc_close
+            FROM moex.tradestats_fo
+            WHERE asset_code = '{asset}'
             GROUP BY bt5
             ORDER BY bt5 DESC
             LIMIT {n_bars + 5}
@@ -241,7 +241,7 @@ def get_latest_bars(ticker, asset, n_bars=50):
         ch.close()
         return df
     except Exception as e:
-        log.error("CH error for %s: %s", ticker, e)
+        log.error("CH error for %s/%s: %s", ticker, asset, e)
         ch.close()
         return None
 
