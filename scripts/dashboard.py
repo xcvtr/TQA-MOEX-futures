@@ -50,8 +50,8 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 <div style="display:flex;gap:10px;margin-bottom:12px;align-items:stretch">
   <div class="col"><h2 style="color:#58a6ff">🔹 Stop Hunt</h2><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-sh" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-sh" style="font-size:.7rem;color:#484f58">—</div></div>
   <div class="col"><h2 style="color:#d29922">🔸 Impulse Return</h2><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-ir" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-ir" style="font-size:.7rem;color:#484f58">—</div></div>
-  <div class="col"><h2 style="color:#3fb950">🔷 Portfolio All</h2><div class="dashboard" id="stats-pf"></div><div id="chart-pf" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-pf" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-pf" style="font-size:.7rem;color:#484f58">—</div></div>
   <div class="col"><h2 style="color:#bf7fff">🐉 Dragon</h2><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-dr" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-dr" style="font-size:.7rem;color:#484f58">—</div></div>
+  <div class="col"><h2 style="color:#3fb950">🔷 Portfolio All</h2><div class="dashboard" id="stats-pf"></div><div id="chart-pf" style="height:120px;margin:6px 0"></div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Позиции</h3><div id="positions-pf" style="font-size:.75rem;color:#484f58">—</div><h3 style="font-size:.75rem;color:#8b949e;margin:8px 0 4px">Сделки</h3><div id="trades-pf" style="font-size:.7rem;color:#484f58">—</div></div>
 </div>
 <div class="refresh-info" id="refresh-info"></div>
 <div id="health-bar" style="font-size:.65rem;color:#484f58;margin-top:4px;display:flex;gap:16px"></div>
@@ -70,34 +70,7 @@ async function load() {
     const drPositions = (d.positions || []).filter(p => p.strategy === 'dragon');
     const pfPositions = d.positions || [];
     
-    // Stop Hunt cards
-    const eq = d.equity;
     const init = d.capital;
-    const ret = ((eq/init)-1)*100;
-    const eqCls = ret >= 0 ? 'positive' : 'negative';
-    const posCount = d.positions ? d.positions.length : 0;
-    
-    document.getElementById('stats-sh').innerHTML = [
-      `<div class="card"><h3>Equity</h3><div class="val ${eqCls}">${eq.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>Return</h3><div class="val ${eqCls}">${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%</div><div class="sub">peak: ${d.peak.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>MDD</h3><div class="val">${d.mdd_pct.toFixed(2)}%</div><div class="sub">cash DD</div></div>`,
-      `<div class="card"><h3>MTM DD</h3><div class="val">${(d.mtm_dd_pct || 0).toFixed(2)}%</div><div class="sub">mark-to-market</div></div>`,
-      `<div class="card"><h3>Positions</h3><div class="val">${posCount}</div><div class="sub">open / ${d.n_trades || 0} total</div></div>`,
-    ].join('');
-    
-    // Impulse Return cards
-    const eq2 = d2.equity || init;
-    const ret2 = ((eq2/init)-1)*100;
-    const eq2Cls = ret2 >= 0 ? 'positive' : 'negative';
-    const pos2Count = irPositions.length;
-    
-    document.getElementById('stats-ir').innerHTML = [
-      `<div class="card"><h3>Equity</h3><div class="val ${eq2Cls}">${eq2.toLocaleString()} ₽</div><div class="sub">start: ${init.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>Return</h3><div class="val ${eq2Cls}">${ret2 >= 0 ? '+' : ''}${ret2.toFixed(2)}%</div><div class="sub">peak: ${d.peak.toLocaleString()} ₽</div></div>`,
-      `<div class="card"><h3>MTM DD</h3><div class="val">${(d.mtm_dd_pct || 0).toFixed(2)}%</div><div class="sub">mark-to-market</div></div>`,
-      `<div class="card"><h3>MDD</h3><div class="val">${d.mdd_pct.toFixed(2)}%</div><div class="sub">cash DD</div></div>`,
-      `<div class="card"><h3>Positions</h3><div class="val">${pos2Count}</div><div class="sub">open / ${d.n_trades || 0} total</div></div>`,
-    ].join('');
     
     // Positions
     const renderPos = (id, data) => {
