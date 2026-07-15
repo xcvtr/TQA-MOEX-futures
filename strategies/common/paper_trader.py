@@ -217,12 +217,46 @@ def calc_mtm_equity(capital, positions, bar_data, specs):
 def get_latest_bars(ticker, asset, n_bars=50):
     """Get last N 5-min OHLC bars.
     
-    Primary: tradestats_fo (real OHLC). Если данные старше 60 мин — 
-    fallback на prices_5min (ISS snapshots, актуальная цена).
+    Priority:
+    1. moex.mt5_bars (1-min ticks from MT5 FINAM, aggregated to 5-min)
+    2. moex.tradestats_fo (AlgoPack real OHLC)
+    3. moex.prices_5min (ISS snapshots, fallback)
     Returns DataFrame or None.
     """
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+    
+    # ── 1. mt5_bars (primary) ───────────────────────────────────────────────
     try:
+        df = ch.query_df(f"""
+            SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
+                   argMin(opn, bt) as opn,
+                   max(hi) as hi,
+                   min(lo) as lo,
+                   argMax(prc, bt) as prc_close
+            FROM moex.mt5_bars
+            WHERE ticker = '{ticker}'
+            GROUP BY bt5
+            ORDER BY bt5 DESC
+            LIMIT {n_bars + 5}
+        """)
+        if not df.empty:
+            df = df.sort_values('bt5').reset_index(drop=True)
+            df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
+            # Check freshness
+            last_ts = df.iloc[-1]['bt']
+            age = (datetime.now(timezone.utc) - last_ts).total_seconds() / 60 if isinstance(last_ts, datetime) else 99999
+            if age < 10:  # < 10 min — свежие данные
+                ch.close()
+                return df
+            log.info("mt5_bars age=%.0fm, checking next source", age)
+        ch.close()
+    except Exception as e:
+        log.warning("mt5_bars error for %s: %s, trying next source", ticker, e)
+        ch.close()
+    
+    # ── 2. tradestats_fo ────────────────────────────────────────────────────
+    try:
+        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         df = ch.query_df(f"""
             SELECT toStartOfInterval(SYSTIME, INTERVAL 5 MINUTE) as bt5,
                    argMin(pr_open, SYSTIME) as opn,
@@ -238,22 +272,18 @@ def get_latest_bars(ticker, asset, n_bars=50):
         if not df.empty:
             df = df.sort_values('bt5').reset_index(drop=True)
             df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
-            # Check freshness
             last_ts = df.iloc[-1]['bt']
-            if isinstance(last_ts, datetime):
-                age = (datetime.now(timezone.utc) - last_ts).total_seconds()
-            else:
-                age = 99999
-            if age < 3600:  # < 1 hour — свежие данные
+            age = (datetime.now(timezone.utc) - last_ts).total_seconds() / 60 if isinstance(last_ts, datetime) else 99999
+            if age < 60:  # < 1 hour
                 ch.close()
                 return df
-            log.info("tradestats_fo stale (age=%.0fm), fallback to prices_5min", age / 60)
+            log.info("tradestats_fo stale (age=%.0fm), fallback to prices_5min", age)
         ch.close()
     except Exception as e:
-        log.warning("tradestats_fo error for %s/%s: %s, fallback to prices_5min", ticker, asset, e)
+        log.warning("tradestats_fo error for %s/%s: %s", ticker, asset, e)
         ch.close()
     
-    # Fallback: prices_5min
+    # ── 3. prices_5min (fallback) ───────────────────────────────────────────
     try:
         ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         df = ch.query_df(f"""
@@ -274,7 +304,7 @@ def get_latest_bars(ticker, asset, n_bars=50):
         ch.close()
         return df
     except Exception as e:
-        log.error("CH error for %s/%s (fallback): %s", ticker, asset, e)
+        log.error("CH error for %s (all sources): %s", ticker, e)
         ch.close()
         return None
 
