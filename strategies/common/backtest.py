@@ -57,7 +57,7 @@ def load_bars(ticker, days=365):
         ts = r[0]
         if ts.weekday() >= 5: continue
         h, m = ts.hour, ts.minute
-        if h < 7 or (h == 15 and m > 45) or h > 15: continue
+        if h < 15 or h > 23 or (h == 23 and m > 45): continue
         bars.append({'ts': ts, 'opn': float(r[1]), 'hi': float(r[2]), 'lo': float(r[3]), 'prc': float(r[4])})
     return bars
 

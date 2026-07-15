@@ -1,6 +1,6 @@
 # Архитектура проекта TQA-MOEX-futures
 
-**Последний чекпойнт: 159 (2026-07-10)** — cron portfolio paper trader fix
+**Последний чекпойнт: 163 (2026-07-15)** — Dragon M1 TZ fix + portfolio
 
 ## 🚨 Правила работы
 

@@ -1,3 +1,14 @@
+## [163] 2026-07-15
+### Fixed
+- **TZ bug в M1 backtest'ах** — часовой фильтр 07:00→15:00 IRK во всех 3 файлах (backtest.py, common/backtest.py, sweep.py)
+### Added
+- **Sweep M1** — `strategies/dragon/scripts/sweep_m1.py`, sweep по 8 тикерам MT5 M1
+- **Портфельный бэктест** — `strategies/dragon/scripts/portfolio_test.py` с MTM DD, GO check, reinvest
+### Changed
+- **Dragon portfolio** — MM×2, GZ×2, GD×1 (по ГО): +38.17%, MDD 5.90%, PF 2.23, Calmar 6.5
+### Checkpoint
+- checkpoint/163-dragon-m1-tz-fix-portfolio.md
+
 ## [162] 2026-07-15
 ### Added
 - **MT5 FINAM** — второй portable MT5, подключён счёт, загружено 380K M1 баров
