@@ -218,85 +218,95 @@ def get_latest_bars(ticker, asset, n_bars=50):
     """Get last N 5-min OHLC bars.
     
     Priority:
-    1. moex.mt5_bars (1-min ticks from MT5 FINAM, aggregated to 5-min)
-    2. moex.tradestats_fo (AlgoPack real OHLC)
-    3. moex.prices_5min (ISS snapshots, fallback)
+    1. PG futures.bars_1m (live, autopurge 2mo, для paper trader)
+    2. CH moex.mt5_bars (полная история, для backtest)
+    3. CH moex.tradestats_fo (AlgoPack real OHLC)
+    4. CH moex.prices_5min (ISS snapshots, fallback)
     Returns DataFrame or None.
     """
-    ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+    now = datetime.now(timezone.utc)
     
-    # ── 1. mt5_bars (primary) ───────────────────────────────────────────────
+    # ── 1. PG (primary для paper trader) ────────────────────────────────────
+    try:
+        import psycopg2
+        conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT to_timestamp(floor(extract(epoch from bt) / 300) * 300) as bt5,
+                   (array_agg(opn ORDER BY bt))[1] as opn,
+                   max(hi) as hi, min(lo) as lo,
+                   (array_agg(prc ORDER BY bt DESC))[1] as prc
+            FROM futures.bars_1m
+            WHERE ticker = %s
+            GROUP BY bt5 ORDER BY bt5 DESC LIMIT %s
+        """, (ticker, n_bars + 5))
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        
+        if rows:
+            import pandas as pd
+            df = pd.DataFrame(rows, columns=['bt', 'opn', 'hi', 'lo', 'prc'])
+            df = df.sort_values('bt').reset_index(drop=True)
+            age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
+            if age < 3:  # < 3 min — свежие данные
+                return df
+            log.info("PG bars_1m age=%.0fm, trying next source", age)
+    except Exception as e:
+        log.warning("PG bars_1m error for %s: %s", ticker, e)
+    
+    # ── 2. CH mt5_bars ──────────────────────────────────────────────────────
+    ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     try:
         df = ch.query_df(f"""
             SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
                    argMin(opn, bt) as opn,
-                   max(hi) as hi,
-                   min(lo) as lo,
+                   max(hi) as hi, min(lo) as lo,
                    argMax(prc, bt) as prc_close
-            FROM moex.mt5_bars
-            WHERE ticker = '{ticker}'
-            GROUP BY bt5
-            ORDER BY bt5 DESC
-            LIMIT {n_bars + 5}
+            FROM moex.mt5_bars WHERE ticker = '{ticker}'
+            GROUP BY bt5 ORDER BY bt5 DESC LIMIT {n_bars + 5}
         """)
         if not df.empty:
             df = df.sort_values('bt5').reset_index(drop=True)
             df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
-            # Check freshness
-            last_ts = df.iloc[-1]['bt']
-            age = (datetime.now(timezone.utc) - last_ts).total_seconds() / 60 if isinstance(last_ts, datetime) else 99999
-            if age < 10:  # < 10 min — свежие данные
-                ch.close()
-                return df
-            log.info("mt5_bars age=%.0fm, checking next source", age)
+            age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
+            if age < 5:
+                ch.close(); return df
         ch.close()
     except Exception as e:
-        log.warning("mt5_bars error for %s: %s, trying next source", ticker, e)
+        log.warning("mt5_bars error for %s: %s", ticker, e)
         ch.close()
     
-    # ── 2. tradestats_fo ────────────────────────────────────────────────────
+    # ── 3. tradestats_fo ────────────────────────────────────────────────────
     try:
         ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         df = ch.query_df(f"""
             SELECT toStartOfInterval(SYSTIME, INTERVAL 5 MINUTE) as bt5,
                    argMin(pr_open, SYSTIME) as opn,
-                   max(pr_high) as hi,
-                   min(pr_low) as lo,
+                   max(pr_high) as hi, min(pr_low) as lo,
                    argMax(pr_close, SYSTIME) as prc_close
-            FROM moex.tradestats_fo
-            WHERE asset_code = '{asset}'
-            GROUP BY bt5
-            ORDER BY bt5 DESC
-            LIMIT {n_bars + 5}
+            FROM moex.tradestats_fo WHERE asset_code = '{asset}'
+            GROUP BY bt5 ORDER BY bt5 DESC LIMIT {n_bars + 5}
         """)
         if not df.empty:
             df = df.sort_values('bt5').reset_index(drop=True)
             df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
-            last_ts = df.iloc[-1]['bt']
-            age = (datetime.now(timezone.utc) - last_ts).total_seconds() / 60 if isinstance(last_ts, datetime) else 99999
-            if age < 60:  # < 1 hour
-                ch.close()
-                return df
-            log.info("tradestats_fo stale (age=%.0fm), fallback to prices_5min", age)
+            age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
+            if age < 60:
+                ch.close(); return df
         ch.close()
     except Exception as e:
         log.warning("tradestats_fo error for %s/%s: %s", ticker, asset, e)
         ch.close()
     
-    # ── 3. prices_5min (fallback) ───────────────────────────────────────────
+    # ── 4. prices_5min (fallback) ────────────────────────────────────────────
     try:
         ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         df = ch.query_df(f"""
             SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
-                   argMin(prc, bt) as opn,
-                   max(prc) as hi,
-                   min(prc) as lo,
+                   argMin(prc, bt) as opn, max(prc) as hi, min(prc) as lo,
                    argMax(prc, bt) as prc_close
-            FROM moex.prices_5min
-            WHERE ticker = '{ticker}'
-            GROUP BY bt5
-            ORDER BY bt5 DESC
-            LIMIT {n_bars + 5}
+            FROM moex.prices_5min WHERE ticker = '{ticker}'
+            GROUP BY bt5 ORDER BY bt5 DESC LIMIT {n_bars + 5}
         """)
         if not df.empty:
             df = df.sort_values('bt5').reset_index(drop=True)
