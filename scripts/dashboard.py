@@ -91,14 +91,17 @@ async function load() {{
       const positions = s.key === PORTFOLIO_KEY ? allPositions : allPositions.filter(p => p.strategy === s.key);
       const count = positions.length;
       const eq = d.equity || init;
+      const floating = positions.reduce((s, p) => s + (p.unrealized_pnl || 0), 0);
+      const totalEq = eq + floating;
       const ret = ((eq/init)-1)*100;
       const cls = ret >= 0 ? 'positive' : 'negative';
+      const floatCls = floating >= 0 ? 'positive' : 'negative';
 
       document.getElementById('stats-' + s.key).innerHTML = [
+        '<div class="card"><h3>Floating PnL</h3><div class="val ' + floatCls + '">' + (floating >= 0 ? '+' : '') + floating.toFixed(0) + ' ₽</div><div class="sub">unrealized</div></div>',
+        '<div class="card"><h3>Equity+UPnL</h3><div class="val ' + floatCls + '">' + totalEq.toFixed(0) + ' ₽</div><div class="sub">capital + floating</div></div>',
         '<div class="card"><h3>MTM DD</h3><div class="val">' + (d.mtm_dd_pct || 0).toFixed(2) + '%</div><div class="sub">mark-to-market</div></div>',
         '<div class="card"><h3>Equity</h3><div class="val ' + cls + '">' + eq.toLocaleString() + ' ₽</div><div class="sub">start: ' + init.toLocaleString() + ' ₽</div></div>',
-        '<div class="card"><h3>Return</h3><div class="val ' + cls + '">' + (ret >= 0 ? '+' : '') + ret.toFixed(2) + '%</div><div class="sub">peak: ' + d.peak.toLocaleString() + ' ₽</div></div>',
-        '<div class="card"><h3>MDD</h3><div class="val">' + d.mdd_pct.toFixed(2) + '%</div><div class="sub">cash DD</div></div>',
         '<div class="card"><h3>Positions</h3><div class="val">' + count + '</div><div class="sub">open / ' + (d.n_trades || 0) + ' total</div></div>',
       ].join('');
 
