@@ -454,7 +454,14 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
 # ── Main tick ─────────────────────────────────────────────────────────────
 
-def run_tick(strategy_filter=None):
+def run_tick(strategy_filter=None, mode=None):
+    """Run paper trader tick.
+    
+    Args:
+        strategy_filter: filter by strategy name
+        mode: None (full: manage + detect), 'tick' (only manage positions),
+              'detect' (only check signals)
+    """
     _load_strategies()
 
     # Load state
@@ -568,18 +575,19 @@ def run_tick(strategy_filter=None):
     state['bar_idx'] = max_bar_idx
 
     # Manage existing positions
-    closed = manage_positions(positions, bar_data, specs, max_bar_idx)
-    for c in closed:
-        c['exit_time'] = datetime.now(timezone.utc)
-        c['saved'] = False
-        c['id'] = next_id
-        next_id += 1
-        equity += c['pnl']
-        trades.append(c)
-        log.info("Closed %s %s PnL=%.0f (%s)", c['ticker'], c['direction'], c['pnl'], c.get('exit_reason', ''))
+    if mode != 'detect':
+        closed = manage_positions(positions, bar_data, specs, max_bar_idx)
+        for c in closed:
+            c['exit_time'] = datetime.now(timezone.utc)
+            c['saved'] = False
+            c['id'] = next_id
+            next_id += 1
+            equity += c['pnl']
+            trades.append(c)
+            log.info("Closed %s %s PnL=%.0f (%s)", c['ticker'], c['direction'], c['pnl'], c.get('exit_reason', ''))
 
     # Check for new signals (only when market is open)
-    if market_open:
+    if mode != 'tick' and market_open:
         for ticker in tickers:
             bd = bar_data.get(ticker)
             if not bd:
@@ -662,6 +670,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--strategy', type=str, default=None, help='Strategy name filter (e.g. impulse_return)')
     parser.add_argument('--state-key', type=str, default=None, help='State key suffix for separate instance')
+    parser.add_argument('--mode', type=str, default=None, choices=['tick', 'detect'], help='tick=only manage, detect=only signals')
     args = parser.parse_args()
     
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -669,4 +678,4 @@ if __name__ == '__main__':
     if args.state_key:
         STATE_KEY = args.state_key
     
-    run_tick(strategy_filter=args.strategy)
+    run_tick(strategy_filter=args.strategy, mode=args.mode)
