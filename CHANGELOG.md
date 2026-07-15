@@ -1,3 +1,20 @@
+## [162] 2026-07-15
+### Added
+- **MT5 FINAM** — второй portable MT5, подключён счёт, загружено 380K M1 баров
+- **Dual-write** — CH moex.mt5_bars (история) + PG futures.bars_1m (live, autopurge 2mo)
+- **M1 tick** — управление позициями каждую минуту (`--mode tick`), detect остался на M5
+- **Универсальный backtest** — `strategies/common/backtest.py`, читает portfolio из PG
+- **Дашборд** — колонка Dragon 🐉
+### Fixed
+- **Data source** — `get_latest_bars()`: PG → CH mt5 → tradestats_fo → prices_5min
+- **CVD** — отключён (не показал edge)
+- **Dragon** — параметры оптимизированы (impulse=0.3%, retrace=70%, hump=0.1%)
+### Changed
+- **Cron** — mt5_bars_loader каждую минуту, tick каждую минуту
+- **CHANGELOG.md** — добавлен [162]
+### Checkpoint
+- checkpoint/162-mt5-m1-data-pipeline.md
+
 ## [161] 2026-07-13
 ### Added
 - **Dragon стратегия** (🐉) — адаптирована из TQA-crypto для MOEX futures
