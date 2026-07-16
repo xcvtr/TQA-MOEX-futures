@@ -1,3 +1,24 @@
+## [164] 2026-07-16
+### Added
+- **MT5 Continuous** — 10.5M M1 баров по 9 тикерам с 2020 (Indicative Continuous FINAM)
+- **Sweep 113 continuous** — все indicative continuous символы FINAM MT5 проанализированы
+- **Grid search** — sl/trail_act/trail_trail оптимизация (лучший: sl=1%, act=1.5%, trail=0.5%)
+- **Time-aligned portfolio** — честный backtest без sequential бага
+- **Per-ticker allocation + GO/KNUR** — alloc=12.5%/t, KNUR=0.7, GO limit 140K
+- **Reinvest 3%/ticker** — риск от капитала тикера, не от всего портфеля
+### Results
+- **Risk 3%:** 200K→362K (+81%), MDD 4%, PF 1.76, Calmar 20.3
+- **Risk 4%:** 200K→342K (+71%), MDD 6.3%, PF 1.47
+- **Risk 5%:** 200K→338K (+69%), MDD 7.4%, PF 1.39
+### Files
+- `strategies/dragon/scripts/final_v2.py` — финальный портфель alloc+GO+KNUR
+- `strategies/dragon/scripts/portfolio_alloc.py` — per-ticker alloc
+- `strategies/dragon/scripts/time_aligned_portfolio.py` — time-aligned
+- `strategies/dragon/scripts/sweep_113.py` — sweep всех 113 continuous
+- `checkpoint/164-dragon-mt5-continuous-portfolio.md`
+### Checkpoint
+- checkpoint/164-dragon-mt5-continuous-portfolio.md
+
 ## [163] 2026-07-15
 ### Fixed
 - **TZ bug в M1 backtest'ах** — часовой фильтр 07:00→15:00 IRK во всех 3 файлах (backtest.py, common/backtest.py, sweep.py)
