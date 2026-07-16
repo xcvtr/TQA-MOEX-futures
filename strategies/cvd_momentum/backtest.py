@@ -135,6 +135,7 @@ def backtest_ticker(bars, ticker, params, specs):
     trades = []
     n = len(bars)
     min_step = specs.get('min_step', 1)
+    last_trade_bar = -params.get('cooldown', 9999)
     
     for i in range(n):
         b = bars[i]
@@ -142,6 +143,9 @@ def backtest_ticker(bars, ticker, params, specs):
         if i < params['z_window'] // 2:
             continue
         if i < 5 or i > n - params['fwd_min'] - 1:
+            continue
+        # Cooldown: skip if last trade too recent
+        if i - last_trade_bar < params.get('cooldown', 0):
             continue
         
         prc_5m_ago = bars[i - params['lookback_min']]['prc']
@@ -161,24 +165,18 @@ def backtest_ticker(bars, ticker, params, specs):
         mom_short = cvd_z < -params['z_thresh']
         mom_long = cvd_z > params['z_thresh']
         
-        # Divergence signals
-        bear_div = prc_chg_pct > params['prc_chg_thresh'] and cvd_z < -params['div_z_thresh']
-        bull_div = prc_chg_pct < -params['prc_chg_thresh'] and cvd_z > params['div_z_thresh']
-        
+        signals = []
         if params.get('signal_type', 'mom') == 'div':
-            signals = []
-            if bear_div: signals.append(-1)
-            if bull_div: signals.append(1)
+            if prc_chg_pct > params['prc_chg_thresh'] and cvd_z < -params['div_z_thresh']:
+                signals.append(-1)
+            if prc_chg_pct < -params['prc_chg_thresh'] and cvd_z > params['div_z_thresh']:
+                signals.append(1)
         else:
-            signals = []
             if mom_short: signals.append(-1)
             if mom_long: signals.append(1)
         
         for direction in signals:
-            if direction == -1:
-                correct = fwd_chg_pct < 0
-            else:
-                correct = fwd_chg_pct > 0
+            correct = (fwd_chg_pct < 0) if direction == -1 else (fwd_chg_pct > 0)
             
             trades.append({
                 'ticker': ticker,
@@ -191,33 +189,46 @@ def backtest_ticker(bars, ticker, params, specs):
                 'fwd_chg_15m': round(fwd_chg_pct, 3),
                 'correct': correct,
             })
+            last_trade_bar = i
     
     return trades
 
 
-def compute_pnl(trades, specs, capital=100_000):
+def compute_pnl(trades, specs, capital=100_000, spread_ticks=1, entry_style='market'):
     """Compute PnL in RUB for trades."""
     results = []
     for t in trades:
         sp = specs['step_price']
         ms = specs['min_step']
-        lot = specs['lot']
         go = specs['go']
         
-        price_diff = abs(t['entry'] - t['exit'])
+        entry = t['entry']
+        exit_prc = t['exit']
+        
+        # Лимитки: entry на 1 tick лучше рынка
+        if entry_style == 'limit':
+            if t['direction'] == 'LONG':
+                entry -= ms  # покупаем по лучшей цене (ниже)
+            else:
+                entry += ms  # продаём по лучшей цене (выше)
+            # Комиссия: только брокерская 0.45×2
+            commission = 0.90
+        else:
+            commission = 2.0  # ~2 RUB round-trip (брокер + биржа)
+        
+        price_diff = abs(entry - exit_prc)
         ticks = price_diff / ms if ms > 0 else price_diff
         pnl_rub = ticks * sp
         if t['direction'] == 'SHORT':
-            pnl_rub = pnl_rub if t['entry'] > t['exit'] else -pnl_rub
+            pnl_rub = pnl_rub if entry > exit_prc else -pnl_rub
         else:
-            pnl_rub = pnl_rub if t['exit'] > t['entry'] else -pnl_rub
+            pnl_rub = pnl_rub if exit_prc > entry else -pnl_rub
         
-        # Commission: 4 RUB round-trip per contract via MOEX
-        pnl_rub -= 4
-        
+        pnl_rub -= commission
         max_contracts = int(capital * 0.99 / go) if go > 0 else 1
-        contracts = min(1, max_contracts)  # 1 contract fixed for now
+        contracts = min(1, max_contracts)
         
+        t['entry'] = entry
         t['pnl_rub'] = round(pnl_rub * contracts, 2)
         t['contracts'] = contracts
         results.append(t)
@@ -283,6 +294,7 @@ def run_backtest(args):
         'fwd_min': args.fwd,
         'prc_chg_thresh': args.prc_chg,
         'signal_type': args.signal_type,
+        'cooldown': args.cooldown,
     }
     
     log.info("Parameters: %s", params)
@@ -302,7 +314,7 @@ def run_backtest(args):
         trades = backtest_ticker(bars, ticker, params, specs)
         
         # Compute PnL in RUB
-        trades = compute_pnl(trades, specs, args.capital)
+        trades = compute_pnl(trades, specs, args.capital, spread_ticks=args.spread, entry_style=args.entry_style)
         
         # Report
         n = len(trades)
@@ -353,6 +365,13 @@ if __name__ == '__main__':
                         help='Signal type: mom (momentum) or div (divergence)')
     parser.add_argument('--capital', type=float, default=100_000,
                         help='Starting capital RUB (default: 100,000)')
+    parser.add_argument('--cooldown', type=int, default=0,
+                        help='Min minutes between trades (default: 0)')
+    parser.add_argument('--spread', type=float, default=1.0,
+                        help='Spread cost in ticks per side (default: 1)')
+    parser.add_argument('--entry-style', type=str, default='market',
+                        choices=['market', 'limit'],
+                        help='Entry style: market (with slippage) or limit (maker, 1 tick better)')
     parser.add_argument('--output', type=str, default='',
                         help='Save trades JSON to file')
     args = parser.parse_args()

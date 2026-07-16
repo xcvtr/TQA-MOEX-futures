@@ -9,7 +9,6 @@ PG = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres')
 STRATEGIES = [
     {'key': 'stop_hunt',      'name': 'Stop Hunt',      'icon': '\U0001f539', 'color': '#58a6ff'},
     {'key': 'impulse_return', 'name': 'Impulse Return', 'icon': '\U0001f538', 'color': '#d29922'},
-    {'key': 'cvd',            'name': 'CVD',            'icon': '\U0001f4c8', 'color': '#f0883e'},
     {'key': 'dragon',         'name': 'Dragon',         'icon': '\U0001f409', 'color': '#bf7fff'},
     {'key': 'portfolio',      'name': 'Portfolio All',  'icon': '\U0001f537', 'color': '#3fb950'},
 ]

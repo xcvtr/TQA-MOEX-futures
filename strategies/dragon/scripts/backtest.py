@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dragon backtest на M1 барах из moex.mt5_bars — detect на M5, tick на M1."""
+"""Dragon backtest на M1 барах — detect на резэмплированных M5, tick на M1."""
 import sys, os, argparse
 from datetime import datetime, timezone, timedelta
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -8,9 +8,8 @@ import clickhouse_connect as cc
 import numpy as np
 
 CH = dict(host='10.0.0.60', port=8123, database='moex')
-TC = 4          # trade cost per contract
-TO_M5 = 12      # timeout in M5 bars = 60 min
-TO_M1 = 60      # timeout in M1 bars
+TC = 4
+TO_M1 = 60
 TRAIL_ACT, TRAIL_TRAIL = 0.005, 0.003
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -31,7 +30,7 @@ SPECS = {
 
 
 def load_bars(ticker, days=365):
-    """Load M1 bars from moex.mt5_bars, filter MOEX hours + weekdays."""
+    """Load M1 bars, filter MOEX hours."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     ch = cc.get_client(**CH)
     rows = ch.query(f"""
@@ -42,7 +41,6 @@ def load_bars(ticker, days=365):
         ORDER BY bt
     """, parameters={'cutoff': cutoff}).result_rows
     ch.close()
-
     bars = []
     for r in rows:
         ts = r[0]
@@ -53,12 +51,29 @@ def load_bars(ticker, days=365):
     return bars
 
 
+def build_m5_bars(m1_bars, up_to):
+    """Build M5 bars from M1 bars up to index up_to.
+    Returns list of M5 dicts: opn, hi, lo, prc.
+    """
+    m5 = []
+    for group_start in range(0, up_to, 5):
+        group = m1_bars[group_start:min(group_start+5, up_to)]
+        if len(group) < 3:
+            break  # incomplete group
+        m5.append({
+            'opn': group[0]['opn'],
+            'hi': max(b['hi'] for b in group),
+            'lo': min(b['lo'] for b in group),
+            'prc': group[-1]['prc'],
+        })
+    return m5
+
+
 def calc_pnl(entry, exit_, direction, ms, sp):
     return ((exit_ - entry) / ms * sp - TC) * (1 if direction == 'long' else -1)
 
 
 def backtest(ticker, params=None, capital=200000):
-    """Run dragon backtest on M1 bars with M5 detect + M1 tick."""
     bars = load_bars(ticker, days=365)
     print(f'{ticker}: {len(bars)} M1 баров')
 
@@ -66,7 +81,6 @@ def backtest(ticker, params=None, capital=200000):
     ms, sp = s['ms'], s['sp']
 
     trades, open_pos = [], None
-    DETECT_INTERVAL = 5  # detect every 5 M1 bars (= M5)
 
     for i in range(30, len(bars)):
         bar = bars[i]
@@ -99,14 +113,17 @@ def backtest(ticker, params=None, capital=200000):
                     trades.append({'ts': bar['ts'], 'ticker': ticker, 'pnl': pnl, 'reason': 'exit'})
                     open_pos = None
 
-        # ── Detect (M5): check signals every 5th bar ──
-        if i % DETECT_INTERVAL == 0 and not open_pos:
-            # Build bars_list up to current bar for dragon
-            bars_list = [{'opn': b['opn'], 'hi': b['hi'], 'lo': b['lo'], 'prc': b['prc']} for b in bars[:i+1]]
-            bd = {'prc': bar['prc'], 'bars_list': bars_list}
+        # ── Detect на РЕЗЭМПЛИРОВАННЫХ M5 барах ──
+        if i % 5 == 0 and not open_pos:
+            m5_bars = build_m5_bars(bars, i + 1)
+            if len(m5_bars) < 6:
+                continue
+            current_m5 = m5_bars[-1]
+            bd = {'prc': current_m5['prc'], 'bars_list': m5_bars}
             sig = check_signal(bd, ticker)
             if sig:
-                open_pos = {'bi': i, 'ep': sig['entry_price'], 'dir': sig['direction'], 'tr': False, 'tl': None, 'ts': bar['ts']}
+                open_pos = {'bi': i, 'ep': sig['entry_price'], 'dir': sig['direction'],
+                            'tr': False, 'tl': None}
 
     if open_pos and bars:
         pnl = calc_pnl(open_pos['ep'], bars[-1]['prc'], open_pos['dir'], ms, sp) * 2
@@ -124,7 +141,6 @@ def report(trades, capital=200000):
     total = sum(t['pnl'] for t in trades)
     wr = len(wins) / len(trades) * 100
 
-    # MDD
     cap = capital
     peak = cap
     mdd = 0
@@ -139,14 +155,8 @@ def report(trades, capital=200000):
     tn = sum(abs(t['pnl']) for t in losses)
     pf = tp / tn if tn > 0 else float('inf')
 
-    reasons = {}
-    for t in trades:
-        r = t.get('reason', '?')
-        reasons[r] = reasons.get(r, 0) + 1
-
     print(f'  Сделок: {len(trades)} | WR: {wr:.1f}% | PnL: {total:+.0f}₽')
     print(f'  MDD: {mdd:.2f}% | PF: {pf:.2f} | AvgWin: {aw:.0f} | AvgLoss: {al:.0f}')
-    print(f'  Причины: {reasons}')
 
 
 if __name__ == '__main__':

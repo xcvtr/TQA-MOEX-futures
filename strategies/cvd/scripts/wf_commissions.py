@@ -298,9 +298,9 @@ for SYM in ['NG', 'BR', 'Si', 'MXI']:
             ep = 0.0
             bars = 0
 
-            def record_trade(row, pos, ep, tick, tick_cost, comm):
+            def record_trade(row, pos, ep, tick, tick_cost, comm, lot=1, pct=1.0):
                 pnl_ticks = round((row['close'] - ep) * pos / tick, 0)
-                pnl_rub = pnl_ticks * tick_cost
+                pnl_rub = pnl_ticks * tick_cost * lot * pct
                 pnl_net = pnl_rub - comm
                 month = str(row['time'].to_period('M'))
                 all_trades_gross.append({'month': month, 'pnl_rub': pnl_rub})
@@ -315,7 +315,7 @@ for SYM in ['NG', 'BR', 'Si', 'MXI']:
                     if pos != 0:
                         bars += 1
                         if bars >= hold_bars:
-                            record_trade(row, pos, ep, tick, tick_cost, COMMISSION_RUB)
+                            record_trade(row, pos, ep, tick, tick_cost, COMMISSION_RUB, lot=1, pct=1.0)
                             pos = 0
                     continue
 
@@ -326,11 +326,11 @@ for SYM in ['NG', 'BR', 'Si', 'MXI']:
                 else:
                     bars += 1
                     if bars >= hold_bars:
-                        record_trade(row, pos, ep, tick, tick_cost, COMMISSION_RUB)
+                        record_trade(row, pos, ep, tick, tick_cost, COMMISSION_RUB, lot=1, pct=1.0)
                         pos = 0
 
             if pos != 0:
-                record_trade(test.iloc[-1], pos, ep, tick, tick_cost, COMMISSION_RUB)
+                record_trade(test.iloc[-1], pos, ep, tick, tick_cost, COMMISSION_RUB, lot=1, pct=1.0)
 
             i += 60
 

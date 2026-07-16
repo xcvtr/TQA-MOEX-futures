@@ -20,9 +20,9 @@ def check_signal(bar_data: dict, ticker: str, params: dict = None) -> dict:
     """
     if params is None:
         params = {
-            'impulse_pct': 0.5,       # 0.5% для MOEX (меньше волатильность)
-            'retrace_max_pct': 50,
-            'hump_extension': 0.2,    # 0.2% пробой
+            'impulse_pct': 0.3,       # оптимизировано для MOEX
+            'retrace_max_pct': 70,
+            'hump_extension': 0.1,
             'lookback': 100,
         }
 

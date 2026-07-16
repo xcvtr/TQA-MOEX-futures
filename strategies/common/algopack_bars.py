@@ -70,7 +70,7 @@ def load_date(target_date):
     ensure_tables()
     dt_str = target_date.strftime('%Y-%m-%d')
     try:
-        raw = list(moexalgo.Market('forts').tradestats(date=dt_str, use_dataframe=False))
+        raw = list(moexalgo.Market('forts').tradestats(date=dt_str))
     except Exception as e:
         log.error("Fetch failed: %s", e)
         return 0
@@ -78,7 +78,7 @@ def load_date(target_date):
 
     # Also fetch FUTOI (OI by client groups)
     try:
-        futoi_raw = list(moexalgo.Market('forts').futoi(date=dt_str, use_dataframe=False))
+        futoi_raw = list(moexalgo.Market('forts').futoi(date=dt_str))
     except Exception:
         futoi_raw = []
     log.info("  %d futoi rows", len(futoi_raw))
@@ -86,6 +86,8 @@ def load_date(target_date):
     # ── TRADESTATS (bars) ────────────────────────────────────────────────
     groups = defaultdict(list)
     for r in raw:
+        if not isinstance(r, dict):
+            continue
         ts = r.get('ts')
         if ts is None:
             continue
@@ -143,6 +145,8 @@ def load_date(target_date):
     if futoi_raw:
         futoi_groups = defaultdict(lambda: {'bf': 0, 'sf': 0, 'by': 0, 'sy': 0})
         for r in futoi_raw:
+            if not isinstance(r, dict):
+                continue
             t = r.get('ticker', '')
             ts = r.get('ts')
             if not t or ts is None:
@@ -184,12 +188,25 @@ def load_date(target_date):
     log.info("  %d bars saved", total)
     return total
 
+def load_date_range(start_dt, end_dt):
+    """Load all weekdays in [start_dt, end_dt] inclusive."""
+    current = start_dt
+    total = 0
+    while current <= end_dt:
+        if current.weekday() < 5:
+            total += load_date(current)
+        current += timedelta(days=1)
+    log.info("Date range %s → %s: %d bars loaded", start_dt, end_dt, total)
+    return total
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--load-date', type=str)
     parser.add_argument('--backfill', type=int)
+    parser.add_argument('--start-date', type=str, help='Start date for range (YYYY-MM-DD)')
+    parser.add_argument('--end-date', type=str, help='End date for range (YYYY-MM-DD)')
     args = parser.parse_args()
     if args.dry_run:
         log.info("Imports OK")
@@ -201,5 +218,9 @@ if __name__ == '__main__':
             d = date.today() - timedelta(days=i)
             if d.weekday() < 5:
                 load_date(d)
+    elif args.start_date:
+        end = datetime.strptime(args.end_date, '%Y-%m-%d').date() if args.end_date else date.today()
+        start = datetime.strptime(args.start_date, '%Y-%m-%d').date()
+        load_date_range(start, end)
     else:
         load_date(date.today())

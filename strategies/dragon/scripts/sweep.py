@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-"""Dragon sweep по всем MOEX futures."""
+#!/usr/bin/env python3 -u
+"""Dragon sweep по всем MOEX futures — TZ filter в SQL, flush, быстрый."""
 import sys, os, argparse
 from datetime import datetime, timezone, timedelta
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -18,7 +18,7 @@ DP = {"impulse_pct": 0.3, "retrace_max_pct": 70, "hump_extension": 0.1, "lookbac
 
 def get_all_tickers():
     import psycopg2
-    conn = psycopg2.connect(host="10.0.0.60", port=5432, dbname="moex", user="postgres", password="")
+    conn = psycopg2.connect(host="10.0.0.60", port=5432, dbname="moex", user="postgres")
     cur = conn.cursor()
     cur.execute("SELECT ticker, asset_code, min_step, step_price FROM futures.ticker_specs ORDER BY ticker")
     rows = cur.fetchall()
@@ -28,27 +28,23 @@ def get_all_tickers():
 
 
 def load_ohlc(asset_code, days=365):
+    """Load MOEX-hours only bars — TZ filter in SQL."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     ch = cc.get_client(**CH)
+    # Filter 15:00-23:45 IRK right in SQL
     rows = ch.query(
         "SELECT SYSTIME, pr_open, pr_high, pr_low, pr_close "
         "FROM moex.tradestats_fo "
         "WHERE asset_code = %(asset)s AND SYSTIME >= %(cutoff)s "
+        "  AND toDayOfWeek(SYSTIME) BETWEEN 1 AND 5 "
+        "  AND toHour(SYSTIME) BETWEEN 15 AND 23 "
+        "  AND NOT (toHour(SYSTIME) = 23 AND toMinute(SYSTIME) > 45) "
         "ORDER BY SYSTIME",
         parameters={"asset": asset_code, "cutoff": cutoff}
     ).result_rows
     ch.close()
-    bars = []
-    for r in rows:
-        ts = r[0]
-        h, m = ts.hour, ts.minute
-        if ts.weekday() >= 5 or h < 15 or h > 23 or (h == 23 and m > 45):
-            continue
-        bars.append({
-            "ts": ts, "opn": float(r[1]) or 0, "hi": float(r[2]) or 0,
-            "lo": float(r[3]) or 0, "prc": float(r[4]) or 0,
-        })
-    return bars
+    return [{"ts": r[0], "opn": float(r[1]) or 0, "hi": float(r[2]) or 0,
+             "lo": float(r[3]) or 0, "prc": float(r[4]) or 0} for r in rows]
 
 
 def calc_pnl(entry, exit_, direction, ms, sp):
@@ -69,31 +65,34 @@ def backtest_one(ticker, spec, days=365):
             bar = bars[i]
             if i - open_pos["bar_idx"] >= TIMEOUT_BARS:
                 pnl = calc_pnl(open_pos["price"], bar["prc"], open_pos["dir"], ms, sp)
-                trades.append({"pnl": pnl, "reason": "timeout", "ts": bar["ts"]})
+                trades.append({"pnl": pnl, "reason": "timeout"})
                 open_pos = None
                 continue
             ep = open_pos["price"]
             if not open_pos.get("trail"):
-                if (open_pos["dir"] == "long" and bar["hi"] >= ep * 1.005) or                    (open_pos["dir"] == "short" and bar["lo"] <= ep * 0.995):
+                if (open_pos["dir"] == "long" and bar["hi"] >= ep * 1.005) or \
+                   (open_pos["dir"] == "short" and bar["lo"] <= ep * 0.995):
                     open_pos["trail"] = True
                     open_pos["tl"] = bar["hi"] * 0.997 if open_pos["dir"] == "long" else bar["lo"] * 1.003
             exit_p = None
             if open_pos.get("trail"):
-                if (open_pos["dir"] == "long" and bar["lo"] <= open_pos["tl"]) or                    (open_pos["dir"] == "short" and bar["hi"] >= open_pos["tl"]):
+                if (open_pos["dir"] == "long" and bar["lo"] <= open_pos["tl"]) or \
+                   (open_pos["dir"] == "short" and bar["hi"] >= open_pos["tl"]):
                     exit_p = open_pos["tl"]
             if not exit_p:
                 sl = ep * 0.993 if open_pos["dir"] == "long" else ep * 1.007
-                if (open_pos["dir"] == "long" and bar["lo"] <= sl) or                    (open_pos["dir"] == "short" and bar["hi"] >= sl):
+                if (open_pos["dir"] == "long" and bar["lo"] <= sl) or \
+                   (open_pos["dir"] == "short" and bar["hi"] >= sl):
                     exit_p = sl
             if exit_p:
                 pnl = calc_pnl(ep, exit_p, open_pos["dir"], ms, sp)
-                trades.append({"pnl": pnl, "reason": "exit", "ts": bar["ts"]})
+                trades.append({"pnl": pnl, "reason": "exit"})
                 open_pos = None
         if sig and not open_pos:
             open_pos = {"bar_idx": i, "price": sig["entry_price"], "dir": sig["direction"]}
     if open_pos:
         pnl = calc_pnl(open_pos["price"], bars[-1]["prc"], open_pos["dir"], ms, sp)
-        trades.append({"pnl": pnl, "reason": "eof", "ts": bars[-1]["ts"]})
+        trades.append({"pnl": pnl, "reason": "eof"})
     return trades
 
 
@@ -105,64 +104,38 @@ if __name__ == "__main__":
 
     tickers = get_all_tickers()
     results = {}
-    for ticker, spec in sorted(tickers.items()):
+    total = len(tickers)
+    for idx, (ticker, spec) in enumerate(sorted(tickers.items())):
+        print(f"[{idx+1}/{total}] {ticker}...", end=" ", flush=True)
         try:
             trades = backtest_one(ticker, spec, args.days)
             n = len(trades)
             if n < args.min_trades:
+                print(f"n={n} skp", flush=True)
                 continue
             pnl = sum(t["pnl"] for t in trades)
             wins = [t for t in trades if t["pnl"] > 0]
             losses = [t for t in trades if t["pnl"] <= 0]
             wr = len(wins) / n * 100
-            total_pos = sum(t["pnl"] for t in wins)
-            total_neg = sum(abs(t["pnl"]) for t in losses)
-            pf = total_pos / total_neg if total_neg > 0 else float("inf")
-            aw = sum(t["pnl"] for t in wins) / len(wins) if wins else 0
-            al = sum(t["pnl"] for t in losses) / len(losses) if losses else 0
-
+            tp = sum(t["pnl"] for t in wins)
+            tn = sum(abs(t["pnl"]) for t in losses)
+            pf = tp / tn if tn > 0 else float("inf")
+            aw = tp / len(wins) if wins else 0
+            al = tn / len(losses) if losses else 0
             results[ticker] = {"n": n, "wr": round(wr, 1), "pnl": round(pnl), "pf": round(pf, 2),
                                "aw": round(aw), "al": round(al)}
-            print(f"  {ticker:4s} n={n:5d} wr={wr:5.1f}% pnl={pnl:+8.0f} pf={pf:.2f} aw={aw:+6.0f} al={al:+6.0f}")
+            print(f"n={n:5d} wr={wr:5.1f}% pnl={pnl:+8.0f} pf={pf:.2f}", flush=True)
         except Exception as e:
-            pass
+            print(f"ERR: {e}", flush=True)
 
-    good = {t: r for t, r in results.items() if r["pf"] > 1 and r["n"] >= 20}
-    print(f"\n=== PF>1 ({len(good)}/{len(results)}) ===")
-    for t in sorted(good, key=lambda x: good[x]["pf"], reverse=True):
+    print(f"\n=== PF>1.2 ({len(results)} tickers) ===", flush=True)
+    good = {t: r for t, r in results.items() if r["pf"] > 1.2 and r["n"] >= args.min_trades}
+    for t in sorted(good, key=lambda x: good[x]["pnl"] / max(good[x]["n"], 1), reverse=True):
         r = good[t]
-        print(f"  {t:4s} n={r['n']:5d} wr={r['wr']:5.1f}% pnl={r['pnl']:+8.0f} pf={r['pf']:.2f} aw={r['aw']:+6.0f} al={r['al']:+6.0f}")
+        print(f"  {t:4s} n={r['n']:5d} wr={r['wr']:5.1f}% pnl={r['pnl']:+8.0f} pf={r['pf']:.2f}", flush=True)
 
     if good:
-        tickers_good = {t: tickers[t] for t in good}
-        all_trades = []
-        for t, spec in sorted(tickers_good.items()):
-            trades = backtest_one(t, spec, args.days)
-            for tr in trades:
-                tr["ticker"] = t
-            all_trades.extend(trades)
-        all_trades.sort(key=lambda x: x["ts"] if x.get("ts") else datetime.min)
-
-        cap = 200000
-        peak = cap
-        mdd = 0
-        eq = cap
-        for t in all_trades:
-            eq += t["pnl"]
-            peak = max(peak, eq)
-            mdd = max(mdd, (peak - eq) / peak * 100)
-
-        wins = [t for t in all_trades if t["pnl"] > 0]
-        losses = [t for t in all_trades if t["pnl"] <= 0]
-        total_pnl = sum(t["pnl"] for t in all_trades)
-        wr = len(wins) / len(all_trades) * 100
-        tp = sum(t["pnl"] for t in wins)
-        tn = sum(abs(t["pnl"]) for t in losses)
-        pf = tp / tn if tn > 0 else float("inf")
-        aw = tp / len(wins) if wins else 0
-        al = tn / len(losses) if losses else 0
-
-        print(f"\n=== ПОРТФЕЛЬ (PF>1, {len(tickers_good)} тикеров, {len(all_trades)} сделок) ===")
-        print(f"  Capital: 200000 -> {cap + total_pnl:.0f} ({total_pnl / 200000 * 100:+.1f}%)")
-        print(f"  WR: {wr:.1f}% | PF: {pf:.2f} | MDD: {mdd:.2f}%")
-        print(f"  AvgWin: {aw:.0f} | AvgLoss: {al:.0f}")
+        print(f"\n=== TOP 20 by PnL ===", flush=True)
+        for t in sorted(good, key=lambda x: good[x]["pnl"], reverse=True)[:20]:
+            r = good[t]
+            print(f"  {t:4s} n={r['n']:5d} wr={r['wr']:5.1f}% pnl={r['pnl']:+8.0f} pf={r['pf']:.2f}", flush=True)
