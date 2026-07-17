@@ -167,10 +167,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             qs = parse_qs(urlparse(self.path).query)
             strategy = qs.get('strategy', [None])[0]
             tbl = 'futures.paper_state' + ('' if not strategy else '_' + strategy)
-            cols, rows = query(f"SELECT capital, equity, peak, mtm_equity, mtm_peak, positions_json, updated_at FROM {tbl}")
+            c, rows = query('SELECT capital, equity, peak, mtm_equity, mtm_peak, positions_json, updated_at FROM ' + tbl)
+            if not rows and strategy == 'portfolio':
+                c, rows = query('SELECT capital, equity, peak, mtm_equity, mtm_peak, positions_json, updated_at FROM futures.paper_state_dragon')
             if not rows:
                 self._json({'error': 'no data'}); return
-            d = dict(zip(cols, rows[0]))
+            d = dict(zip(c, rows[0]))
             positions = json.loads(d.get('positions_json', '[]') or '[]')
             open_positions = [p for p in positions if not p.get('closed', False)]
             if open_positions:
