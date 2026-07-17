@@ -66,7 +66,7 @@ def load_portfolio():
     cur.execute("""
         SELECT ticker, strategy, contracts, weight,
                COALESCE(trailing_activation, 0.5), COALESCE(trailing_trail, 0.3),
-               COALESCE(timeout_bars, 12)
+               COALESCE(timeout_bars, 12), params
         FROM futures.portfolio
         WHERE enabled = true
         ORDER BY ticker, strategy
@@ -78,6 +78,13 @@ def load_portfolio():
     asset_map = {}
     for r in rows:
         ticker, strategy = r[0], r[1]
+        # Parse params JSONB for stop_loss and other extras
+        params = r[7] if isinstance(r[7], dict) else {}
+        if isinstance(r[7], str):
+            try:
+                params = json.loads(r[7])
+            except (json.JSONDecodeError, TypeError):
+                params = {}
         portfolio[ticker].append({
             'strategy': strategy,
             'contracts': r[2],  # None = use fixed contract count from ticker_specs
@@ -85,6 +92,7 @@ def load_portfolio():
             'trailing_activation': float(r[4]) if r[4] else 0.5,
             'trailing_trail': float(r[5]) if r[5] else 0.3,
             'timeout_bars': int(r[6]) if r[6] else 12,
+            'stop_loss': float(params.get('stop_loss_pct', 0.7)) / 100.0,
         })
     return dict(portfolio)
 
@@ -639,7 +647,7 @@ def run_tick(strategy_filter=None, mode=None):
                 'part_pnl': 0,
                 'activation': entry.get('trailing_activation', 0.005),
                 'trail': entry.get('trailing_trail', 0.003),
-                'stop_loss': 0.007,
+                'stop_loss': entry.get('stop_loss', 0.007),
                 'timeout_bars': entry.get('timeout_bars', 12),
                 'pct': specs.get(ticker, {}).get('pct', 1.0),
                 }
