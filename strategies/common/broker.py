@@ -63,9 +63,10 @@ class Position:
 class BrokerSim:
     """Реалистичный симулятор с трейлингом от пика, проскальзыванием, ликвидностью."""
 
-    def __init__(self, commission=DEFAULT_COMMISSION, slippage_out=DEFAULT_SLIPPAGE_OUT):
+    def __init__(self, commission=DEFAULT_COMMISSION, slippage_out=DEFAULT_SLIPPAGE_OUT, slippage_in=1):
         self.commission = commission
         self.slippage_out = slippage_out
+        self.slippage_in = slippage_in
 
     def check_liquidity(self, shares: int, volume: float) -> float:
         """Проверить ликвидность. Вернуть множитель slippage."""

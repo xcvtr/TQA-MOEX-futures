@@ -109,8 +109,8 @@ class Executor:
             return None
 
         go = float(specs.get('go', 0))
-        step_price = float(specs.get('step_price', 1.0))
-        min_step = float(specs.get('min_step', 0.01))
+        step_price = float(specs.get('step_price') or specs.get('sp', 1.0))
+        min_step = float(specs.get('min_step') or specs.get('ms', 0.01))
         lot = int(specs.get('lot_volume', 1))
         pct = float(specs.get('pct', 1.0))
 
@@ -125,6 +125,13 @@ class Executor:
             # Sizing по ГО (margin) — 1% от капитала / GO
             weight = float(self._portfolio.get((ticker, strategy), {}).get('weight', 1.0))
             shares = max(1, int(self.equity * RISK_PCT * weight / float(go)))
+
+        # Проверка ГО: суммарное ГО всех открытых позиций + новая не должно превышать лимит
+        knur = 0.5
+        go_limit = self.equity * knur
+        go_used = sum((p.go or 0) * max(p.shares or 1, 1) for p in self.positions if not p.closed)
+        if go_used + go * shares > go_limit:
+            return None
 
         # Проверка ликвидности (vol — уже в контрактах)
         if bar_data:

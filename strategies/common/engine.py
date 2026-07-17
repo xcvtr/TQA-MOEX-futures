@@ -11,10 +11,11 @@ class PortfolioEngine:
     strategies: [(name, check_signal_fn, tickers, params), ...]
     """
 
-    def __init__(self, strategies: list, broker=None, capital=100_000):
+    def __init__(self, strategies: list, broker=None, capital=100_000, slippage_in=1):
         self.strategies = strategies
         self.executor = Executor(broker=broker or BrokerSim(), initial_capital=capital)
-        self._pending = {}  # {ticker: [signal_dict, ...]} — сигналы, ждущие исполнения на open следующего бара
+        self._pending = {}
+        self.slippage_in = slippage_in  # {ticker: [signal_dict, ...]} — сигналы, ждущие исполнения на open следующего бара
 
     def _build_bar(self, df, bar_idx, price_10_arr=None):
         """Собрать bar_data с контекстом для всех стратегий."""
@@ -96,6 +97,9 @@ class PortfolioEngine:
             else:
                 price_10_cache[ticker] = [0.0] * len(df)
 
+        # MTM MDD tracking
+        mtm_mdd_history = []
+        
         for bar_idx in range(50, max_len):
             # Pre-build bar_data once per ticker
             bars_for_ticker = {}
@@ -119,9 +123,9 @@ class PortfolioEngine:
                         break  # уже есть позиция по этому тикеру
                     direction = pending['direction']
                     if direction == 'long':
-                        pending['entry_price'] = float(bar['opn']) + 1.0 * min_step
+                        pending['entry_price'] = float(bar['opn']) + self.slippage_in * min_step
                     else:
-                        pending['entry_price'] = float(bar['opn']) - 1.0 * min_step
+                        pending['entry_price'] = float(bar['opn']) - self.slippage_in * min_step
                     if self.executor.process_signal(pending, bar_idx, specs, bar):
                         break  # первая успешная стратегия заняла тикер
                 del self._pending[ticker]
@@ -183,6 +187,13 @@ class PortfolioEngine:
             self.executor.balance_curve.append(self.executor.equity)
             self.executor.mtm_value = self.executor.equity + floating
             self.executor.mtm_curve.append(self.executor.mtm_value)
+            # MTM peak & MDD
+            if not hasattr(self.executor, 'mtm_peak'):
+                self.executor.mtm_peak = self.executor.mtm_value
+            self.executor.mtm_peak = max(self.executor.mtm_peak, self.executor.mtm_value)
+            mtm_dd = (self.executor.mtm_peak - self.executor.mtm_value) / self.executor.mtm_peak * 100
+            mtm_mdd_history.append(mtm_dd)
+            self.executor.mtm_max_dd = max(getattr(self.executor, 'mtm_max_dd', 0), mtm_dd)
             if self.executor.equity > self.executor.peak:
                 self.executor.peak = self.executor.equity
             self.executor.rm.update(self.executor.equity)
