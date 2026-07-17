@@ -1,6 +1,6 @@
 # Архитектура проекта TQA-MOEX-futures
 
-**Последний чекпойнт: 163 (2026-07-15)** — Dragon M1 TZ fix + portfolio
+**Последний чекпойнт: 168 (2026-07-17)** — Dragon in PortfolioEngine — M5 resampling, PG params, bars_list
 
 ## 🚨 Правила работы
 
