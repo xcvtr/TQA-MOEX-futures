@@ -1,3 +1,24 @@
+## [168] 2026-07-17
+### Added
+- Dragon integration into PortfolioEngine: M1→M5 resampling, bars_list
+- executor.py parses params JSONB (stop_loss_pct) from PG
+- broker.py: configurable slippage_in parameter
+
+### Changed
+- engine.py: M1→M5 resampling in signal loop (not every bar)
+- engine.py: _build_bar optimized (no heavy bars_list per bar)
+- PG futures.portfolio: Dragon trailing params (1.5/0.5/60/1.0)
+- PG futures.ticker_specs: correct ms/sp/go for all tickers
+
+### Fixed
+- IR engine: cooldown, volume filter, min_vol check
+- Executor: proper stop_loss from PG params JSONB
+
+### Removed
+- Heavy bars_list from _build_bar (was causing timeout on 120K M1 bars)
+
+- Checkpoint: checkpoint/168-dragon-framework-integration.md
+
 ## [164] 2026-07-16
 ### Added
 - **MT5 Continuous** — 10.5M M1 баров по 9 тикерам с 2020 (Indicative Continuous FINAM)

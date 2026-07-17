@@ -59,16 +59,24 @@ class Executor:
 
         for r in rows:
             ticker, strategy = r[0], r[1]
+            # Parse params JSONB
+            params = {}
+            if r[5]:
+                try:
+                    params = json.loads(r[5])
+                except (json.JSONDecodeError, TypeError):
+                    params = {}
             key = (ticker, strategy)
             self._portfolio[key] = {
                 'enabled': r[2],
                 'contracts': r[3],  # может быть None
                 'weight': float(r[4]) if r[4] else 1.0,
-                'params': r[5],
+                'params': params,
                 'trailing': {
                     'activation': float(r[6]) if r[6] else 0.5,
                     'trail': float(r[7]) if r[7] else 0.3,
                     'timeout': int(r[8]) if r[8] else 12,
+                    'stop_loss': float(params.get('stop_loss_pct', 0.7)),
                 },
             }
         return self._portfolio

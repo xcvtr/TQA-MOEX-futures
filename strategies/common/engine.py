@@ -16,15 +16,16 @@ class PortfolioEngine:
         self.executor = Executor(broker=broker or BrokerSim(), initial_capital=capital)
         self._pending = {}
         self.slippage_in = slippage_in  # {ticker: [signal_dict, ...]} — сигналы, ждущие исполнения на open следующего бара
+        self._m5_cache = {}  # {ticker: [m5_bar_dict, ...]} — M5 бары, собранные из M1
 
     def _build_bar(self, df, bar_idx, price_10_arr=None):
         """Собрать bar_data с контекстом для всех стратегий."""
         row = df.iloc[bar_idx]
         bar = {
             'prc': float(row.get('prc', row.get('close', 0))),
+            'opn': float(row.get('opn', row.get('open', 0))),
             'hi': float(row.get('hi', row.get('high', 0))),
             'lo': float(row.get('lo', row.get('low', 0))),
-            'opn': float(row.get('opn', row.get('open', 0))),
             'vol': float(row.get('vol', 0)),
             'vb': float(row.get('vb', 0)),
             'vs': float(row.get('vs', 0)),
@@ -131,19 +132,41 @@ class PortfolioEngine:
                 del self._pending[ticker]
 
             # Сигналы — становятся pending для исполнения на следующем баре
+            is_m5 = (bar_idx % 5 == 4)  # M5: каждые 5 M1 баров
+            
             for name, check_fn, tickers, params in self.strategies:
                 for ticker in tickers:
                     bar = bars_for_ticker.get(ticker)
                     if bar is None:
                         continue
-                    signal = check_fn(bar, ticker, params)
-                    if signal:
-                        # Проверка: нет ли уже открытой позиции по этому тикеру
-                        has_pos = any(not p.closed and p.ticker == ticker for p in self.executor.positions)
-                        if not has_pos:
-                            if ticker not in self._pending:
-                                self._pending[ticker] = []
-                            self._pending[ticker].append(signal)
+                    
+                    # Build M5 bars from M1
+                    if is_m5 and ticker not in self._m5_cache:
+                        self._m5_cache[ticker] = []
+                    if ticker in self._m5_cache:
+                        df = bars_dict.get(ticker)
+                        if df is not None and bar_idx >= 4:
+                            m1_5 = df.iloc[bar_idx-4:bar_idx+1]
+                            m5_bar = {
+                                'opn': float(m1_5['opn'].iloc[0]),
+                                'hi': float(m1_5['hi'].max()),
+                                'lo': float(m1_5['lo'].min()),
+                                'prc': float(m1_5['prc'].iloc[-1]),
+                                'vol': float(m1_5['vol'].sum()) if 'vol' in m1_5 else 0,
+                            }
+                            self._m5_cache[ticker].append(m5_bar)
+                    
+                    # Only check signals on M5 with enough history
+                    if is_m5 and ticker in self._m5_cache and len(self._m5_cache[ticker]) >= 30:
+                        m5_bars = self._m5_cache[ticker]
+                        bar['bars_list'] = m5_bars
+                        signal = check_fn(bar, ticker, params)
+                        if signal:
+                            has_pos = any(not p.closed and p.ticker == ticker for p in self.executor.positions)
+                            if not has_pos:
+                                if ticker not in self._pending:
+                                    self._pending[ticker] = []
+                                self._pending[ticker].append(signal)
 
             # Управление позициями — передаём бары ТОЛЬКО своего тикера
             for p in list(self.executor.positions):
