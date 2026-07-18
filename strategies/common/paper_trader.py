@@ -235,30 +235,33 @@ def get_latest_bars(ticker, asset, n_bars=50):
     """
     now = datetime.now(timezone.utc)
     
-    # ── 0. mt5_continuous (primary) ─────────────────────────────────────
-    ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+    # ── 0. PG bars_1m (primary) ──────────────────────────────────────────
     try:
-        df = ch.query_df(f"""
-            SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
-                   argMin(opn, bt) as opn,
+        import psycopg2
+        conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT to_timestamp(floor(extract(epoch from bt) / 300) * 300) as bt5,
+                   (array_agg(opn ORDER BY bt))[1] as opn,
                    max(hi) as hi, min(lo) as lo,
-                   argMax(prc, bt) as prc_close,
-                   sum(vol) as vol
-            FROM moex.mt5_continuous WHERE ticker = '{ticker}'
-              AND bt >= '2025-01-01'
-            GROUP BY bt5 ORDER BY bt5 DESC LIMIT {n_bars + 5}
-        """)
-        if not df.empty:
-            df = df.sort_values('bt5').reset_index(drop=True)
-            df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
+                   (array_agg(prc ORDER BY bt DESC))[1] as prc
+            FROM futures.bars_1m
+            WHERE ticker = %s
+            GROUP BY bt5 ORDER BY bt5 DESC LIMIT %s
+        """, (ticker, n_bars + 5))
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        
+        if rows:
+            import pandas as pd
+            df = pd.DataFrame(rows, columns=['bt', 'opn', 'hi', 'lo', 'prc'])
+            df = df.sort_values('bt').reset_index(drop=True)
             age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
             if age < 10:  # < 10 min — свежие данные
-                ch.close(); return df
-            log.info("mt5_continuous age=%.0fm, trying next source", age)
-        ch.close()
+                return df
+            log.info("PG bars_1m age=%.0fm, trying next source", age)
     except Exception as e:
-        log.warning("mt5_continuous error for %s: %s", ticker, e)
-        ch.close()
+        log.warning("PG bars_1m error for %s: %s", ticker, e)
     
     # ── 1. PG (для paper trader) ────────────────────────────────────────
     try:
