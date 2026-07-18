@@ -26,7 +26,7 @@ TICKERS = ['MM','GZ','NG','BR','SV','CR','GD','RN','Si']  # portfolio tickers
 
 def load_mt5_to_pg():
     now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=2)  # last 2 hours only
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')  # last 2 hours only
     
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     conn = psycopg2.connect(**PG_CONFIG, connect_timeout=10)
@@ -34,12 +34,9 @@ def load_mt5_to_pg():
     
     total = 0
     for ticker in TICKERS:
-        rows = ch.query(f"""
-            SELECT bt, opn, hi, lo, prc, vol
-            FROM moex.mt5_continuous
-            WHERE ticker = '{ticker}' AND bt >= '{cutoff.isoformat()}'
-            ORDER BY bt
-        """).result_rows
+        q = ("SELECT bt, opn, hi, lo, prc, vol FROM moex.mt5_continuous "
+             f"WHERE ticker = '{ticker}' AND bt >= '{cutoff}' ORDER BY bt")
+        rows = ch.query(q).result_rows
         
         if not rows:
             continue
@@ -62,12 +59,15 @@ def load_mt5_to_pg():
             log.info("%s: %d new bars", ticker, inserted)
         total += inserted
     
-    # Autopurge
-    purge_before = now - timedelta(days=RETENTION_DAYS)
-    cur.execute("DELETE FROM futures.bars_1m WHERE bt < %s", (purge_before,))
-    purged = cur.rowcount
-    if purged:
-        log.info("Purged %d old bars (< %s)", purged, purge_before.date())
+    # Autopurge — keep only last 60 days
+    try:
+        purge_before = (datetime.utcnow() - timedelta(days=RETENTION_DAYS)).strftime('%Y-%m-%d')
+        cur.execute("DELETE FROM futures.bars_1m WHERE bt < %s::date", (purge_before,))
+        purged = cur.rowcount
+        if purged:
+            log.info("Purged %d old bars (< %s)", purged, purge_before)
+    except Exception as e:
+        log.warning("Autopurge failed (non-fatal): %s", e)
     
     conn.commit()
     cur.close()
