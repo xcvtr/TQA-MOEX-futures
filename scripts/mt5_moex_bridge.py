@@ -62,14 +62,15 @@ def main():
         now = datetime.now()
         print(f"\n=== MT5 MOEX Bridge == {now.isoformat()}", flush=True)
         
-        # Initialize MT5 — try MOEX FINAM path, then FINAM old, then default
-        moex_path = 'C:/Program Files/MetaTrader 5 MOEX/terminal64.exe'
-        finam_old = 'C:/Program Files/MetaTrader 5 FINAM/terminal64.exe'
-        init_ok = mt5.initialize(path=moex_path)
+        # Initialize MT5 — connect to same-prefix terminal (env inherited from finam)
+        init_ok = mt5.initialize()
         if not init_ok:
-            init_ok = mt5.initialize(path=finam_old)
-        if not init_ok:
-            init_ok = mt5.initialize(path='C:/Program Files/MetaTrader 5/terminal64.exe')
+            # Fallback: try known paths
+            for p in ['C:/Program Files/MetaTrader 5/terminal64.exe',
+                      'C:/Program Files/MetaTrader 5 FINAM/terminal64.exe',
+                      'C:/Program Files/MetaTrader 5 MOEX/terminal64.exe']:
+                init_ok = mt5.initialize(path=p)
+                if init_ok: break
         if not init_ok:
             init_ok = mt5.initialize()  # try without path
         if not init_ok:
