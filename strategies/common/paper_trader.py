@@ -226,6 +226,7 @@ def get_latest_bars(ticker, asset, n_bars=50):
     """Get last N 5-min OHLC bars.
     
     Priority:
+    0. CH moex.mt5_continuous (FINAM, live, M1→M5 OHLC)
     1. PG futures.bars_1m (live, autopurge 2mo, для paper trader)
     2. CH moex.mt5_bars (полная история, для backtest)
     3. CH moex.tradestats_fo (AlgoPack real OHLC)
@@ -234,7 +235,32 @@ def get_latest_bars(ticker, asset, n_bars=50):
     """
     now = datetime.now(timezone.utc)
     
-    # ── 1. PG (primary для paper trader) ────────────────────────────────────
+    # ── 0. mt5_continuous (primary) ─────────────────────────────────────
+    ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+    try:
+        df = ch.query_df(f"""
+            SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
+                   argMin(opn, bt) as opn,
+                   max(hi) as hi, min(lo) as lo,
+                   argMax(prc, bt) as prc_close,
+                   sum(vol) as vol
+            FROM moex.mt5_continuous WHERE ticker = '{ticker}'
+              AND bt >= '2025-01-01'
+            GROUP BY bt5 ORDER BY bt5 DESC LIMIT {n_bars + 5}
+        """)
+        if not df.empty:
+            df = df.sort_values('bt5').reset_index(drop=True)
+            df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
+            age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
+            if age < 10:  # < 10 min — свежие данные
+                ch.close(); return df
+            log.info("mt5_continuous age=%.0fm, trying next source", age)
+        ch.close()
+    except Exception as e:
+        log.warning("mt5_continuous error for %s: %s", ticker, e)
+        ch.close()
+    
+    # ── 1. PG (для paper trader) ────────────────────────────────────────
     try:
         import psycopg2
         conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
