@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Load recent M1 bars from mt5_continuous (CH) into PG bars_1m.
-Incremental: only loads last 2 hours, skips existing rows.
+"""Load recent M1 bars into PG bars_1m.
+Primary: mt5_continuous (FINAM, CH)
+Fallback: prices_5min (ISS snapshots, CH)
 Autopurge: keeps 60 days.
 """
 import os, sys, logging
@@ -22,44 +23,57 @@ PG_CONFIG = dict(
 )
 
 RETENTION_DAYS = 60
-TICKERS = ['MM','GZ','NG','BR','SV','CR','GD','RN','Si']  # portfolio tickers
+TICKERS = ['MM','GZ','NG','BR','SV','CR','GD','RN','Si']
 
-def load_mt5_to_pg():
+def load_bars():
     now = datetime.now(timezone.utc)
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')  # last 2 hours only
+    cutoff = (now - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')
     
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     conn = psycopg2.connect(**PG_CONFIG, connect_timeout=10)
     cur = conn.cursor()
-    
     total = 0
+    
     for ticker in TICKERS:
-        q = ("SELECT bt, opn, hi, lo, prc, vol FROM moex.mt5_continuous "
-             f"WHERE ticker = '{ticker}' AND bt >= '{cutoff}' ORDER BY bt")
-        rows = ch.query(q).result_rows
+        rows = None
+        
+        # Source 1: mt5_continuous (FINAM, indicative continuous)
+        try:
+            q = ("SELECT bt, opn, hi, lo, prc, vol FROM moex.mt5_continuous "
+                 f"WHERE ticker = '{ticker}' AND bt >= '{cutoff}' ORDER BY bt")
+            rows = ch.query(q).result_rows
+            if rows:
+                log.info("%s: %d bars from mt5_continuous", ticker, len(rows))
+        except Exception as e:
+            log.warning("%s mt5_continuous error: %s", ticker, e)
+        
+        # Source 2: prices_5min (ISS snapshots, fallback)
+        if not rows:
+            try:
+                # ISS data is 5-min snapshots, spread across M1
+                q = ("SELECT bt, opn, hi, lo, prc, vol FROM moex.prices_5min "
+                     f"WHERE ticker = '{ticker}' AND bt >= '{cutoff}' ORDER BY bt")
+                rows = ch.query(q).result_rows
+                if rows:
+                    log.info("%s: %d bars from prices_5min (fallback)", ticker, len(rows))
+            except Exception as e:
+                log.warning("%s prices_5min error: %s", ticker, e)
         
         if not rows:
             continue
         
-        inserted = 0
-        for r in rows:
-            bt, opn, hi, lo, prc, vol = r
-            try:
-                cur.execute("""
-                    INSERT INTO futures.bars_1m (ticker, bt, opn, hi, lo, prc, vol)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (ticker, bt) DO NOTHING
-                """, (ticker, bt, float(opn), float(hi), float(lo), float(prc), int(vol) if vol else 0))
-                if cur.rowcount > 0:
-                    inserted += 1
-            except Exception as e:
-                log.warning("Insert error %s/%s: %s", ticker, bt, e)
+        batch = [(ticker, r[0], float(r[1]), float(r[2]), float(r[3]), float(r[4]),
+                  int(r[5]) if r[5] else 0) for r in rows]
         
-        if inserted:
-            log.info("%s: %d new bars", ticker, inserted)
-        total += inserted
+        for i in range(0, len(batch), 10000):
+            sub = batch[i:i+10000]
+            args = ','.join(cur.mogrify('(%s,%s,%s,%s,%s,%s,%s)', x).decode() for x in sub)
+            cur.execute('INSERT INTO futures.bars_1m (ticker,bt,opn,hi,lo,prc,vol) VALUES ' +
+                        args + ' ON CONFLICT DO NOTHING')
+            conn.commit()
+        total += len(batch)
     
-    # Autopurge — keep only last 60 days
+    # Autopurge
     try:
         purge_before = (datetime.utcnow() - timedelta(days=RETENTION_DAYS)).strftime('%Y-%m-%d')
         cur.execute("DELETE FROM futures.bars_1m WHERE bt < %s::date", (purge_before,))
@@ -76,4 +90,4 @@ def load_mt5_to_pg():
     log.info("Done: %d new bars loaded", total)
 
 if __name__ == '__main__':
-    load_mt5_to_pg()
+    load_bars()
