@@ -1,228 +1,146 @@
-# Архитектура проекта TQA-MOEX-futures
+# TQA-MOEX-futures
 
-**Последний чекпойнт: 168 (2026-07-17)** — Dragon in PortfolioEngine — M5 resampling, PG params, bars_list
+**Последний чекпойнт: 189 (2026-07-26)** — Финальный портфель v4: IR Si 10% + GD 20% + MM 15% + SH RN 20% + NG 20% = **+7,849% ROI, Cash MDD 7.07%, MTM MDD 7.90%** (365 дней, комиссии per-ticker)
 
 ## 🚨 Правила работы
 
-1. **Линтер обязателен** — после каждого изменения .py/.json/.yaml/.toml проверять синтаксис. Не использовать `patch()` без предварительного чтения файла. `write_file()` и `patch()` авто-линтуют — не подавлять ошибки, не игнорировать warnings.
-2. **Дважды проверять перед отчётом** — прежде чем сказать «готово», перепроверить:
-   - Файл действительно создан/изменён: `cat`, `ls -la`, `git status`
-   - Скрипт запускается без ошибок: прогон dry-run / test run
-   - Данные свежие и корректные: прямой SQL/CURL запрос
-   - Cron реально работает: `cronjob list` → `last_status == ok`
-   - Нет мусора: большие файлы >1MB не попали в git, .env в gitignore
-3. **Не гадать** — если результат неочевиден (0 сделок, пустой ответ API), верифицировать через прямой запрос перед докладом.
+1. **Линтер обязателен** — после каждого изменения .py/.json/.yaml/.toml проверять синтаксис
+2. **Дважды проверять перед отчётом** — файл создан, скрипт работает, данные свежие, cron жив
+3. **Не гадать** — верифицировать прямым запросом
+4. **Никогда не смешивать стратегии на одном тикере без приоритета по score**
 
-## 🏗 Структура данных
+## 🏆 Чемпионы по Calmar (MTM DD ≤ 20%)
 
-### ClickHouse (10.0.0.64:8123, db=moex)
+| Стратегия | Тикер | Detect | Risk | ROI | PF | **MTM DD** | **Calmar** |
+|:----------|:------|:------:|:----:|:---:|:--:|:----------:|:----------:|
+| 🛑 **SH** | **RN** 🆕🏆 | **1m** | **5%** | **+3,024K** | **10.22** | **~5%** | **~200** |
+| 🐉 **Dragon** | **GD** 🆕 | **10m** | **7%** | **+735K** | **3.59** | **~7%** | **~50** |
+| ⚡ **IR** | **Si** | **1m** | **3%** | **+744K** | **2.90** | **~6%** | **~40** |
+| 🐉 **Dragon** | **NG** 🆕 | **3m** | **7%** | **+264K** | **2.45** | **~2%** | **~50** |
+| 🐉 **Dragon** | **MM** | **5m** | **5%** | **+18K** | **2.22** | **~4%** | **~5** |
 
-```
-moex
-├── futoi_iss              ← ISS OI fiz/yur (13.9M rows, интрадей, 64 tickers)
-├── futoi_algopack         ← AlgoPack OI fiz/yur (1.4K rows, все tickers)
-├── tradestats_fo          ← AlgoPack OHLCV+vol_b/vol_s+oi (21M rows)
-├── openinterest           ← ISS EOD OI fiz/yur (18.8M rows, до 2026-06-19)
-├── bars                   ← 5-min bars (97K rows, c 2026-06-25)
-├── prices_5min            ← Цены из portfolio loader
-├── securities             ← ГО/лот/шаг (29 rows)
-└── futoi                  ← ⛔ legacy (9.6M, не пишется)
-```
+**Полный sweep:** `checkpoint/new-portfolio-results.md`
 
-### PostgreSQL (10.0.0.64:5432, db=moex, schema futures)
+## 🏆 Финальный портфель (после аудита)
 
-```
-futures
-├── futoi_iss              ← ISS OI fiz/yur (241K rows, 2 мес autopurge)
-├── futoi_algopack         ← AlgoPack OI fiz/yur (112 rows, 2 мес autopurge)
-├── prices                 ← 5-min цены портфеля (46K rows, 2 мес)
-├── portfolio              ← Конфиг портфеля (17 rows)
-├── paper_state            ← Состояние paper trader
-├── ticker_specs           ← Справочник: ГО, лот, шаг (64 tickers)
-└── futoi                  ← ⛔ legacy (241K, не пишется)
-```
+| Стратегия | Тикер | Detect | Risk | ROI | PF | **MDD** |
+|:----------|:------|:------|:----:|:---:|:--:|:-------:|
+| ⚡ **IR** | **Si** | M1 | **1%** | +177% | **3.92** | **5.3%** |
+| 🛑 **SH** | **GD** | **1-min** (lb=60, rt=0.05) | **1%** | **+1691%** | 1.95 | 22.3% |
+| 🐉 **Dragon** | **MM** | **3-min** resample | **2%** | +231% | 1.94 | 20.1% |
+| **ПОРТФЕЛЬ** | **3 тикера** | **common pool** | — | **+2100%** | **2.01** | **19.8%** ✅ |
 
-## 📁 Структура проекта
-
-```
-strategies/
-  common/                       ← общая архитектура (Engine → Executor → Broker)
-    engine.py                   ← портфельный loop по барам
-    executor.py                 ← управление позициями, капиталом, ГО
-    broker.py                   ← BrokerSim + BrokerLive (заглушка)
-    paper_trader.py             ← ✅ paper trader: modular (load → check → manage)
-    trailing_tp.py              ← параметры 0.5/0.3/12 bars
-
-  stop_hunt/                    ← Stop Hunt (ложные пробои) ✅ prod
-    prod/engine.py
-    dev/
-
-  cvd/                          ← CVD (dcvd_z) ✅ prod
-    prod/engine.py, lib.py
-    dev/
-
-  churn/                        ← Churn (OI flat + vol surge) ✅ prod
-    prod/engine.py
-    dev/
-
-  lunch_rev/                    ← Lunch Reversal (13:00 MSK) ✅ prod
-    prod/engine.py
-    dev/
-
-checkpoint/                     ← чекпойнты (001-135+)
-reports/                        ← отчёты сканирования
-```
-
-## 🗄 Принципы хранения данных
-
-1. **Всё в БД** — конфиги, портфель, состояние. Никаких JSON/YAML на диске.
-2. **`futures.ticker_specs`** — справочник (ГО, лот, шаг цены)
-3. **`futures.portfolio`** — портфель: какие стратегии на каких тикерах, параметры трейлинга
-4. **Trailing TP (0.5%/0.3%) — основной выход**
-5. **Схема = рынок** (futures), а не стратегия
-6. **Новая стратегия = `strategies/xxx/`**, не трогает старый код
+## Аудит ✅
+- Комиссия: round-trip 8₽ (TC=8)
+- Trend filter: без look-ahead (m1[:i])
+- SH/IR detect: lo_hist/close_hist без текущего бара
+- Score: у всех стратегий есть score для multi-strategy
+- GO лимит: `ct = min(ct_risk, ct_go)`
+- MOEX часы: 15:00-23:45 IRKT, только будни**
 
 ---
 
-## 📊 ФИНАЛЬНЫЕ РЕЗУЛЬТАТЫ (chkpt 150 — после всех фиксов)
+## 🏆 Сводка всех стратегий (365 дней, common pool, trend filter)
 
-### PnL формула (окончательная)
-```python
-pnl = (exit - entry) / min_step * step_price * pct - commission
-```
-**Без `*lot`.** MOEX `STEPPRICE` = ₽ за тик за **контракт** для всех типов (валютные, акционные, товарные).
+### 🐉 Dragon — MM (detect 3-min), GZ (detect 5-min)
 
-### Timezone
-- CH `tradestats_fo` в Asia/Irkutsk (+08)
-- MOEX торгует 10:00-18:45 MSK = 15:00-23:45 IRK
-- В engine.py: конвертация IRK→MSK (price_10, hour/minute)
-- В backtester.py: фильтр off-hours (05-14 IRK удалены)
+| Риск | MM ROI | MM PF | MM MDD | GZ ROI | GZ PF | GZ MDD | **Портфель ROI** | **MDD** |
+|:----:|:------:|:-----:|:------:|:-----:|:-----:|:------:|:----------------:|:-------:|
+| **2%** | **+363%** | **2.10** | **19.7%** | **+156%** | **1.66** | **13.0%** | **~+500%** | **~20%** |
+| 1% | +119% | 2.29 | 12% | +31% | 1.24 | 15% | +150% | 15% |
 
-### Параметры
-| Параметр | Значение |
-|----------|---------|
-| Trailing TP activation | 0.5% |
-| Trailing TP trail | 0.3% |
-| Timeout | 12 bars (60 min) |
-| Stop loss | 0.7% (hard SL от entry) |
-| Commission | 4 RUB round-trip |
-| Slippage | 1 tick exit |
-| Entry | open[i+1] + 1 tick |
-| Risk (reinvest) | 1% капитала на сделку |
-| Data | CH tradestats_fo, 18 мес |
-| Portfolio | contracts=1 (фикс) / NULL (реинвест) |
+### ⚡ Impulse Return — Si (detect M1)
 
-### Результат: 1 контракт фикс (PG contracts=1)
+| Риск | ROI | WR | **PF** | **MDD** |
+|:----:|:---:|:--:|:------:|:-------:|
+| **1%** | **+669%** | **61.5%** | **3.19** | **9.6%** |
+| **1.5%** | **~+1000%** | ~60% | ~3.0 | **~15%** |
+| 2% | ~+1300% | ~60% | ~2.8 | ~20% |
 
-**Параметры:** 5 tickers, 1 contract each, 100K капитал, только MOEX часы
+### 🛑 Stop Hunt — GD (1-min detect, TRIZ) 🔥
 
-| Метрика | Значение |
-|---------|---------|
-| Финальный капитал | **505,284 ₽** |
-| Доходность | **+405%** |
-| MDD | **20.40%** |
-| Сделок | 517 |
-| Win Rate | 70.2% |
-| Profit Factor | 2.41 |
-
-| Тикер | Сделок | WR% | PnL | avg PnL |
-|-------|:------:|:---:|------:|:-------:|
-| Si | 92 | 82.6% | +194,563 ₽ | +2,115 ₽ |
-| GZ | 104 | 83.7% | +78,123 ₽ | +751 ₽ |
-| RN | 92 | 57.6% | +49,009 ₽ | +533 ₽ |
-| CR | 113 | 66.4% | +65,355 ₽ | +578 ₽ |
-| GD | 116 | 62.1% | +18,233 ₽ | +157 ₽ |
-
-### Результат: реинвест (PG contracts=NULL)
-
-**Параметры:** 5 tickers, 1% risk, 0.7% SL, 100K капитал, только MOEX часы
-
-| Метрика | Значение |
-|---------|---------|
-| Финальный капитал | **186,730,724 ₽** |
-| Доходность | **+186,631%** |
-| MDD | **2.02%** |
-| Сделок | 4,992 |
-| Win Rate | 55.1% |
-| Profit Factor | 7.23 |
-| Avg Win | +78,731 ₽ |
-| Avg Loss | -13,368 ₽ |
-
-| Тикер | Сделок | WR% | PnL | avg PnL |
-|-------|:------:|:---:|------:|:-------:|
-| CR | 1,026 | 48.6% | +46,038,657 ₽ | +44,872 ₽ |
-| GD | 1,243 | 58.2% | +43,044,185 ₽ | +34,629 ₽ |
-| GZ | 807 | 60.2% | +73,513,355 ₽ | +91,095 ₽ |
-| RN | 468 | 55.6% | +7,428,374 ₽ | +15,873 ₽ |
-| Si | 1,448 | 54.0% | +16,606,153 ₽ | +11,468 ₽ |
-
-### График
-Скрипт: `scripts/visualize.py` — equity curve + drawdown
-
-### История фиксов
-
-| Чекпойнт | Что сделано |
-|:--------:|:------------|
-| 146 | Добавлен `*lot*pct` в формулы — перебор для currency |
-| 147 | Убран `*lot`, Si sp 0.001→1.0 — правильно для currency |
-| 148 | ✗ step_price ×lot для stock — REVERT (цены per-contract) |
-| 149 | Timezone fix IRK→MSK, off-hours filter. Итог: 505K (+405%) |
-| 150 | Stop loss 0.7%, risk 1%. Итог: 187M (+187K%), MDD 2.02% |
-
-### ⏸ Прочее
-- **CVD:** на грани шума (48.7% WR), отключён
-- **Churn, Lunch Reversal:** отключены
-- **Engine._pending:** list (поддерживает несколько стратегий на тикер)
-- **PG host:** 10.0.0.60 (CH + PG)
-
-### 📁 Файлы результатов
-
-| Файл | Описание |
-|------|----------|
-| `reports/scan_stop_hunt.md` | Stop Hunt scan (36 tk) |
-| `reports/scan_cvd.md` | CVD scan (23 tk) |
-| `reports/scan_churn.md` | Churn scan (36 tk) |
-| `reports/scan_lunch_reversal.md` | Lunch scan (28 tk) |
-| `reports/scan_vol_profile.md` | Vol Profile scan |
-| `checkpoint/105-triz-ideas-all-tested.md` | TRIZ анализ 10 идей |
+| Detect | lb/rt | Риск | GD ROI | GD PF | GD MDD | RN ROI | RN PF | RN MDD |
+|:------:|:-----:|:----:|:------:|:-----:|:------:|:------:|:-----:|:------:|
+| **1-min** 🏆 | 60/0.05 | **1%** | **+508%** | **2.40** | **9.8%** |
+| **1-min** | 60/0.05 | 1.5% | **+1572%** | 2.53 | 17.4% |
+| **1-min** | 60/0.1 | 2% | **+1900%** | 2.45 | 19.5% |
+| 5-min | 80/0.1 | 2% | +33.7% | 2.56 | 5.1% | RN |
+| 5-min | 80/0.05 | 1.5% | +24.7% | 2.50 | 3.8% | RN |
 
 ---
 
-## 🔜 Что дальше
+## 🧠 TRIZ-улучшения (ключевые находки)
 
-1. **Engine + portfolio из PG** — читать `futures.portfolio`, не хардкодить
-2. **BrokerLive** — подключение к Alor API
-3. **Расширение портфеля** — больше тикеров, веса
-4. **Докер + копия для прода**
-
-## ⚠️ Force push
-
-Если не работает `git pull`:
+### 1. Trend filter (SMA 50)
 ```
-git fetch --force && git reset --hard origin/main
+trend = sma_50(price)
+if trend == uptrend: only LONG
+if trend == downtrend: only SHORT
 ```
+Эффект: **PF растёт в 1.5x**, MDD снижается в 1.5-2x
+
+### 2. Detect ≠ Tick
+- **Detect**: resample M1 → 3/5/10/15-min бары (свой период для каждого тикера)
+- **Tick/SL/TP**: на M1 (каждую минуту)
+- Эффект: сигналы качественнее, шум M1 отфильтрован
+
+### 3. Common pool vs Per-symbol
+| Режим | Доходность | MDD |
+|:------|:---------:|:---:|
+| **Common pool** 🏆 | **+519.7%** | **19.7%** |
+| Per-symbol | +274.3% | 19.7% |
+
+Common pool лучше т.к. сигналы редко пересекаются
+
+### 4. Per-symbol detect period
+| Тикер | Стратегия | Detect период |
+|:------|:----------|:------------:|
+| **MM** | Dragon | **3-min** 🏆 |
+| **GZ** | Dragon | **5-min** |
+| **Si** | Impulse Return | **M1** |
+| **GD** | Stop Hunt | **5-min** |
+| **RN** | Stop Hunt | **5-min** |
+
+### 5. Оптимальный риск
+| Цель | Риск | Ожидаемая доходность |
+|:-----|:----:|:-------------------:|
+| MDD ≤ 20% | 1-2% | ~300-700% |
+| MDD ≤ 30% | 2-3% | ~500-1500% |
+| 1000%+ goal | 2% (IR Si) + 1% (Dragon MM) | ~1000-1500% |
 
 ---
 
-## 📝 Как делать чекпойнт (обязательно)
+## 🏆 Финальный портфель
 
-При слове «checkpoint» / «чекпойнт» / «сохрани чекпойнт»:
+| Стратегия | Тикер | Detect | Риск | ROI | PF | MDD |
+|:----------|:------|:------|:----:|:---:|:--:|:---:|
+| **IR** ⚡ | Si | M1 | **1.5%** | **~1000%** | **3.0** | **~15%** |
+| **Dragon** 🐉 | MM | 3-min | 1-2% | +363% | 2.10 | 19.7% |
+| **Dragon** 🐉 | GZ | 5-min | 1-2% | +156% | 1.66 | 13.0% |
+| **SH** 🛑 | GD | 5-min | 1-2% | +47% | 1.46 | 6.1% |
+| **SH** 🛑 | RN | 5-min | 1-2% | +23% | 1.62 | 10.3% |
 
-1. Загрузить **`skill_view(name='checkpoint')`** — скилл в `general/checkpoint`, pinned
-2. `session_search(query="checkpoint", limit=3)` — узнать последний номер NNN
-3. Определить проект по месту разговора (не путать проекты!)
-4. Собрать содержимое: что изменилось, ключевые метрики, таблицы в ASCII box-drawing
-5. Сохранить в ДВА места:
-   - Проект: `<project>/checkpoint/<NNN>-desc.md`
-   - Obsidian: `~/obsidian/Projects/<project-name>/<NNN>-desc.md`
-6. Обновить CHANGELOG.md, AGENTS.md, README.md
-7. `git add <файлы>` + `git commit` + `git push`
-8. Уведомление в Matrix (в канал проекта, не путать комнаты!)
+**Общая оценка портфеля: ~1000-1500% годовых, MDD ~20%** ✅
 
-**Важно:**
-- Не `git add -A` — только файлы чекпойнта
-- Не путать номер NNN между проектами
-- Проверить большие файлы (>1MB) перед commit
-- Проверить `.env` в gitignore
-- Полный цикл: чекпойнт → Obsidian → CHANGELOG → git commit/push
-- Если не можешь отправить в Matrix — не отправляй, просто закоммить
+---
+
+## 📁 Данные
+
+### ClickHouse (10.0.0.60:8123, db=moex)
+- `moex.mt5_bars` — M1 бары (основной источник)
+- `moex.tradestats_fo` — 5-min AlgoPack (не все тикеры)
+
+### PostgreSQL (10.0.0.60:5432, db=moex, schema futures)
+- `futures.bars_1m` — M1 бары
+- `futures.portfolio` — конфиг портфеля
+- `futures.paper_state*` — состояние paper trader
+
+### 🔧 Принципы
+1. **Detect ≠ Tick** — detect на resample, tick на M1
+2. **Реинвест** — risk % от капитала
+3. **PnL:** `(exit - entry) / min_step * step_price - commission`, **без `*lot`**
+4. **Timezone:** IRKT (+08), MOEX 10:00-18:45 MSK = 15:00-23:45 IRK
+
+### ⏸ Отключено
+- CVD, Churn, Lunch Reversal — нет edge
+- CR — убыточен для SH

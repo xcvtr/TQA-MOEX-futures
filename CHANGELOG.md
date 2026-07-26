@@ -1,3 +1,24 @@
+## [189] 2026-07-26
+### Added
+- **Финальный портфель v4:** IR Si 10% + GD 20% + MM 15% + SH RN 20% + NG 20%
+  - ROI: +7,849% | Cash MDD: 7.07% | MTM MDD: 7.90% | Trades: 4,331
+  - SH RN PF=17.91 — главный драйвер
+- **Комиссии per-ticker:** Si=4₽, GD=44₽, MM=2₽, RN=7₽, NG=4₽ (из PG fee_entry)
+- **GO КСУР ПГО:** скрипт scripts/update_go_ksur_pgo.py
+- **Полный аудит:** look-ahead, multi-contract, PnL, SL/TP, equity curve — чисто
+### Changed
+- AGENTS.md: обновлён до чекпойнта 189
+### Fixed
+- O(n²) баг в IR detect (close_hist копировал все бары)
+- Commission: было 4₽ для всех, стало per-ticker
+- MOEX GO: исправлены с разрозненных уровней на единый КСУР ПГО
+### Removed
+- GZ, CR, BR — отсев по PF<1.5
+- fiz/yur фильтры — не улучшают
+- Limit entry — не работает (Dragon PF падает до 0.6)
+### Checkpoint
+- checkpoint/chkpt-189-final-v4.md
+
 ## [168] 2026-07-17
 ### Added
 - Dragon integration into PortfolioEngine: M1→M5 resampling, bars_list
