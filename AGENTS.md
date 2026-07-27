@@ -179,7 +179,8 @@ Common pool лучше т.к. сигналы редко пересекаются
 - CR — убыточен для SH
 
 ### 🤖 Paper Trader
-- **Cron:** `moex-futures-paper-v5` — `*/5 15-23,0-4 * * 1-5`, no_agent
-- **Скрипт:** `~/.hermes/scripts/run_moex_futures_paper.sh` → `run_paper_trader.py --state-key portfolio_v5`
+- **Cron (system):** `*/5 15-23,0-4 * * 1-5` — crontab пользователя
+- **Скрипт:** `scripts/cron_paper_v5.sh` → `run_paper_trader.py --state-key portfolio_v5`
 - **State:** `futures.paper_state_portfolio_v5`, `futures.paper_trades_portfolio_v5`
-- Все 5 стратегий из `futures.portfolio` (enabled=true)
+- **Лог:** `/tmp/paper_trader.log`
+- **Дашборд:** `dashboard_v5.py` — порт 8085
