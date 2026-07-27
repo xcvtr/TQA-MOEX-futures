@@ -177,3 +177,9 @@ Common pool лучше т.к. сигналы редко пересекаются
 ### ⏸ Отключено
 - CVD, Churn, Lunch Reversal — нет edge
 - CR — убыточен для SH
+
+### 🤖 Paper Trader
+- **Cron:** `moex-futures-paper-v5` — `*/5 15-23,0-4 * * 1-5`, no_agent
+- **Скрипт:** `~/.hermes/scripts/run_moex_futures_paper.sh` → `run_paper_trader.py --state-key portfolio_v5`
+- **State:** `futures.paper_state_portfolio_v5`, `futures.paper_trades_portfolio_v5`
+- Все 5 стратегий из `futures.portfolio` (enabled=true)
