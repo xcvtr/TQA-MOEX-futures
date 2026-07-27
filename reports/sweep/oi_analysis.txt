@@ -1,0 +1,79 @@
+Si: 3515 OI bars
+GD: 38624 OI bars
+MM: 38515 OI bars
+RN: 38515 OI bars
+NG: 38624 OI bars
+Si: 98734 M1 bars
+GD: 99669 M1 bars
+MM: 86446 M1 bars
+RN: 64490 M1 bars
+NG: 99754 M1 bars
+
+=== IR Si ===
+ALL: n= 595 W= 311 L= 284 WR=52.3% PnL=+10,235,817 PF=2.97
+  dfb<0          : n=  64 PF=  0.93 PnL=   -55,721
+  dfb>0          : n= 204 PF=  3.05 PnL=+6,471,775
+  dyb>0          : n= 190 PF=  2.89 PnL=+6,276,904
+  dyb<0          : n=  77 PF=  1.32 PnL=  +179,684
+  dys>0          : n= 177 PF=  2.93 PnL=+6,195,154
+  dfs>0          : n=  92 PF=  1.63 PnL=  +467,644
+  dyur>0         : n=  72 PF=  2.06 PnL=  +437,686
+  dyur<0         : n= 196 PF=  2.70 PnL=+5,978,368
+  dfiz>0         : n= 196 PF=  2.70 PnL=+5,978,368
+  dfiz<0         : n=  72 PF=  2.06 PnL=  +437,686
+  dfb>0+LONG     : n= 115 PF=  0.54 PnL=-1,161,013
+  dyb<0+SHORT    : n=  27 PF=  3.34 PnL=  +322,529
+  dfb>0+dfiz<0   : n=  36 PF=  5.12 PnL=  +375,178 ✅
+  dyb<0+dfs>0    : n=  39 PF=  1.65 PnL=  +207,024
+
+=== DRAGON GD ===
+ALL: n= 144 W=  82 L=  62 WR=56.9% PnL=  +194,960 PF=3.42
+  dfb<0          : n=  65 PF=  2.77 PnL=   +57,759
+  dfb>0          : n=  46 PF=  4.45 PnL=   +80,839
+  dyb>0          : n=  49 PF=  2.81 PnL=   +55,777
+  dyb<0          : n=  60 PF=  4.41 PnL=   +83,363
+  dys>0          : n=  51 PF=  2.95 PnL=   +57,467
+  dfs>0          : n=  48 PF=  4.02 PnL=   +60,137
+  dyur>0         : n=  52 PF=  3.27 PnL=   +60,463
+  dyur<0         : n=  59 PF=  3.66 PnL=   +78,135
+  dfiz>0         : n=  58 PF=  3.66 PnL=   +78,013
+  dfiz<0         : n=  53 PF=  3.27 PnL=   +60,585
+  dfb>0+LONG     : n=  17 PF=  3.82 PnL=   +30,494
+  dyb<0+SHORT    : n=  36 PF=  5.36 PnL=   +47,443 ✅
+  dyb<0+dfs>0    : n=  27 PF=  5.60 PnL=   +38,753 ✅
+
+=== DRAGON MM ===
+ALL: n= 203 W= 106 L=  97 WR=52.2% PnL=  +162,524 PF=1.96
+  dfb<0          : n=  73 PF=  2.78 PnL=  +120,282 ✅
+  dfb>0          : n=  87 PF=  1.31 PnL=   +23,586
+  dyb>0          : n=  48 PF=  1.60 PnL=   +22,073
+  dyb<0          : n= 107 PF=  2.08 PnL=  +110,413
+  dys>0          : n=  88 PF=  1.15 PnL=   +12,540
+  dfs>0          : n=  52 PF=  1.82 PnL=   +28,213
+  dyur>0         : n=  74 PF=  3.33 PnL=  +137,223 ✅
+  dyur<0         : n=  85 PF=  1.08 PnL=    +6,324
+  dfiz>0         : n=  85 PF=  1.08 PnL=    +6,324
+  dfiz<0         : n=  74 PF=  3.33 PnL=  +137,223 ✅
+  dfb>0+LONG     : n=  43 PF=  1.07 PnL=    +2,754
+  dyb<0+SHORT    : n=  59 PF=  3.45 PnL=  +113,414 ✅
+  dyb<0+dfs>0    : n=  21 PF=  1.63 PnL=    +9,399
+
+=== SH RN ===
+ALL: n=   2 W=   0 L=   2 WR=0.0% PnL=      -908 PF=0.00
+
+=== DRAGON NG ===
+ALL: n= 843 W= 419 L= 424 WR=49.7% PnL=+2,349,095 PF=2.86
+  dfb<0          : n= 284 PF=  3.64 PnL=+1,051,972
+  dfb>0          : n= 284 PF=  2.55 PnL=  +708,037
+  dyb>0          : n= 280 PF=  2.69 PnL=  +731,070
+  dyb<0          : n= 288 PF=  3.44 PnL=+1,028,940
+  dys>0          : n= 328 PF=  2.56 PnL=  +874,107
+  dfs>0          : n= 219 PF=  3.76 PnL=  +701,471 ✅
+  dyur>0         : n= 239 PF=  3.14 PnL=  +659,173
+  dyur<0         : n= 329 PF=  3.01 PnL=+1,100,837
+  dfiz>0         : n= 329 PF=  3.03 PnL=+1,105,103
+  dfiz<0         : n= 239 PF=  3.10 PnL=  +654,906
+  dfb>0+LONG     : n= 157 PF=  2.08 PnL=  +291,577
+  dyb<0+SHORT    : n= 113 PF=  1.68 PnL=  +136,577
+  dfb>0+dfiz<0   : n=  53 PF=  4.28 PnL=  +207,942 ✅
+  dyb<0+dfs>0    : n=  84 PF=  3.32 PnL=  +255,483
