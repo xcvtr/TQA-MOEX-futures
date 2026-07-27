@@ -124,16 +124,49 @@ Common pool лучше т.к. сигналы редко пересекаются
 
 ---
 
-## 📁 Данные
+## 📁 Данные и артефакты
 
 ### ClickHouse (10.0.0.60:8123, db=moex)
-- `moex.mt5_bars` — M1 бары (основной источник)
-- `moex.tradestats_fo` — 5-min AlgoPack (не все тикеры)
+- `moex.mt5_continuous` — M1 continuous (основной источник)
+- `moex.mt5_bars` — M1 бары (запасной)
+- `moex.futoi_iss` — OI fiz/yur (5min, до июля 2026)
+- `moex.prices_5m_oi` — OI fiz/yur (M5, до мая 2026)
+- `moex.openinterest` — OI + accounts (до июня 2026)
+- `moex.tradestats_fo` — AlgoPack trade stats
 
 ### PostgreSQL (10.0.0.60:5432, db=moex, schema futures)
-- `futures.bars_1m` — M1 бары
+- `futures.ticker_specs` — GO, ms, sp, fee_entry (обновляемы через update_go_ksur_pgo.py)
 - `futures.portfolio` — конфиг портфеля
 - `futures.paper_state*` — состояние paper trader
+
+### Этапы отбора портфеля (checkpoint 190)
+
+**1. Dragon sweep:** `strategies/dragon/scripts/dragon_full_sweep.py`
+   → `reports/sweep/dragon_full_sweep_results.json` + `reports/sweep/dragon_full_sweep_output.txt`
+
+**2. TRIZ фильтры:** `strategies/dragon/scripts/dragon_triz_test.py`
+   → вывод в stdout (перезапустить при необходимости)
+
+**3. SH RN:** `strategies/dragon/scripts/sh_rn_sweep.py`
+   → вывод в stdout
+
+**4. Портфель:** `strategies/dragon/scripts/portfolio_run.py`
+   → `reports/sweep/equity_curve.json` + `reports/sweep/equity_curve.html`
+
+**5. OI анализ:** `strategies/dragon/scripts/oi_analysis.py`
+   → `reports/sweep/oi_analysis.txt`
+
+**6. GO update:** `scripts/update_go_ksur_pgo.py`
+   → PG `futures.ticker_specs.go`
+
+**7. Аудит:** `strategies/dragon/scripts/portfolio_audit.py`
+   → вывод в stdout
+
+### Чекпойнты
+- `checkpoint/chkpt-190-realistic-slippage.md` — финальный
+- `checkpoint/chkpt-189-final-v4.md` — per-ticker fees
+- `checkpoint/chkpt-188-final-portfolio.md` — первый финальный
+- Все чекпойнты: `checkpoint/` + Obsidian `~/obsidian/Projects/TQA-MOEX-futures/`
 
 ### 🔧 Принципы
 1. **Detect ≠ Tick** — detect на resample, tick на M1
