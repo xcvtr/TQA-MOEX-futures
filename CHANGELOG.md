@@ -1,3 +1,13 @@
+## [190] 2026-07-26
+### Added
+- **Реалистичный slippage:** 2-5 tick в зависимости от shares (2 + shares//3)
+- **Финальный портфель v5:** +7,721% ROI, Cash MDD 7.09%, MTM MDD 7.92%
+- Портфель устойчив — разница с v1 всего 1.1%
+### Changed
+- AGENTS.md: обновлён до чекпойнта 190
+### Checkpoint
+- checkpoint/chkpt-190-realistic-slippage.md
+
 ## [189] 2026-07-26
 ### Added
 - **Финальный портфель v4:** IR Si 10% + GD 20% + MM 15% + SH RN 20% + NG 20%
