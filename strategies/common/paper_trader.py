@@ -41,7 +41,9 @@ PG_DB = os.getenv('MOEX_PG_DB', 'moex')
 PG_USER = os.getenv('MOEX_PG_USER', 'postgres')
 PG_PASS = os.getenv('MOEX_PG_PASSWORD', '')
 
-TRADE_COST = 4  # руб за сделку
+TRADE_COST = 4  # fallback, per-ticker из PG
+MAX_CONTRACTS = 20
+VOLUME_CAP = 0.2  # 20% of M1 volume (0.5 for Si)
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
 STATE_KEY = ''  # модульный уровень — задаётся в __main__ или run_paper_trader.py
 
@@ -107,7 +109,8 @@ def load_specs(tickers):
     cur.execute(f"""
         SELECT ticker, go, step_price, min_step, lot_volume,
                COALESCE(pct, 1.0),
-               COALESCE(asset_code, ticker)
+               COALESCE(asset_code, ticker),
+               COALESCE(fee_entry, 4.0)
         FROM futures.ticker_specs
         WHERE ticker IN ({placeholders})
     """, list(tickers))
@@ -121,6 +124,7 @@ def load_specs(tickers):
             'lot': int(r[4]) if r[4] else 1,
             'pct': float(r[5]) if r[5] else 1.0,
             'asset': str(r[6]),
+            'fee': float(r[7]) if r[7] else 4.0,
         }
         for r in rows
     }
@@ -210,7 +214,7 @@ def calc_mtm_equity(capital, positions, bar_data, specs):
         contracts = p.get('contracts', 1)
         pct = p.get('pct', 1.0)
         rem = max(0.001, p.get('rem', 1))
-        trade_cost = TRADE_COST * contracts
+        trade_cost = specs.get(ticker, {}).get("fee", TRADE_COST) * 2 * contracts
         
         if p['direction'] == 'long':
             pnl = (prc - entry) / ms * sp * pct * rem - trade_cost
@@ -423,7 +427,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
         # Timeout
         if bar_idx - p['entry_bar'] >= p.get('timeout_bars', 12):
-            pnl = (close - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - TRADE_COST * p.get('contracts', 1)
+            pnl = (close - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
             pnl += p.get('part_pnl', 0)
             p['pnl'] = pnl
             p['exit_price'] = close
@@ -452,7 +456,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
             if exit_price:
                 rem = max(0.001, p.get('rem', 1))
-                pnl = (exit_price - p['entry_price']) / ms * sp * p.get('pct', 1.0) * rem - TRADE_COST * p.get('contracts', 1)
+                pnl = (exit_price - p['entry_price']) / ms * sp * p.get('pct', 1.0) * rem - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
                 pnl += p.get('part_pnl', 0)
                 p['pnl'] = pnl
                 p['exit_price'] = exit_price
@@ -478,7 +482,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
             if exit_price:
                 rem = max(0.001, p.get('rem', 1))
-                pnl = (p['entry_price'] - exit_price) / ms * sp * p.get('pct', 1.0) * rem - TRADE_COST * p.get('contracts', 1)
+                pnl = (p['entry_price'] - exit_price) / ms * sp * p.get('pct', 1.0) * rem - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
                 pnl += p.get('part_pnl', 0)
                 p['pnl'] = pnl
                 p['exit_price'] = exit_price
@@ -651,13 +655,36 @@ def run_tick(strategy_filter=None, mode=None):
                 if not signal:
                     continue
 
-                # Entry on next bar's open + 1 tick
-                ms_val = ms
-                entry_price = float(bd['prc']) + ms_val  # latest close + 1 tick slippage
-                entry_price = round(entry_price / ms_val) * ms_val
+                # Trend filter (SMA50) from params
+                params = entry.get('params', {})
+                if params.get('trend') and 'close_hist' in bd and len(bd.get('close_hist', [])) >= 50:
+                    closes = bd['close_hist'][-50:]
+                    sma50 = sum(closes) / 50
+                    if signal['direction'] == 'long' and float(bd['prc']) < sma50:
+                        continue
+                    if signal['direction'] == 'short' and float(bd['prc']) > sma50:
+                        continue
 
+                # Realistic slippage: 2-5 tick based on position size — moved after contracts
+                
                 # Contract sizing
                 contracts = entry.get('contracts') or 1
+
+                # Volume cap
+                b_vol = bd.get('vol', 0)
+                if b_vol and b_vol > 0:
+                    vc = 0.5 if strategy_name == 'impulse_return' else 0.2
+                    contracts = min(contracts, max(1, int(b_vol * vc)))
+                contracts = min(contracts, MAX_CONTRACTS)
+                if s.get('go', 0) * contracts > equity:
+                    contracts = max(1, int(equity * 0.1 / s.get('go', 1)))
+
+                # Realistic slippage: 2-5 tick based on position size
+                ms_val = ms
+                base_slip = 2 + min(contracts // 3, 3)
+                slip_total = ms_val * base_slip
+                entry_price = float(bd['prc']) + (slip_total if signal['direction'] == 'long' else -slip_total)
+                entry_price = round(entry_price / ms_val) * ms_val
 
                 pos = {
                     'id': next_id,
