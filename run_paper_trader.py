@@ -134,7 +134,7 @@ def main():
     # ── Run tick ────────────────────────────────────────────────────────
     import subprocess
     cmd = [sys.executable, 'strategies/common/paper_trader.py'] + pt_args
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
         print(f"❌ PaperTrader ошибка (exit={result.returncode}): {result.stderr.strip() or result.stdout.strip()}")
         sys.exit(1)
