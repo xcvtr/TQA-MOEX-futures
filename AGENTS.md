@@ -1,6 +1,6 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 190 (2026-07-26)** — Реалистичный портфель (slippage 2-5 tick, per-ticker fees): **+7,721% ROI, Cash MDD 7.09%, MTM MDD 7.92%**
+**Последний чекпойнт: 191 (2026-07-26)** — Paper Trader (system cron, per-ticker fees, slippage, vol cap) + Dashboard v5 http://localhost:8085
 
 ## 🚨 Правила работы
 

@@ -1,3 +1,18 @@
+## [191] 2026-07-26
+### Added
+- **Dashboard v5:** `dashboard_v5.py` — порт 8085, общий портфель + по стратегиям + floating PnL
+- **System cron:** `scripts/cron_paper_v5.sh` → crontab `*/5 15-23,0-4 * * 1-5`
+### Changed
+- **Paper Trader logic:** per-ticker fees (из PG fee_entry), slippage 2-5 tick, volume cap 20%, max 20 ct, trend filter SMA50
+- **Paper Trader:** вынесен из Hermes cron в system crontab
+- **Timeout:** 60→120с в run_paper_trader.py
+- AGENTS.md: обновлён до чекпойнта 191
+### Fixed
+- NaN в PnL% дашборда (shares vs contracts)
+- Port conflict: dashboard переехал на 8085
+### Checkpoint
+- checkpoint/chkpt-191-paper-dashboard.md
+
 ## [190] 2026-07-26
 ### Added
 - **Реалистичный slippage:** 2-5 tick в зависимости от shares (2 + shares//3)
