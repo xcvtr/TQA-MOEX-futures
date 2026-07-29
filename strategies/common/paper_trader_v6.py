@@ -356,5 +356,8 @@ if __name__ == '__main__':
                         choices=[None, 'tick', 'detect'])
     args = parser.parse_args()
 
-    STATE_KEY = args.state_key
+    # Assign state key
+    import strategies.common.paper_trader as _pt
+    _pt.STATE_KEY = args.state_key or 'portfolio_v6'
+    STATE_KEY = args.state_key or 'portfolio_v6'
     run_tick_v6(args.strategy, args.mode)

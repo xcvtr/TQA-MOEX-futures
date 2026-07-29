@@ -740,6 +740,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
     
     if args.state_key:
+        import __main__
+        __main__.STATE_KEY = args.state_key
         STATE_KEY = args.state_key
     
     run_tick(strategy_filter=args.strategy, mode=args.mode)

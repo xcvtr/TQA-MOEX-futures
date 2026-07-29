@@ -113,3 +113,39 @@ public.mt5_deals            -- history deals (deal_id, ticker, profit, commissio
 - Snapshot: account_info раз в минуту
 - terminal64: 2 (AlfaForex + FINAM)
 - MT5 в VNC: 5901 (пароль finam)
+
+## Update 2: bugfixes
+
+### Fixed: STATE_KEY не работал
+- `global STATE_KEY` отсутствовал в `main()` paper_trader.py и paper_trader_v6.py
+- Все state-key игнорировались — v5 и v6 писали в общую таблицу `futures.paper_state`
+- Исправлено: `set STATE_KEY` через `__main__.STATE_KEY` / `pt.STATE_KEY`
+- Удалён старый state из `futures.paper_state`
+- Оба трейдера теперь пишут в свои таблицы (`portfolio_v5`, `portfolio_v6`)
+
+### Fixed: хостовые terminal64 плодились systemd сервисами
+- `mt5-terminal.service` — хостовой MT5 терминал (Wine + Xvfb)
+- `tqa-moex-mt5-bridge.service` — хостовой FINAM bridge (auto-restart плодил процессы)
+- `tqa-fx-terminal.service` — хостовой FX терминал
+- `~/.config/autostart/mt5.desktop` — автозапуск при старте XFCE
+- Все отключены: `systemctl --user disable`, autostart удалён
+
+### Fixed: cron v6 не запускался
+- `set -euo pipefail` в cron_wrapper v6 убивал скрипт при первой ошибке
+- `python3` без полного пути в cron (PATH не включал venv)
+- Исправлено: убран `set -e`, добавлен PATH с Hermes venv
+
+### Fixed: стакан (DOM) не собирался
+- `market_book_get()` возвращал None после `copy_rates_from_pos()` из-за занятого соединения
+- Исправлено: новый `mt5.initialize()` + 2s sleep + `market_book_add()` для каждого символа
+- Стакан: 64 строки × 11 тикеров, раз в ~85 секунд
+
+### Состояние на 29 июля 17:30 IRKT
+- terminal64: 2 (AlfaForex + FINAM) — только Docker
+- Хостовые user terminal64: 0
+- v5: 1 позиция (Si SHORT impulse_return, entry 88404)
+- v6: 1 позиция (Si SHORT impulse_return, entry 88404, slippage 2 tick)
+- Оба на cron `*/5 15-23,0-4 * * 1-5`
+- Бары: 11/11, свежие (18:19+ MSK)
+- Стакан: 11 тикеров, 64 rows, раз в минуту
+- Snapshot: account_info каждую минуту
