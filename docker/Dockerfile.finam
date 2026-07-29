@@ -1,0 +1,20 @@
+FROM mt5:latest
+
+LABEL version="1.0.0"
+LABEL description="FINAM MT5 + DOM bridge + MT5 snapshot"
+LABEL maintainer="Hermes Agent"
+
+# Copy bridge scripts and entrypoint
+COPY engine/ /app/engine/
+COPY entrypoint.sh /app/entrypoint.sh
+COPY starter.sh /app/starter.sh
+RUN chmod +x /app/entrypoint.sh /app/starter.sh
+
+# Default env
+ENV VNC_DISPLAY=5
+ENV VNC_PORT=5901
+ENV VNC_PASS=finam
+ENV WINEPREFIX=/root/.mt5
+ENV DISPLAY=:5
+
+CMD ["bash", "/app/entrypoint.sh"]
