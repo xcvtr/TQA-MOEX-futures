@@ -115,9 +115,13 @@ def main():
                         help='State key suffix for separate instance (e.g. stop_hunt)')
     parser.add_argument('--stdout', action='store_true',
                         help='Принудительный вывод статуса')
+    parser.add_argument('--broker', type=str, default='sim',
+                        choices=['sim', 'dom'],
+                        help='Брокер: sim (BrokerSim, default) или dom (OrderBook)')
     args = parser.parse_args()
 
     state_key = args.state_key
+    broker = args.broker
 
     # Build CLI args for paper_trader.py
     pt_args = []
@@ -133,7 +137,8 @@ def main():
 
     # ── Run tick ────────────────────────────────────────────────────────
     import subprocess
-    cmd = [sys.executable, 'strategies/common/paper_trader.py'] + pt_args
+    script = 'strategies/common/paper_trader_v6.py' if broker == 'dom' else 'strategies/common/paper_trader.py'
+    cmd = [sys.executable, script] + pt_args
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
         print(f"❌ PaperTrader ошибка (exit={result.returncode}): {result.stderr.strip() or result.stdout.strip()}")

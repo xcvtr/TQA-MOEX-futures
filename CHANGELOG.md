@@ -255,3 +255,18 @@
 - Timeout calibration: TO=12 bars confirmed optimal (1.65 PF at 50.7% WR)
 ### Added
 - Checkpoint: checkpoint/136-ch-cluster-recovery-backtest.md
+
+## [192] 2026-07-29
+### Added
+- FINAM MT5 в Docker (контейнер mt5-finam, VNC 5901)
+- Сбор стакана (DOM) через Python API (market_book_add/get)
+- API сервер dom_api.py :8808 → PG
+- MT5 snapshot: account, positions, deals → TimescaleDB
+- Paper Trader v6 (--broker dom) с исполнением по стакану
+- BrokerDOM (strategies/common/broker_dom.py)
+- TimescaleDB для moex (hypertable + compression)
+
+### Fixed
+- Плодовитость terminal64 — удалён wine-runner.sh, всё через docker exec
+- Убран @reboot run_finam_terminal.sh
+- Checkpoint: checkpoint/192-finam-docker-dom-mt5-snapshot.md
