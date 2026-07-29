@@ -91,3 +91,25 @@ public.mt5_deals            -- history deals (deal_id, ticker, profit, commissio
 2. Запустить paper v6: `python3 run_paper_trader.py --state-key portfolio_v6 --broker dom`
 3. Дашборд: `dashboard_v5.py :8085` (не исправлен, висит на `portfolio_v5`)
 4. При пересоздании контейнера: `docker run -d --name mt5-finam --restart always --network host --shm-size=512m -e VNC_DISPLAY=5 -e VNC_PORT=5901 -e VNC_PASS=finam -e WINEPREFIX=/root/.mt5 -v /home/user/.wine-finam:/root/.mt5 -v /home/user/.hermes/finam-bridge:/app mt5:latest bash /app/entrypoint.sh`
+
+## Update: post-checkpoint fixes
+
+### Bug fixes
+- **Snapshot не писался** — удалён `__pycache__`, исправлена ошибка типа в except. Работает: `mt5_account` пишет balance/equity/margin каждую минуту.
+- **Плодовитость terminal64 в AlfaForex** — добавлен `&& wineserver -k` в cron для `docker exec mt5` (bars-updater и mt5-bridge). Каждый запуск теперь убивает wineserver после завершения.
+
+### Dockerfile
+- `docker/Dockerfile.finam` — версионированный образ `mt5-finam:1.0.0` (FROM mt5:latest + bridge скрипты)
+- Контейнер пересоздан из образа, mount только `/root/.mt5` (wine prefix)
+
+### Cron
+- v5: `*/5 15-23,0-4 * * 1-5 scripts/cron_paper_v5.sh`
+- v6: `*/5 15-23,0-4 * * 1-5 scripts/cron_paper_v6.sh`
+- Оба сброшены (clean state, 200K капитала, 0 позиций)
+
+### Состояние на 29 июля 12:00 IRKT
+- Бары: свежие (11/11, MSK)
+- Стакан: 11 тикеров, 40 уровней, раз в минуту
+- Snapshot: account_info раз в минуту
+- terminal64: 2 (AlfaForex + FINAM)
+- MT5 в VNC: 5901 (пароль finam)

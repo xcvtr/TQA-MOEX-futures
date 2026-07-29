@@ -270,3 +270,11 @@
 - Плодовитость terminal64 — удалён wine-runner.sh, всё через docker exec
 - Убран @reboot run_finam_terminal.sh
 - Checkpoint: checkpoint/192-finam-docker-dom-mt5-snapshot.md
+
+### Fixed
+- Snapshot not writing (debug print + pycache fix)
+- Terminal64 proliferation in AlfaForex (wineserver -k in cron)
+
+### Added
+- docker/Dockerfile.finam — версионированный образ mt5-finam:1.0.0
+- Cron для paper v6
