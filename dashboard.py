@@ -1,183 +1,256 @@
 #!/usr/bin/env python3
-"""Minimal dashboard for TQA-MOEX-futures PaperTrader.
-
-Serves HTTP on :8080, reads state from PG.
 """
-import os, json
+Dashboard for MOEX futures - v5 (sim) + v6 (dom) + DOM + MT5 snapshot.
+Usage: python3 dashboard.py [port]
+"""
+import os, json, html
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import psycopg2
+from datetime import datetime, timezone
 
-PG = dict(host='10.0.0.60', port=5432, dbname='moex', user='user')
+PG = dict(host='10.0.0.60', port=5432, dbname='moex', user='postgres', connect_timeout=3)
+CH_URL = "http://10.0.0.60:8123"
 
-def get_state():
-    conn = psycopg2.connect(**PG, connect_timeout=3)
+def q(query, params=None):
+    import psycopg2
+    conn = psycopg2.connect(**PG)
     cur = conn.cursor()
-    cur.execute("SELECT key, value FROM futures.paper_state")
-    state = {r[0]: r[1] for r in cur.fetchall()}
-    cur.close()
-    conn.close()
-    return state
-
-def get_portfolio():
-    conn = psycopg2.connect(**PG, connect_timeout=3)
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT p.ticker, p.strategy, p.enabled, p.weight
-        FROM futures.portfolio p
-        WHERE p.enabled = true
-        ORDER BY p.ticker, p.strategy
-    """)
+    cur.execute(query, params or ())
     rows = cur.fetchall()
-    result = []
-    for r in rows:
-        cur.execute("SELECT prc, bt FROM futures.prices WHERE ticker=%s ORDER BY bt DESC LIMIT 1", (r[0],))
-        pr = cur.fetchone()
-        result.append([r[0], r[1], r[2], float(r[3]) if r[3] else 1.0,
-                       float(pr[0]) if pr else 0, str(pr[1])[:19] if pr and pr[1] else '-'])
-    cur.close()
-    conn.close()
-    return result
+    cur.close(); conn.close()
+    return rows
 
-HTML = """<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TQA-MOEX-futures Dashboard</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;padding:20px;max-width:900px;margin:auto}
-h1{color:#58a6ff;margin-bottom:20px}
-.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin-bottom:16px}
-.card h2{color:#8b949e;font-size:14px;text-transform:uppercase;margin-bottom:8px}
-.metric{display:inline-block;margin-right:32px;margin-bottom:8px}
-.metric .val{font-size:24px;font-weight:600;color:#58a6ff}
-.metric .label{font-size:12px;color:#8b949e}
-.metric.pos .val{color:#3fb950}
-.metric.neg .val{color:#f85149}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:#8b949e;border-bottom:1px solid #30363d;padding:6px 4px}
-td{padding:4px;border-bottom:1px solid #21262d}
-.enabled{color:#3fb950}.disabled{color:#8b949e}
-.status-ok{color:#3fb950}.status-paused,.status-error{color:#f85149}
-</style>
-</head><body>
-<h1>📊 TQA-MOEX-futures</h1>
-<div class=card>
-<h2>PaperTrader</h2>
-<div class="metric"><div class="val" id=equity>--</div><div class=label>Equity (RUB)</div></div>
-<div class="metric"><div class="val" id=return>--</div><div class=label>Return %</div></div>
-<div class="metric"><div class="val" id=trades>--</div><div class=label>Trades</div></div>
-<div class="metric"><div class="val" id=open_pos>--</div><div class=label>Open</div></div>
-<div class="metric" id=mdd_c><div class="val" id=mdd>--</div><div class=label>Max DD %</div></div>
-<div class="metric"><div class="val" id=dd>--</div><div class=label>Current DD %</div></div>
-<div class="metric"><div class="val" id=rm_status>--</div><div class=label>RiskManager</div></div>
-</div>
+def ch(query):
+    import urllib.request, urllib.parse
+    try:
+        req = urllib.request.Request(f"{CH_URL}/?query={urllib.parse.quote(query)}&format=JSON", method='GET')
+        resp = urllib.request.urlopen(req, timeout=3)
+        data = json.loads(resp.read())
+        return data.get('data', [])
+    except: return []
 
-<div class=card>
-<h2>Позиции</h2>
-<table><thead><tr><th>Тикер</th><th>Направление</th><th>Стратегия</th><th>Вход</th><th>Контр</th><th>PnL</th></tr></thead>
-<tbody id=positions></tbody></table>
-</div>
+def get_state(sk):
+    rows = q(f"SELECT capital, equity, peak, mtm_equity, mtm_peak, positions_json, updated_at FROM futures.paper_state_{sk} ORDER BY updated_at DESC LIMIT 1")
+    if not rows: return None
+    r = rows[0]
+    pos = json.loads(r[5]) if r[5] else []
+    return {'capital': float(r[0]), 'equity': float(r[1]), 'peak': float(r[2]),
+            'mtm_eq': float(r[3] or r[1]), 'mtm_pk': float(r[4] or r[2]),
+            'positions': pos, 'pos_count': len(pos), 'ts': str(r[6])[:19]}
 
-<div class=card>
-<h2>Портфель</h2>
-<table><thead><tr><th>Тикер</th><th>Стратегия</th><th>Статус</th><th>Вес</th><th>Цена</th><th>Обновлено</th></tr></thead>
-<tbody id=portfolio></tbody></table>
-</div>
+def get_trades(sk, limit=10):
+    rows = q(f"SELECT ticker, strategy, direction, pnl_rub, exit_reason, exit_time FROM futures.paper_trades_{sk} ORDER BY exit_time DESC NULLS LAST LIMIT {limit}")
+    return rows
 
-<script>
-async function load(){
- try{
-  let r=await fetch('/api/state'); let d=await r.json()
-  document.getElementById('equity').textContent=d.equity.toLocaleString()
-  document.getElementById('return').textContent=(d.return_pct||0).toFixed(1)+'%'
-  document.getElementById('return').parentElement.className=d.return_pct>=0?'metric pos':'metric neg'
-  document.getElementById('trades').textContent=d.n_trades||0
-  document.getElementById('open_pos').textContent=(d.positions||[]).length
-  document.getElementById('mdd').textContent=(d.mdd_pct||0).toFixed(1)+'%'
-  document.getElementById('mdd_c').className=(d.mdd_pct||0)>20?'metric neg':'metric'
-  document.getElementById('dd').textContent=(d.dd_pct||0).toFixed(1)+'%'
-  let rm=document.getElementById('rm_status')
-  if(d.rm_active){rm.textContent='Active';rm.style.color='#3fb950'}
-  else{rm.textContent='STOP: '+d.rm_reason;rm.style.color='#f85149'}
+def get_latest_bars():
+    rows = q("SELECT ticker, max(bt) as bt, count(*) as bars FROM futures.bars_1m GROUP BY ticker ORDER BY bt DESC")
+    return [(r[0], str(r[1])[:19] if r[1] else '-', r[2]) for r in rows]
 
-  let tbody=document.getElementById('positions'); tbody.innerHTML=''
-  for(let p of d.positions||[]){
-   let row=tbody.insertRow()
-   row.insertCell().textContent=p.ticker
-   row.insertCell().textContent=p.direction
-   let pnlCell=row.insertCell(); pnlCell.textContent=p.strategy
-   row.insertCell().textContent=p.entry.toFixed?p.entry.toFixed(2):p.entry
-   row.insertCell().textContent=p.shares
-   let pnl=row.insertCell(); pnl.textContent=(p.pnl||0).toFixed(0)
-   pnl.style.color=(p.pnl||0)>=0?'#3fb950':'#f85149'
-  }
- }catch(e){}
-}
+def get_dom_stats():
+    rows = q("SELECT ticker, max(ts) as ts, count(*) as rows FROM futures.dom WHERE ts > now() - interval '5 minute' GROUP BY ticker ORDER BY ts DESC")
+    return [(r[0], str(r[1])[:19] if r[1] else '-', r[2]) for r in rows]
 
-async function loadPortfolio(){
- try{
-  let r=await fetch('/api/portfolio'); let rows=await r.json()
-  let tbody=document.getElementById('portfolio'); tbody.innerHTML=''
-  for(let r of rows){
-   let tr=tbody.insertRow()
-   tr.insertCell().textContent=r[0]
-   tr.insertCell().textContent=r[1]
-   let s=tr.insertCell(); s.textContent=r[2]?'active':'off'; s.className=r[2]?'enabled':'disabled'
-   tr.insertCell().textContent=r[3]
-   tr.insertCell().textContent=r[4]
-   tr.insertCell().textContent=r[5]
-  }
- }catch(e){}
-}
+def get_specs():
+    """Get ticker specs from PG."""
+    rows = q("SELECT ticker, min_step, step_price FROM futures.ticker_specs")
+    return {r[0]: {'ms': float(r[1] or 0.01), 'sp': float(r[2] or 1.0)} for r in rows}
 
-load();loadPortfolio();setInterval(load,5000);setInterval(loadPortfolio,15000)
-</script>
-</body></html>"""
+def get_current_prices():
+    """Get latest close prices from PG bars_1m."""
+    rows = q("""
+        SELECT DISTINCT ON (ticker) ticker, prc
+        FROM futures.bars_1m
+        ORDER BY ticker, bt DESC
+    """)
+    return {r[0]: float(r[1]) for r in rows if r[1]}
+
+def calc_upnl(pos, prices, specs):
+    """Calculate unrealized PnL for a position."""
+    ticker = pos['ticker']
+    price = prices.get(ticker)
+    if not price:
+        return 0, 0
+    entry = pos['entry_price']
+    contracts = pos.get('contracts', 1)
+    s = specs.get(ticker, {'ms': 0.01, 'sp': 1.0})
+    ms = s['ms']
+    sp = s['sp']
+    if ms <= 0:
+        return 0, 0
+    if pos['direction'] == 'short':
+        ticks = (entry - price) / ms
+        pnl_per_ct = ticks * sp
+    else:
+        ticks = (price - entry) / ms
+        pnl_per_ct = ticks * sp
+    total = pnl_per_ct * contracts
+    # subtract commission
+    total -= pos.get('commission', 0)
+    return round(total, 0), round(pnl_per_ct, 0)
+
+def get_mt5_account():
+    rows = q("SELECT ts, balance, equity, margin, margin_free, margin_level FROM mt5_account ORDER BY ts DESC LIMIT 1")
+    if not rows: return None
+    r = rows[0]
+    return {'ts': str(r[0])[:19], 'balance': float(r[1] or 0), 'equity': float(r[2] or 0),
+            'margin': float(r[3] or 0), 'margin_free': float(r[4] or 0), 'margin_level': float(r[5] or 0)}
+
+def calc_dd(pk, eq):
+    return (pk - eq) / pk * 100 if pk > 0 else 0
+
+def state_card(name, sk, state, trades, prices, specs):
+    if not state:
+        return f'<div class="card"><h2>{name}</h2><div class="empty">Нет данных</div></div>'
+    dd = calc_dd(state['peak'], state['equity'])
+    mtm_dd = calc_dd(state['mtm_pk'], state['mtm_eq'])
+    total_pnl = state['equity'] - state['capital']
+    ret = total_pnl / state['capital'] * 100
+    colors = {'v5': '#4a9eff', 'v6': '#ff6b6b'}
+    color = colors.get(sk, '#888')
+    pos_html = ''
+    total_upnl = 0
+    for p in state['positions']:
+        upnl, per_ct = calc_upnl(p, prices, specs)
+        total_upnl += upnl
+        upnl_str = f'{upnl:+.0f}' if upnl != 0 else '0'
+        cls = 'positive' if upnl > 0 else ('negative' if upnl < 0 else '')
+        pos_html += f'<div class="pos">{p["direction"].upper()} {p["ticker"]} {p["strategy"]} entry={p["entry_price"]} <span class="{cls}">UPnL={upnl_str}₽</span></div>'
+    
+    trades_html = ''
+    for t in trades[:5]:
+        tkr, strat, direc, pnl, reason, ts = t
+        sign = '🟢' if pnl and pnl > 0 else ('🔴' if pnl and pnl < 0 else '⚪')
+        pnl_str = f'{pnl:+.0f}' if pnl else '0'
+        trades_html += f'<div class="trade">{sign} {tkr} {direc} {strat} PnL={pnl_str} ({reason})</div>'
+    
+    return f'''
+    <div class="card" style="border-left: 4px solid {color}">
+        <h2>{name}</h2>
+        <div class="state-row">
+            <span class="label">Капитал</span><span class="value">{state["capital"]:>.0f}₽</span>
+        </div>
+        <div class="state-row">
+            <span class="label">Equity (Cash)</span><span class="value">{state["equity"]:>.0f}₽</span>
+        </div>
+        <div class="state-row">
+            <span class="label">Peak</span><span class="value">{state["peak"]:>.0f}₽</span>
+        </div>
+        <div class="state-row">
+            <span class="label">Cash DD</span><span class="value {'negative' if dd > 5 else ''}">{dd:.1f}%</span>
+        </div>
+        <div class="state-row">
+            <span class="label">MTM DD</span><span class="value {'negative' if mtm_dd > 5 else ''}">{mtm_dd:.1f}%</span>
+        </div>
+        <div class="state-row">
+            <span class="label">PnL</span><span class="value {'positive' if total_pnl > 0 else 'negative'}">{total_pnl:+.0f}₽ ({ret:+.1f}%)</span>
+        </div>
+        <div class="state-row">
+            <span class="label">Позиции</span><span class="value">{state["pos_count"]}</span>
+        </div>
+        <div class="state-row">
+            <span class="label">Обновлено</span><span class="value">{state["ts"]}</span>
+        </div>
+        <h3>Открытые позиции</h3>
+        {pos_html if state["positions"] else '<div class="empty">Нет открытых позиций</div>'}
+        <div class="state-row">
+            <span class="label">Unrealized PnL</span><span class="value {'positive' if total_upnl > 0 else 'negative'}">{total_upnl:+.0f}₽</span>
+        </div>
+        <h3>Последние сделки</h3>
+        {trades_html if trades else '<div class="empty">Нет сделок</div>'}
+    </div>'''
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            if self.path == '/':
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/html; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(HTML.encode())
-            elif self.path == '/api/state':
-                state = get_state()
-                data = {'equity': 100000, 'return_pct': 0, 'n_trades': 0, 'mdd_pct': 0, 'positions': [],
-                        'dd_pct': 0, 'rm_active': True, 'rm_reason': 'ok'}
-                if 'capital' in state:
-                    data['equity'] = float(state['capital'])
-                if 'peak' in state:
-                    peak = float(state['peak'])
-                    data['dd_pct'] = round((peak - data['equity']) / peak * 100, 1)
-                if 'positions' in state:
-                    data['positions'] = json.loads(state['positions'])
-                if data['dd_pct'] >= 20:
-                    data['rm_active'] = False
-                    data['rm_reason'] = f'dd_stop ({data["dd_pct"]}%)'
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps(data).encode())
-            elif self.path == '/api/portfolio':
-                rows = get_portfolio()
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps(rows).encode())
-            else:
-                self.send_response(404)
-                self.end_headers()
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.end_headers()
+            page = self._build_page()
+            self.wfile.write(page.encode('utf-8'))
         except Exception as e:
             self.send_response(500)
             self.send_header('Content-Type', 'text/plain')
             self.end_headers()
-            self.wfile.write(str(e).encode())
-            self.end_headers()
+            self.wfile.write(f'Error: {e}'.encode('utf-8'))
+    
+    def _build_page(self):
+        state_v5 = get_state('portfolio_v5')
+        state_v6 = get_state('portfolio_v6')
+        trades_v5 = get_trades('portfolio_v5') if state_v5 else []
+        trades_v6 = get_trades('portfolio_v6') if state_v6 else []
+        prices = get_current_prices()
+        specs = get_specs()
+        bars = get_latest_bars()
+        dom = get_dom_stats()
+        acc = get_mt5_account()
+
+        bars_html = ''
+        for tkr, bt, cnt in bars[:11]:
+            bars_html += f'<div class="bar-row"><span class="label">{tkr}</span><span class="value">{bt}</span><span class="value-small">{cnt} bars</span></div>'
+        
+        dom_html = ''
+        for tkr, ts, cnt in dom[:11]:
+            dom_html += f'<div class="bar-row"><span class="label">{tkr}</span><span class="value">{ts}</span><span class="value-small">{cnt} rows</span></div>'
+        
+        acc_html = ''
+        if acc:
+            acc_html = f'''
+            <div class="card">
+                <h2>MT5 Account (FINAM)</h2>
+                <div class="state-row"><span class="label">Баланс</span><span class="value">{acc["balance"]:>.0f}₽</span></div>
+                <div class="state-row"><span class="label">Equity</span><span class="value">{acc["equity"]:>.0f}₽</span></div>
+                <div class="state-row"><span class="label">Margin</span><span class="value">{acc["margin"]:>.0f}₽</span></div>
+                <div class="state-row"><span class="label">Free Margin</span><span class="value">{acc["margin_free"]:>.0f}₽</span></div>
+                <div class="state-row"><span class="label">Обновлено</span><span class="value">{acc["ts"]}</span></div>
+            </div>'''
+
+        html_page = f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="30">
+<title>MOEX Futures Dashboard</title>
+<style>
+* {{ margin:0; padding:0; box-sizing:border-box; }}
+body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#0d1117; color:#c9d1d9; padding:20px; }}
+h1 {{ color:#58a6ff; font-size:24px; margin-bottom:20px; }}
+h2 {{ color:#8b949e; font-size:16px; margin-bottom:12px; border-bottom:1px solid #21262d; padding-bottom:6px; }}
+h3 {{ color:#8b949e; font-size:13px; margin:12px 0 6px; }}
+.grid {{ display:flex; gap:16px; flex-wrap:wrap; }}
+.card {{ background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px; min-width:320px; flex:1; }}
+.state-row {{ display:flex; justify-content:space-between; padding:4px 0; font-size:13px; border-bottom:1px solid #21262d; }}
+.label {{ color:#8b949e; }}
+.value {{ color:#c9d1d9; font-weight:600; }}
+.value-small {{ color:#8b949e; font-size:11px; }}
+.positive {{ color:#3fb950; }}
+.negative {{ color:#f85149; }}
+.pos {{ padding:3px 8px; margin:3px 0; background:#1c2128; border-radius:4px; font-size:12px; }}
+.trade {{ padding:2px 0; font-size:12px; }}
+.bar-row {{ display:flex; justify-content:space-between; padding:2px 0; font-size:12px; border-bottom:1px solid #1c2128; }}
+.empty {{ color:#484f58; font-style:italic; font-size:12px; padding:8px 0; }}
+.footer {{ color:#484f58; font-size:11px; margin-top:20px; text-align:center; }}
+</style></head><body>
+<h1>📊 MOEX Futures — Paper Trader Dashboard</h1>
+<div class="grid">
+            {state_card('v5 (BrokerSim)', 'v5', state_v5, trades_v5, prices, specs)}
+            {state_card('v6 (BrokerDOM)', 'v6', state_v6, trades_v6, prices, specs)}
+    {acc_html}
+</div>
+<div class="grid" style="margin-top:16px">
+    <div class="card">
+        <h2>📈 M1 Бары (FINAM)</h2>
+        {bars_html if bars else '<div class="empty">Нет данных</div>'}
+    </div>
+    <div class="card">
+        <h2>📊 Стакан (DOM) — последние 5 мин</h2>
+        {dom_html if dom else '<div class="empty">Нет данных</div>'}
+    </div>
+</div>
+<div class="footer">
+    Обновление каждые 30 сек · {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} IRKT
+</div>
+</body></html>'''
+        return html_page
+    def log_message(self, *a): pass
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', '8080'))
+    port = int(os.sys.argv[1]) if len(os.sys.argv) > 1 else 8085
     server = HTTPServer(('0.0.0.0', port), Handler)
-    print(f'Dashboard on http://0.0.0.0:{port}')
+    print(f"Dashboard: http://10.0.0.60:{port}")
     server.serve_forever()

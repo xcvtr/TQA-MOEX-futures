@@ -149,3 +149,29 @@ public.mt5_deals            -- history deals (deal_id, ticker, profit, commissio
 - Бары: 11/11, свежие (18:19+ MSK)
 - Стакан: 11 тикеров, 64 rows, раз в минуту
 - Snapshot: account_info каждую минуту
+
+## Update 3: dashboard + bugfixes
+
+### Added: Dashboard
+- `dashboard.py` — переписан с нуля: v5 + v6 + DOM + MT5 account + бары
+- **Unrealized PnL** для каждой открытой позиции (через PG bars_1m + ticker_specs)
+- Автообновление каждые 30 сек
+- Порт 8085: http://10.0.0.60:8085
+- Старый `dashboard_v5.py` не используется
+
+### Fixed: CH запросы через GET
+- `urllib.parse.quote()` с `&format=JSON` давал 404
+- get_current_prices переведён на PG (`futures.bars_1m`)
+- get_latest_bars и get_dom_stats — тоже через PG
+
+### Fixed: systemd user сервисы (документация)
+- `mt5-terminal.service`, `tqa-moex-mt5-bridge.service`, `tqa-fx-terminal.service`
+- autostart `~/.config/autostart/mt5.desktop`
+- При переходе на Docker проверять `systemctl --user list-units`
+
+### Состояние на 29 июля 21:00 IRKT
+- v5: 1 позиция Si SHORT, equity 200K, UPnL -717₽
+- v6: 1 позиция Si SHORT, equity 200K, UPnL -717₽, slippage 2 tick
+- terminal64: 2 (AlfaForex + FINAM) — только Docker
+- Стакан: 11 тикеров, 64 rows
+- Дашборд: 8085 ✅
