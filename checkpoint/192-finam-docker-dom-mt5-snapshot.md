@@ -214,3 +214,26 @@ public.mt5_deals            -- history deals (deal_id, ticker, profit, commissio
 - v6: 0 позиций, Equity 200 000₽
 - Бары: 11/11, SiU6 свежие
 - Дашборд: http://10.0.0.60:8085
+
+## Update 6: фиксация контрактов + защита от экспирации
+
+### Added: Фиксация контрактов в PG
+- `futures.active_symbols (prefix, symbol, expiration_time, last_bar_time, updated_at)`
+- Bridge проверяет PG перед каждым циклом: использует зафиксированный символ
+- Новый символ выбирается только если старый `trade_mode != ENABLED/LONGONLY`
+- При перезапуске bridge не переключается между контрактами
+
+### Added: Защита от экспирации
+- `run_paper_trader.py` проверяет expiration_time перед каждым запуском
+- Если expiration < 5 дней — принудительное закрытие позиций (удаление state)
+- expiration_time записывается из MT5 `symbol_info().expiration_time`
+
+### Fixed: timeout по реальному времени
+- `manage_positions` проверяет `age_sec > timeout_bars * 300` — даже если бары не приходят
+
+### Состояние на 30 июля 22:00 IRKT
+- v5: 0 позиций, Equity 200 000₽
+- v6: 0 позиций, Equity 200 000₽
+- Все контракты зафиксированы (Si→SiU7, MM→MMU6, GZ→GZZ6...)
+- Ближайшая экспирация: BR→BRQ6 exp 2026-08-03 (4 дня)
+- Дашборд: http://10.0.0.60:8085
