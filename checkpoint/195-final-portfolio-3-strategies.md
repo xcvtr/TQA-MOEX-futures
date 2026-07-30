@@ -34,3 +34,19 @@
 - Портфель в PG: Si IR + GD Dragon + NG Dragon
 - Оба трейдера сброшены, Equity 200K
 - Cron: `*/5 15-23,0-4 * * 1-5`
+
+## Update: live-директория + deploy
+
+### Added
+- `strategies/common/live/` — изолированная копия paper_trader, broker, executor, engine
+- `scripts/deploy_live.sh` — скрипт деплоя (копирует из разработки в live)
+- Скилл `deploy-moex-paper` — процедура деплоя
+
+### Fixed
+- `entry_time` TypeError — `p['entry_time']` хранится как строка, не datetime. Добавлен `datetime.fromisoformat()`
+
+### Состояние paper trader
+- v5: Equity 200,000, 0 позиций, ждёт открытия рынка
+- v6: Equity 200,000, 0 позиций
+- Портфель PG: Si IR + GD Dragon + NG Dragon
+- Cron: `*/5 15-23,0-4 * * 1-5`
