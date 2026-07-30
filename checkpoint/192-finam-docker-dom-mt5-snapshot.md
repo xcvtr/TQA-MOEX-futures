@@ -175,3 +175,18 @@ public.mt5_deals            -- history deals (deal_id, ticker, profit, commissio
 - terminal64: 2 (AlfaForex + FINAM) — только Docker
 - Стакан: 11 тикеров, 64 rows
 - Дашборд: 8085 ✅
+
+## Update 4: Dashboard UPnL fix
+
+### Fixed: Unrealized PnL в дашборде
+- mtm_equity из PG устаревала (последний расчёт paper_trader мог быть часы назад)
+- Equity теперь считается как `balance + UPnL` по актуальным ценам из PG bars_1m
+- UPnL для каждой позиции: `(entry - price) / min_step * step_price * contracts`
+- min_step и step_price из futures.ticker_specs
+- Equity (с UPnL) и Balance (realized) отображаются как в терминалах
+
+### Состояние на 29 июля 23:00 IRKT (рынок закрыт)
+- v5: 1 позиция Si SHORT, Equity 199 246₽, UPnL -754₽
+- v6: 1 позиция Si SHORT, Equity 199 246₽, UPnL -754₽
+- terminal64: 2 (Docker)
+- Дашборд: http://10.0.0.60:8085

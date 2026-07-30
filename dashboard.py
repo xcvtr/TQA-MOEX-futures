@@ -109,11 +109,23 @@ def state_card(name, sk, state, trades, prices, specs):
     pos_html = ''
     total_upnl = 0
     for p in state['positions']:
-        upnl, per_ct = calc_upnl(p, prices, specs)
+        tkr = p['ticker']
+        price = prices.get(tkr)
+        s = specs.get(tkr, {'ms': 0.01, 'sp': 1.0})
+        ms = s['ms']; sp = s['sp']
+        if price and ms > 0:
+            if p['direction'] == 'short':
+                upnl_ct = (p['entry_price'] - price) / ms * sp
+            else:
+                upnl_ct = (price - p['entry_price']) / ms * sp
+            upnl = upnl_ct * p.get('contracts', 1)
+        else:
+            upnl = 0
         total_upnl += upnl
         upnl_str = f'{upnl:+.0f}' if upnl != 0 else '0'
         cls = 'positive' if upnl > 0 else ('negative' if upnl < 0 else '')
-        pos_html += f'<div class="pos">{p["direction"].upper()} {p["ticker"]} {p["strategy"]} entry={p["entry_price"]} <span class="{cls}">UPnL={upnl_str}₽</span></div>'
+        pos_html += f'<div class="pos">{p["direction"].upper()} {tkr} {p["strategy"]} entry={p["entry_price"]} <span class="{cls}">UPnL={upnl_str}₽</span></div>'
+    equity_with_upnl = state['equity'] + total_upnl
     
     trades_html = ''
     for t in trades[:5]:
@@ -129,7 +141,10 @@ def state_card(name, sk, state, trades, prices, specs):
             <span class="label">Капитал</span><span class="value">{state["capital"]:>.0f}₽</span>
         </div>
         <div class="state-row">
-            <span class="label">Equity (Cash)</span><span class="value">{state["equity"]:>.0f}₽</span>
+            <span class="label">Equity (с UPnL)</span><span class="value">{equity_with_upnl:>.0f}₽</span>
+        </div>
+        <div class="state-row">
+            <span class="label">Balance (realized)</span><span class="value">{state["equity"]:>.0f}₽</span>
         </div>
         <div class="state-row">
             <span class="label">Peak</span><span class="value">{state["peak"]:>.0f}₽</span>
