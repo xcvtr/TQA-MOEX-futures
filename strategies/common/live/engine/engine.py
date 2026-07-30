@@ -1,0 +1,242 @@
+"""Portfolio Engine — универсальный loop: Broker → Executor → стратегии."""
+
+import numpy as np
+from strategies.common.executor import Executor
+from strategies.common.broker import BrokerSim
+
+
+class PortfolioEngine:
+    """Loop по барам, вызывает все стратегии на каждом баре.
+
+    strategies: [(name, check_signal_fn, tickers, params), ...]
+    """
+
+    def __init__(self, strategies: list, broker=None, capital=100_000, slippage_in=1):
+        self.strategies = strategies
+        self.executor = Executor(broker=broker or BrokerSim(), initial_capital=capital)
+        self._pending = {}
+        self.slippage_in = slippage_in  # {ticker: [signal_dict, ...]} — сигналы, ждущие исполнения на open следующего бара
+        self._m5_cache = {}  # {ticker: [m5_bar_dict, ...]} — M5 бары, собранные из M1
+
+    def _build_bar(self, df, bar_idx, price_10_arr=None):
+        """Собрать bar_data с контекстом для всех стратегий."""
+        row = df.iloc[bar_idx]
+        bar = {
+            'prc': float(row.get('prc', row.get('close', 0))),
+            'opn': float(row.get('opn', row.get('open', 0))),
+            'hi': float(row.get('hi', row.get('high', 0))),
+            'lo': float(row.get('lo', row.get('low', 0))),
+            'vol': float(row.get('vol', 0)),
+            'vb': float(row.get('vb', 0)),
+            'vs': float(row.get('vs', 0)),
+            'oi': float(row.get('oi', 0)),
+            'dcvd_z': float(row.get('dcvd_z', 0)) if 'dcvd_z' in row else 0,
+            'vol_ma20': float(row.get('vol_ma20', 1)) if 'vol_ma20' in row else 1,
+            'sma20': float(row.get('sma20', float(row.get('prc', 0)))) if 'sma20' in row else float(row.get('prc', 0)),
+        }
+
+        # Stop Hunt histories (last 20 bars)
+        n = bar_idx + 1
+        lo_col = 'lo' if 'lo' in df else 'low'
+        hi_col = 'hi' if 'hi' in df else 'high'
+        hist_sh = 30
+        if n >= hist_sh:
+            bar['lo_hist'] = list(df[lo_col].iloc[bar_idx-hist_sh:bar_idx].values.astype(float))
+            bar['hi_hist'] = list(df[hi_col].iloc[bar_idx-hist_sh:bar_idx].values.astype(float))
+        else:
+            bar['lo_hist'] = []
+            bar['hi_hist'] = []
+        # Impulse Return: close_hist (10 bars), vol_hist (10 bars)
+        prc_col = 'prc' if 'prc' in df else 'close'
+        hist_bars = 20
+        if n >= hist_bars:
+            bar['close_hist'] = list(df[prc_col].iloc[bar_idx-hist_bars:bar_idx].values.astype(float))
+            bar['vol_hist'] = list(df['vol'].iloc[bar_idx-hist_bars:bar_idx].values.astype(float))
+        else:
+            bar['close_hist'] = list(df[prc_col].iloc[:bar_idx].values.astype(float)) if bar_idx > 0 else []
+            bar['vol_hist'] = list(df['vol'].iloc[:bar_idx].values.astype(float)) if bar_idx > 0 else []
+
+        # Churn: OI 5 bars ago
+        if n >= 5 and 'oi' in df:
+            bar['oi_5ago'] = float(df['oi'].iloc[bar_idx-5])
+
+        # Lunch Reversal: pre-computed price_10
+        if price_10_arr and bar_idx < len(price_10_arr):
+            bar['price_10'] = price_10_arr[bar_idx]
+        else:
+            bar['price_10'] = 0
+        # Hour/minute from timestamp — convert IRK→MSK
+        bt = row.get('bt') if hasattr(row, 'bt') else row.name
+        if hasattr(bt, 'hour'):
+            bt_msk = bt.tz_convert('Europe/Moscow') if hasattr(bt, 'tz_convert') else bt
+            bar['hour'] = bt_msk.hour
+            bar['minute'] = bt_msk.minute
+        else:
+            bar['hour'] = 0
+            bar['minute'] = 0
+
+        return bar
+
+    def run(self, bars_dict: dict, ticker_specs: dict = None):
+        """bars_dict: {ticker: DataFrame}. Запускает все стратегии на всём периоде."""
+        max_len = max(len(df) for df in bars_dict.values())
+
+        # Pre-compute price_10 for each ticker (цена на 10:00 MSK)
+        price_10_cache = {}
+        for ticker, df in bars_dict.items():
+            if 'bt' in df:
+                # CH data in Asia/Irkutsk (+08). Convert to MSK for time-based logic
+                bt_msk = df['bt'].dt.tz_convert('Europe/Moscow')
+                hours = bt_msk.dt.hour
+                minutes = bt_msk.dt.minute
+                at_10 = (hours == 10) & (minutes == 0)
+                prc_col = df['prc'].values.astype(float) if 'prc' in df else df['close'].values.astype(float)
+                p10 = np.where(at_10, prc_col, 0.0)
+                # Forward-fill
+                for i in range(1, len(p10)):
+                    if p10[i] == 0.0:
+                        p10[i] = p10[i-1]
+                price_10_cache[ticker] = p10.tolist()
+            else:
+                price_10_cache[ticker] = [0.0] * len(df)
+
+        # MTM MDD tracking
+        mtm_mdd_history = []
+        
+        for bar_idx in range(50, max_len):
+            # Pre-build bar_data once per ticker
+            bars_for_ticker = {}
+            for ticker in bars_dict:
+                df = bars_dict[ticker]
+                if bar_idx >= len(df):
+                    continue
+                p10_arr = price_10_cache.get(ticker, [])
+                bars_for_ticker[ticker] = self._build_bar(df, bar_idx, p10_arr)
+
+            # Исполнить pending сигналы на open этого бара
+            for ticker, pending_list in list(self._pending.items()):
+                bar = bars_for_ticker.get(ticker)
+                if bar is None:
+                    continue
+                specs = (ticker_specs or {}).get(ticker, {})
+                min_step = float(specs.get('min_step', 0.01))
+                # Пробуем сигналы по очереди, пока один не откроется
+                for pending in pending_list:
+                    if ticker in [p.ticker for p in self.executor.positions if not p.closed]:
+                        break  # уже есть позиция по этому тикеру
+                    direction = pending['direction']
+                    if direction == 'long':
+                        pending['entry_price'] = float(bar['opn']) + self.slippage_in * min_step
+                    else:
+                        pending['entry_price'] = float(bar['opn']) - self.slippage_in * min_step
+                    if self.executor.process_signal(pending, bar_idx, specs, bar):
+                        break  # первая успешная стратегия заняла тикер
+                del self._pending[ticker]
+
+            # Сигналы — close_entry: исполняем на том же баре
+            is_m5 = True  # detect every M1 bar for 1-min TF
+            
+            for name, check_fn, tickers, params in self.strategies:
+                for ticker in tickers:
+                    bar = bars_for_ticker.get(ticker)
+                    if bar is None:
+                        continue
+                    
+                    # Build M5 bars from M1
+                    if is_m5 and ticker not in self._m5_cache:
+                        self._m5_cache[ticker] = []
+                    if ticker in self._m5_cache:
+                        df = bars_dict.get(ticker)
+                        if df is not None and bar_idx >= 4:
+                            m1_5 = df.iloc[bar_idx-4:bar_idx+1]
+                            m5_bar = {
+                                'opn': float(m1_5['opn'].iloc[0]),
+                                'hi': float(m1_5['hi'].max()),
+                                'lo': float(m1_5['lo'].min()),
+                                'prc': float(m1_5['prc'].iloc[-1]),
+                                'vol': float(m1_5['vol'].sum()) if 'vol' in m1_5 else 0,
+                            }
+                            self._m5_cache[ticker].append(m5_bar)
+                    
+                    # Only check signals on M5 with enough history
+                    if is_m5 and ticker in self._m5_cache and len(self._m5_cache[ticker]) >= 10:
+                        m5_bars = self._m5_cache[ticker]
+                        bar['bars_list'] = m5_bars
+                        signal = check_fn(bar, ticker, params)
+                        if signal:
+                            has_pos = any(not p.closed and p.ticker == ticker for p in self.executor.positions)
+                            if not has_pos:
+                                # Close-entry: execute immediately on this bar's close
+                                specs = (ticker_specs or {}).get(ticker, {})
+                                signal['entry_price'] = bar['prc']  # close of signal bar
+                                self.executor.process_signal(signal, bar_idx, specs, bar)
+
+            # Управление позициями — передаём бары ТОЛЬКО своего тикера
+            for p in list(self.executor.positions):
+                if p.closed:
+                    continue
+                df = bars_dict.get(p.ticker)
+                if df is None or bar_idx >= len(df):
+                    continue
+                bar = df.iloc[bar_idx]
+                hi = float(bar.get('hi', bar.get('high', 0)))
+                lo = float(bar.get('lo', bar.get('low', 0)))
+                prc = float(bar.get('prc', bar.get('close', 0)))
+                vol = float(bar.get('vol', 0))
+                pnl = self.executor.broker.update(p, bar_idx, hi, lo, prc, vol)
+                if p.closed:
+                    if np.isfinite(pnl):
+                        self.executor.equity += float(pnl)
+                    else:
+                        p.closed = False
+                        continue
+                    self.executor.trades.append(p)
+
+            # Cleanup closed positions
+            self.executor.positions = [p for p in self.executor.positions if not p.closed]
+
+            # MTM: floating PnL of open positions
+            floating = 0.0
+            for p in self.executor.positions:
+                if p.closed:
+                    continue
+                df = bars_dict.get(p.ticker)
+                if df is None or bar_idx >= len(df):
+                    continue
+                bar = df.iloc[bar_idx]
+                prc = float(bar.get('prc', bar.get('close', 0)))
+                ticks = (prc - p.entry_price) / max(p.min_step, 0.0001)
+                if p.direction == 'short':
+                    ticks = -ticks
+                floating += ticks * p.step_price * p.shares * p.pct
+
+            self.executor.balance_curve.append(self.executor.equity)
+            self.executor.mtm_value = self.executor.equity + floating
+            self.executor.mtm_curve.append(self.executor.mtm_value)
+            # MTM peak & MDD
+            if not hasattr(self.executor, 'mtm_peak'):
+                self.executor.mtm_peak = self.executor.mtm_value
+            self.executor.mtm_peak = max(self.executor.mtm_peak, self.executor.mtm_value)
+            mtm_dd = (self.executor.mtm_peak - self.executor.mtm_value) / self.executor.mtm_peak * 100
+            mtm_mdd_history.append(mtm_dd)
+            self.executor.mtm_max_dd = max(getattr(self.executor, 'mtm_max_dd', 0), mtm_dd)
+            if self.executor.equity > self.executor.peak:
+                self.executor.peak = self.executor.equity
+            self.executor.rm.update(self.executor.equity)
+
+        # Cleanup pending signals at end of data
+        for ticker, pending_list in list(self._pending.items()):
+            df = bars_dict.get(ticker)
+            if df is not None:
+                bar = df.iloc[-1]
+                specs = (ticker_specs or {}).get(ticker, {})
+                min_step = float(specs.get('min_step', 0.01))
+                for pending in pending_list:
+                    if ticker in [p.ticker for p in self.executor.positions if not p.closed]:
+                        break
+                    direction = pending['direction']
+                    pending['entry_price'] = float(bar.get('prc', bar.get('close', 0)))
+                    if self.executor.process_signal(pending, max_len - 1, specs, {}):
+                        break
+
+        return self.executor
