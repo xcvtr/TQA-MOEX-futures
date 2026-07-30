@@ -190,3 +190,27 @@ public.mt5_deals            -- history deals (deal_id, ticker, profit, commissio
 - v6: 1 позиция Si SHORT, Equity 199 246₽, UPnL -754₽
 - terminal64: 2 (Docker)
 - Дашборд: http://10.0.0.60:8085
+
+## Update 5: timeout fix + bars TZ fix + Si close
+
+### Fixed: timeout по реальному времени
+- `manage_positions` проверял только `bar_idx - entry_bar >= timeout_bars`
+- При отсутствии новых баров (Si) позиция никогда не закрывалась
+- Добавлен `age_sec` — timeout срабатывает через `timeout_bars × 300` секунд реального времени
+- Условие `entry_bar >= bar_idx` теперь пропускает только первую минуту после открытия, не вешает навсегда
+
+### Fixed: загрузка баров в PG (TZ)
+- CH на сервере Asia/Irkutsk (+8), clickhouse-connect отдаёт datetime с таймзоной +08
+- PG bars_1m хранит timestamp без таймзоны как UTC
+- Добавлена конвертация: `bt.astimezone(timezone.utc).replace(tzinfo=None)`
+- PG bars_1m теперь обновляется для всех тикеров
+
+### Closed: Si SHORT impulse_return
+- Entry 88404, exit 80631, PnL +7765₽ (manual close)
+- Причина: позиция висела 24+ часа из-за бага timeout
+
+### Состояние на 30 июля 20:00 IRKT
+- v5: 0 позиций, Equity 207 765₽ (+7 765₽)
+- v6: 0 позиций, Equity 200 000₽
+- Бары: 11/11, SiU6 свежие
+- Дашборд: http://10.0.0.60:8085

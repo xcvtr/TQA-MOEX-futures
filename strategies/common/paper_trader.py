@@ -422,11 +422,14 @@ def manage_positions(positions, bar_data, specs, bar_idx):
         sp, ms = s.get('sp', 1), s.get('ms', 0.01)
         lot = s.get('lot', 1)
         hi, lo, close = bd['hi'], bd['lo'], bd['prc']
-        if p['entry_bar'] >= bar_idx:
+        age_sec = (datetime.now(timezone.utc) - p['entry_time'].replace(tzinfo=timezone.utc)).total_seconds()
+        if p['entry_bar'] >= bar_idx and age_sec < 60:
             continue
-
-        # Timeout
-        if bar_idx - p['entry_bar'] >= p.get('timeout_bars', 12):
+        
+        # Timeout (by bars or by real time)
+        age_bars = bar_idx - p['entry_bar']
+        timeout_triggered = age_bars >= p.get('timeout_bars', 12) or age_sec > p.get('timeout_bars', 12) * 300
+        if timeout_triggered:
             pnl = (close - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
             pnl += p.get('part_pnl', 0)
             p['pnl'] = pnl
