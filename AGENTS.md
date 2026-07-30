@@ -1,6 +1,6 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 193 (2026-07-30)** — Portfolio backtest verified +8,593% ROI, MDD 7.92%
+**Последний чекпойнт: 194 (2026-07-30)** — Portfolio verified +1,228% ROI, MDD 14.3%
 
 ## 🚨 Правила работы
 
