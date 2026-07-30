@@ -609,9 +609,9 @@ def run_tick(strategy_filter=None, mode=None):
                 for _, r in df.iterrows()
             ],
         }
-        # Build hi/lo history for signal check
-        hi_hist = [float(v) for v in df['hi'].iloc[-21:-1].values]
-        lo_hist = [float(v) for v in df['lo'].iloc[-21:-1].values]
+        # Build hi/lo history for signal check (need 60+ for lookback=40 + buffer)
+        hi_hist = [float(v) for v in df['hi'].iloc[-61:-1].values]
+        lo_hist = [float(v) for v in df['lo'].iloc[-61:-1].values]
         bar_data[ticker]['hi_hist'] = hi_hist
         bar_data[ticker]['lo_hist'] = lo_hist
         max_bar_idx = max(max_bar_idx, bar_idx)
