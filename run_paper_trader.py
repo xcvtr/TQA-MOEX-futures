@@ -130,6 +130,29 @@ def main():
     if args.state_key:
         pt_args.extend(['--state-key', args.state_key])
 
+    # ── Проверка экспирации ──────────────────────────────────────────────
+    conn_pg = pg_conn()
+    cur_pg = conn_pg.cursor()
+    cur_pg.execute("""
+        SELECT p.ticker, a.expiration_time
+        FROM futures.paper_state_{0} p
+        JOIN futures.active_symbols a ON a.prefix = p.ticker
+        WHERE a.expiration_time IS NOT NULL
+          AND a.expiration_time < now() + interval '5 days'
+    """.format(state_key or ''))
+    expiring = cur_pg.fetchall()
+    cur_pg.close(); conn_pg.close()
+    
+    if expiring:
+        print(f"⚠️ Экспирация через <5 дней: {[r[0] for r in expiring]}")
+        # Принудительное закрытие — удаляем state
+        conn_clean = pg_conn()
+        cur_clean = conn_clean.cursor()
+        for ticker, exp_time in expiring:
+            cur_clean.execute(f"DELETE FROM futures.paper_state_{state_key or ''}")
+        conn_clean.commit()
+        cur_clean.close(); conn_clean.close()
+    
     # ── Before ──────────────────────────────────────────────────────────
     old_trades = get_trades_count(state_key)
     old_state = get_state(state_key)
