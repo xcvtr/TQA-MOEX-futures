@@ -278,3 +278,16 @@
 ### Added
 - docker/Dockerfile.finam — версионированный образ mt5-finam:1.0.0
 - Cron для paper v6
+
+## [193] 2026-07-30
+### Added
+- Portfolio backtest verified: +8,593% ROI, MTM MDD 7.92%
+- 5 стратегий: IR Si, Dragon GD/MM/NG, SH RN
+- Источник: FINAM MT5 (moex.mt5_continuous)
+- lo_hist увеличена до 60 (SH lookback=40+)
+- backtest.py переведён на mt5_continuous + params из PG
+
+### Fixed
+- Stop Hunt не работал из-за lo_hist=20 < lookback=40
+- backtest.py не передавал params из PG в check_signal
+- backtest.py использовал устаревший mt5_bars вместо mt5_continuous
