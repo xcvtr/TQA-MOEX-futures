@@ -422,7 +422,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
         sp, ms = s.get('sp', 1), s.get('ms', 0.01)
         lot = s.get('lot', 1)
         hi, lo, close = bd['hi'], bd['lo'], bd['prc']
-        age_sec = (datetime.now(timezone.utc) - p['entry_time'].replace(tzinfo=timezone.utc)).total_seconds()
+        age_sec = (datetime.now(timezone.utc) - datetime.fromisoformat(p['entry_time']).replace(tzinfo=timezone.utc)).total_seconds()
         if p['entry_bar'] >= bar_idx and age_sec < 60:
             continue
         
