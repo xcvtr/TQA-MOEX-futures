@@ -133,25 +133,44 @@ def main():
     # ── Проверка экспирации ──────────────────────────────────────────────
     conn_pg = pg_conn()
     cur_pg = conn_pg.cursor()
-    cur_pg.execute("""
-        SELECT p.ticker, a.expiration_time
-        FROM futures.paper_state_{0} p
-        JOIN futures.active_symbols a ON a.prefix = p.ticker
-        WHERE a.expiration_time IS NOT NULL
-          AND a.expiration_time < now() + interval '5 days'
-    """.format(state_key or ''))
-    expiring = cur_pg.fetchall()
-    cur_pg.close(); conn_pg.close()
-    
-    if expiring:
-        print(f"⚠️ Экспирация через <5 дней: {[r[0] for r in expiring]}")
-        # Принудительное закрытие — удаляем state
-        conn_clean = pg_conn()
-        cur_clean = conn_clean.cursor()
-        for ticker, exp_time in expiring:
+    # Экспирация: позиции лежат в positions_json (JSONB). Парсим ticker'ы и
+    # сверяем с active_symbols.
+    try:
+        cur_pg.execute("""
+            SELECT p.positions_json
+            FROM futures.paper_state_{0} p
+        """.format(state_key or ''))
+        state_rows = cur_pg.fetchall()
+        expiring = []
+        if state_rows and state_rows[0][0]:
+            import json as _json
+            try:
+                positions = _json.loads(state_rows[0][0]) if isinstance(state_rows[0][0], str) else state_rows[0][0]
+                if isinstance(positions, dict):
+                    positions = positions.get('positions', [])
+                tickers = [p.get('ticker') for p in positions if isinstance(p, dict)]
+            except Exception:
+                tickers = []
+            for tk in tickers:
+                cur_pg.execute("""
+                    SELECT expiration_time FROM futures.active_symbols
+                    WHERE prefix = %s AND expiration_time IS NOT NULL
+                      AND expiration_time < now() + interval '5 days'
+                """, (tk,))
+                if cur_pg.fetchone():
+                    expiring.append(tk)
+        cur_pg.close(); conn_pg.close()
+        
+        if expiring:
+            print(f"⚠️ Экспирация через <5 дней: {expiring}")
+            conn_clean = pg_conn()
+            cur_clean = conn_clean.cursor()
             cur_clean.execute(f"DELETE FROM futures.paper_state_{state_key or ''}")
-        conn_clean.commit()
-        cur_clean.close(); conn_clean.close()
+            conn_clean.commit()
+            cur_clean.close(); conn_clean.close()
+    except Exception as e:
+        cur_pg.close(); conn_pg.close()
+        print(f"⚠️ Expiry check skipped: {e}")
     
     # ── Before ──────────────────────────────────────────────────────────
     old_trades = get_trades_count(state_key)

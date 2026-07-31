@@ -95,6 +95,7 @@ def load_portfolio():
             'trailing_trail': float(r[5]) if r[5] else 0.3,
             'timeout_bars': int(r[6]) if r[6] else 12,
             'stop_loss': float(params.get('stop_loss_pct', 0.7)) / 100.0,
+            'tf': int(params.get('tf', 5)),  # detect timeframe (minutes)
         })
     return dict(portfolio)
 
@@ -226,8 +227,8 @@ def calc_mtm_equity(capital, positions, bar_data, specs):
 
 # ── CH helpers ────────────────────────────────────────────────────────────
 
-def get_latest_bars(ticker, asset, n_bars=50):
-    """Get last N 5-min OHLC bars.
+def get_latest_bars(ticker, asset, n_bars=1500):
+    """Get last N 1-min OHLC bars.
     
     Priority:
     0. CH moex.mt5_continuous (FINAM, live, M1→M5 OHLC)
@@ -245,13 +246,10 @@ def get_latest_bars(ticker, asset, n_bars=50):
         conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
         cur = conn.cursor()
         cur.execute(f"""
-            SELECT to_timestamp(floor(extract(epoch from bt) / 300) * 300) as bt5,
-                   (array_agg(opn ORDER BY bt))[1] as opn,
-                   max(hi) as hi, min(lo) as lo,
-                   (array_agg(prc ORDER BY bt DESC))[1] as prc
+            SELECT bt, opn, hi, lo, prc
             FROM futures.bars_1m
             WHERE ticker = %s
-            GROUP BY bt5 ORDER BY bt5 DESC LIMIT %s
+            ORDER BY bt DESC LIMIT %s
         """, (ticker, n_bars + 5))
         rows = cur.fetchall()
         cur.close(); conn.close()
@@ -273,13 +271,10 @@ def get_latest_bars(ticker, asset, n_bars=50):
         conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
         cur = conn.cursor()
         cur.execute(f"""
-            SELECT to_timestamp(floor(extract(epoch from bt) / 300) * 300) as bt5,
-                   (array_agg(opn ORDER BY bt))[1] as opn,
-                   max(hi) as hi, min(lo) as lo,
-                   (array_agg(prc ORDER BY bt DESC))[1] as prc
+            SELECT bt, opn, hi, lo, prc
             FROM futures.bars_1m
             WHERE ticker = %s
-            GROUP BY bt5 ORDER BY bt5 DESC LIMIT %s
+            ORDER BY bt DESC LIMIT %s
         """, (ticker, n_bars + 5))
         rows = cur.fetchall()
         cur.close(); conn.close()
@@ -299,22 +294,19 @@ def get_latest_bars(ticker, asset, n_bars=50):
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     try:
         df = ch.query_df(f"""
-            SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
-                   argMin(opn, bt) as opn,
-                   max(hi) as hi, min(lo) as lo,
-                   argMax(prc, bt) as prc_close
-            FROM moex.mt5_bars WHERE ticker = '{ticker}'
-            GROUP BY bt5 ORDER BY bt5 DESC LIMIT {n_bars + 5}
+            SELECT bt, opn, hi, lo, prc
+            FROM moex.mt5_continuous WHERE ticker = '{ticker}'
+            ORDER BY bt DESC LIMIT {n_bars + 5}
         """)
         if not df.empty:
-            df = df.sort_values('bt5').reset_index(drop=True)
-            df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
+            df = df.sort_values('bt').reset_index(drop=True)
             age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
-            if age < 5:
+            if age < 10:
                 ch.close(); return df
+            log.info("mt5_continuous age=%.0fm, trying next", age)
         ch.close()
     except Exception as e:
-        log.warning("mt5_bars error for %s: %s", ticker, e)
+        log.warning("mt5_continuous error for %s: %s", ticker, e)
         ch.close()
     
     # ── 3. tradestats_fo ────────────────────────────────────────────────────
@@ -406,6 +398,28 @@ def calc_dcvd_z(vol_b_hist, vol_s_hist, period=20):
     return (cvd[-1] - mean) / std
 
 
+def resample_m1_to_tf(df, tf_min):
+    """Resample M1 DataFrame (bt,opn,hi,lo,prc) to tf_min bars. Returns list of dicts."""
+    bars = []
+    g = {}
+    for _, r in df.iterrows():
+        ts = r['bt']
+        tm = ts.hour * 60 + ts.minute
+        km = (tm // tf_min) * tf_min
+        k = ts.replace(minute=km % 60, hour=km // 60, second=0)
+        if k not in g:
+            g[k] = {'ts': k, 'opn': float(r['opn']), 'hi': float(r['hi']),
+                    'lo': float(r['lo']), 'prc': float(r['prc'])}
+        else:
+            gg = g[k]
+            gg['hi'] = max(gg['hi'], float(r['hi']))
+            gg['lo'] = min(gg['lo'], float(r['lo']))
+            gg['prc'] = float(r['prc'])
+    for k in sorted(g.keys()):
+        bars.append(g[k])
+    return bars
+
+
 # ── Position management ──────────────────────────────────────────────────
 
 def manage_positions(positions, bar_data, specs, bar_idx):
@@ -422,7 +436,13 @@ def manage_positions(positions, bar_data, specs, bar_idx):
         sp, ms = s.get('sp', 1), s.get('ms', 0.01)
         lot = s.get('lot', 1)
         hi, lo, close = bd['hi'], bd['lo'], bd['prc']
-        age_sec = (datetime.now(timezone.utc) - datetime.fromisoformat(p['entry_time']).replace(tzinfo=timezone.utc)).total_seconds()
+        try:
+            et = p['entry_time']
+            if isinstance(et, str):
+                et = datetime.fromisoformat(et)
+            age_sec = (datetime.now(timezone.utc) - et.replace(tzinfo=timezone.utc)).total_seconds()
+        except Exception:
+            age_sec = 0
         if p['entry_bar'] >= bar_idx and age_sec < 60:
             continue
         
@@ -592,26 +612,32 @@ def run_tick(strategy_filter=None, mode=None):
         vol_hist = vol[:-1] if len(vol) > 1 else []
         current_vol = vol[-1] if vol else 100
         
+        # Resample M1 -> detect tf (согласовано с бэктестом portfolio_run.py)
+        tf = s.get('tf', 5)
+        detect_bars = resample_m1_to_tf(df, tf)
+        if not detect_bars:
+            continue
+        last_d = detect_bars[-1]  # последний ПОЛНЫЙ detect бар
+        # Для bars_list НЕ включаем незакрытый текущий бар:
+        # последний detect бар считается закрытым только если его период завершён.
+        # Здесь last_d — последний полный бар (df уже содержит только закрытые M1).
+        
         bar_data[ticker] = {
             'bt': last['bt'],
             'opn': float(last['opn']),
             'hi': float(last['hi']),
             'lo': float(last['lo']),
-            'prc': float(last['prc']),
+            'prc': float(last['prc']),  # последний M1 close — тики для SL/TP (как бэктест)
             'prc_prev': float(second_last['prc']),
             'vol': current_vol,
             'dcvd_z': dcvd_z,
-            'close_hist': close_hist,
+            'close_hist': [float(b['prc']) for b in detect_bars[:-1]],
             'vol_hist': vol_hist,
-            'bars_list': [
-                {'opn': float(r['opn']), 'hi': float(r['hi']),
-                 'lo': float(r['lo']), 'prc': float(r['prc'])}
-                for _, r in df.iterrows()
-            ],
+            'bars_list': detect_bars,  # detect бары для check_signal (как бэктест: dh + [db])
         }
         # Build hi/lo history for signal check (need 60+ for lookback=40 + buffer)
-        hi_hist = [float(v) for v in df['hi'].iloc[-61:-1].values]
-        lo_hist = [float(v) for v in df['lo'].iloc[-61:-1].values]
+        hi_hist = [float(b['hi']) for b in detect_bars[:-1]][-61:]
+        lo_hist = [float(b['lo']) for b in detect_bars[:-1]][-61:]
         bar_data[ticker]['hi_hist'] = hi_hist
         bar_data[ticker]['lo_hist'] = lo_hist
         max_bar_idx = max(max_bar_idx, bar_idx)

@@ -192,7 +192,7 @@ for mi in range(60, max_len):
                             if vol_hist and median(vol_hist) > 0 and m1_vol / median(vol_hist) < flt['min_vol_ratio']:
                                 sig = None
             elif cfg['strat'] == 'dragon' and len(dh) >= 30:
-                sig = dragon_check({'bars_list': dh, 'prc': db['prc']}, t, cfg['params'])
+                sig = dragon_check({'bars_list': dh + [db], 'prc': db['prc']}, t, cfg['params'])
                 if sig:
                     flt = cfg.get('filters', {})
                     if flt.get('trend') and len(dh) >= 50:
