@@ -56,36 +56,13 @@ def get_specs():
 
 def get_current_prices():
     """Get latest close prices from PG bars_1m."""
-    rows = q("""
-        SELECT DISTINCT ON (ticker) ticker, prc
-        FROM futures.bars_1m
-        ORDER BY ticker, bt DESC
-    """)
+    rows = q("SELECT DISTINCT ON (ticker) ticker, prc FROM futures.bars_1m ORDER BY ticker, bt DESC")
     return {r[0]: float(r[1]) for r in rows if r[1]}
 
-def calc_upnl(pos, prices, specs):
-    """Calculate unrealized PnL for a position."""
-    ticker = pos['ticker']
-    price = prices.get(ticker)
-    if not price:
-        return 0, 0
-    entry = pos['entry_price']
-    contracts = pos.get('contracts', 1)
-    s = specs.get(ticker, {'ms': 0.01, 'sp': 1.0})
-    ms = s['ms']
-    sp = s['sp']
-    if ms <= 0:
-        return 0, 0
-    if pos['direction'] == 'short':
-        ticks = (entry - price) / ms
-        pnl_per_ct = ticks * sp
-    else:
-        ticks = (price - entry) / ms
-        pnl_per_ct = ticks * sp
-    total = pnl_per_ct * contracts
-    # subtract commission
-    total -= pos.get('commission', 0)
-    return round(total, 0), round(pnl_per_ct, 0)
+def get_specs():
+    """Get ticker specs from PG."""
+    rows = q("SELECT ticker, min_step, step_price FROM futures.ticker_specs")
+    return {r[0]: {'ms': float(r[1] or 0.01), 'sp': float(r[2] or 1.0)} for r in rows}
 
 def get_mt5_account():
     rows = q("SELECT ts, balance, equity, margin, margin_free, margin_level FROM mt5_account ORDER BY ts DESC LIMIT 1")
@@ -109,6 +86,9 @@ def state_card(name, sk, state, trades, prices, specs):
     pos_html = ''
     total_upnl = 0
     for p in state['positions']:
+        if p.get('closed', False):
+            pos_html += f'<div class="pos" style="opacity:0.5">{p["direction"].upper()} {p["ticker"]} {p["strategy"]} Closed PnL={p["pnl"]:+.0f}₽</div>'
+            continue
         tkr = p['ticker']
         price = prices.get(tkr)
         s = specs.get(tkr, {'ms': 0.01, 'sp': 1.0})

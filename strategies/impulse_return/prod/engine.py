@@ -106,7 +106,7 @@ def check_signal(bar_data: dict, ticker: str, params: dict = None) -> dict:
 
 def get_default_params():
     return {
-        'impulse_bars': 4,
+        'impulse_bars': 12,  # 12 min M1 (~20 min M5)
         'impulse_pct': 0.5,
         'retrace': 0.618,
         'cooldown': 24,

@@ -39,17 +39,19 @@ class PortfolioEngine:
         n = bar_idx + 1
         lo_col = 'lo' if 'lo' in df else 'low'
         hi_col = 'hi' if 'hi' in df else 'high'
-        if n >= 20:
-            bar['lo_hist'] = list(df[lo_col].iloc[bar_idx-20:bar_idx].values.astype(float))
-            bar['hi_hist'] = list(df[hi_col].iloc[bar_idx-20:bar_idx].values.astype(float))
+        hist_sh = 30
+        if n >= hist_sh:
+            bar['lo_hist'] = list(df[lo_col].iloc[bar_idx-hist_sh:bar_idx].values.astype(float))
+            bar['hi_hist'] = list(df[hi_col].iloc[bar_idx-hist_sh:bar_idx].values.astype(float))
         else:
             bar['lo_hist'] = []
             bar['hi_hist'] = []
         # Impulse Return: close_hist (10 bars), vol_hist (10 bars)
         prc_col = 'prc' if 'prc' in df else 'close'
-        if n >= 10:
-            bar['close_hist'] = list(df[prc_col].iloc[bar_idx-10:bar_idx].values.astype(float))
-            bar['vol_hist'] = list(df['vol'].iloc[bar_idx-10:bar_idx].values.astype(float))
+        hist_bars = 20
+        if n >= hist_bars:
+            bar['close_hist'] = list(df[prc_col].iloc[bar_idx-hist_bars:bar_idx].values.astype(float))
+            bar['vol_hist'] = list(df['vol'].iloc[bar_idx-hist_bars:bar_idx].values.astype(float))
         else:
             bar['close_hist'] = list(df[prc_col].iloc[:bar_idx].values.astype(float)) if bar_idx > 0 else []
             bar['vol_hist'] = list(df['vol'].iloc[:bar_idx].values.astype(float)) if bar_idx > 0 else []
@@ -131,8 +133,8 @@ class PortfolioEngine:
                         break  # первая успешная стратегия заняла тикер
                 del self._pending[ticker]
 
-            # Сигналы — становятся pending для исполнения на следующем баре
-            is_m5 = (bar_idx % 5 == 4)  # M5: каждые 5 M1 баров
+            # Сигналы — close_entry: исполняем на том же баре
+            is_m5 = True  # detect every M1 bar for 1-min TF
             
             for name, check_fn, tickers, params in self.strategies:
                 for ticker in tickers:
@@ -157,16 +159,17 @@ class PortfolioEngine:
                             self._m5_cache[ticker].append(m5_bar)
                     
                     # Only check signals on M5 with enough history
-                    if is_m5 and ticker in self._m5_cache and len(self._m5_cache[ticker]) >= 30:
+                    if is_m5 and ticker in self._m5_cache and len(self._m5_cache[ticker]) >= 10:
                         m5_bars = self._m5_cache[ticker]
                         bar['bars_list'] = m5_bars
                         signal = check_fn(bar, ticker, params)
                         if signal:
                             has_pos = any(not p.closed and p.ticker == ticker for p in self.executor.positions)
                             if not has_pos:
-                                if ticker not in self._pending:
-                                    self._pending[ticker] = []
-                                self._pending[ticker].append(signal)
+                                # Close-entry: execute immediately on this bar's close
+                                specs = (ticker_specs or {}).get(ticker, {})
+                                signal['entry_price'] = bar['prc']  # close of signal bar
+                                self.executor.process_signal(signal, bar_idx, specs, bar)
 
             # Управление позициями — передаём бары ТОЛЬКО своего тикера
             for p in list(self.executor.positions):

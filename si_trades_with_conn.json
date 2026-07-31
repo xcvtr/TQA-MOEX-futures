@@ -1,0 +1,54 @@
+{
+"points": [
+{"time":"2026-06-29T09:00:00","price":79988,"label":"ENTRY","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T08:48:00","price":79800,"label":"IMPULSE START","color":"#888888","size":16,"symbol":"circle"},
+{"time":"2026-06-29T08:55:00","price":80150,"label":"PEAK","color":"#ffd700","size":18,"symbol":"diamond"},
+{"time":"2026-06-29T09:00:00","price":80016,"label":"RETRACE 61.8%","color":"#ffd700","size":12,"symbol":"line-ns-open"},
+{"time":"2026-06-29T09:05:00","price":79869,"label":"EXIT","color":"#ff4466","size":14,"symbol":"cross"},
+
+{"time":"2026-06-29T09:05:00","price":79869,"label":"ENTRY","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T08:53:00","price":79700,"label":"IMPULSE START","color":"#888888","size":16,"symbol":"circle"},
+{"time":"2026-06-29T09:00:00","price":80050,"label":"PEAK","color":"#ffd700","size":18,"symbol":"diamond"},
+{"time":"2026-06-29T09:05:00","price":79916,"label":"RETRACE 61.8%","color":"#ffd700","size":12,"symbol":"line-ns-open"},
+{"time":"2026-06-29T09:17:00","price":79816,"label":"EXIT","color":"#ff4466","size":14,"symbol":"cross"},
+
+{"time":"2026-06-29T10:05:00","price":80720,"label":"ENTRY","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T09:53:00","price":79900,"label":"IMPULSE START","color":"#888888","size":16,"symbol":"circle"},
+{"time":"2026-06-29T10:00:00","price":80800,"label":"PEAK","color":"#ffd700","size":18,"symbol":"diamond"},
+{"time":"2026-06-29T10:05:00","price":80245,"label":"RETRACE 61.8%","color":"#ffd700","size":12,"symbol":"line-ns-open"},
+{"time":"2026-06-29T10:17:00","price":80031,"label":"EXIT","color":"#ff4466","size":14,"symbol":"cross"},
+
+{"time":"2026-06-29T11:00:00","price":79972,"label":"ENTRY","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T10:48:00","price":80200,"label":"IMPULSE START","color":"#888888","size":16,"symbol":"circle"},
+{"time":"2026-06-29T10:55:00","price":79700,"label":"PEAK","color":"#ffd700","size":18,"symbol":"diamond"},
+{"time":"2026-06-29T11:00:00","price":79809,"label":"RETRACE 61.8%","color":"#ffd700","size":12,"symbol":"line-ns-open"},
+{"time":"2026-06-29T11:12:00","price":79636,"label":"EXIT","color":"#00ff88","size":14,"symbol":"cross"},
+
+{"time":"2026-06-29T12:00:00","price":79180,"label":"ENTRY","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T11:48:00","price":79400,"label":"IMPULSE START","color":"#888888","size":16,"symbol":"circle"},
+{"time":"2026-06-29T11:55:00","price":79000,"label":"PEAK","color":"#ffd700","size":18,"symbol":"diamond"},
+{"time":"2026-06-29T12:00:00","price":79152,"label":"RETRACE 61.8%","color":"#ffd700","size":12,"symbol":"line-ns-open"},
+{"time":"2026-06-29T12:12:00","price":79336,"label":"EXIT","color":"#00ff88","size":14,"symbol":"cross"}
+],
+"connections": [
+{"entry_time":"2026-06-29T08:48:00","entry_price":79800,"exit_time":"2026-06-29T08:55:00","exit_price":80150,"color":"#888888","label":"IMPULSE ↑"},
+{"entry_time":"2026-06-29T08:55:00","entry_price":80150,"exit_time":"2026-06-29T09:00:00","exit_price":80016,"color":"#ffd700","label":"RETRACE 61.8%"},
+{"entry_time":"2026-06-29T09:00:00","entry_price":79988,"exit_time":"2026-06-29T09:05:00","exit_price":79869,"color":"#ff4466","label":"-123"},
+
+{"entry_time":"2026-06-29T08:53:00","entry_price":79700,"exit_time":"2026-06-29T09:00:00","exit_price":80050,"color":"#888888","label":"IMPULSE ↑"},
+{"entry_time":"2026-06-29T09:00:00","entry_price":80050,"exit_time":"2026-06-29T09:05:00","exit_price":79916,"color":"#ffd700","label":"RETRACE 61.8%"},
+{"entry_time":"2026-06-29T09:05:00","entry_price":79869,"exit_time":"2026-06-29T09:17:00","exit_price":79816,"color":"#ff4466","label":"-57"},
+
+{"entry_time":"2026-06-29T09:53:00","entry_price":79900,"exit_time":"2026-06-29T10:00:00","exit_price":80800,"color":"#888888","label":"IMPULSE ↑"},
+{"entry_time":"2026-06-29T10:00:00","entry_price":80800,"exit_time":"2026-06-29T10:05:00","exit_price":80245,"color":"#ffd700","label":"RETRACE 61.8%"},
+{"entry_time":"2026-06-29T10:05:00","entry_price":80720,"exit_time":"2026-06-29T10:17:00","exit_price":80031,"color":"#ff4466","label":"-693"},
+
+{"entry_time":"2026-06-29T10:48:00","entry_price":80200,"exit_time":"2026-06-29T10:55:00","exit_price":79700,"color":"#888888","label":"IMPULSE ↓"},
+{"entry_time":"2026-06-29T10:55:00","entry_price":79700,"exit_time":"2026-06-29T11:00:00","exit_price":79809,"color":"#ffd700","label":"RETRACE 61.8%"},
+{"entry_time":"2026-06-29T11:00:00","entry_price":79972,"exit_time":"2026-06-29T11:12:00","exit_price":79636,"color":"#ff4466","label":"-340"},
+
+{"entry_time":"2026-06-29T11:48:00","entry_price":79400,"exit_time":"2026-06-29T11:55:00","exit_price":79000,"color":"#888888","label":"IMPULSE ↓"},
+{"entry_time":"2026-06-29T11:55:00","entry_price":79000,"exit_time":"2026-06-29T12:00:00","exit_price":79152,"color":"#ffd700","label":"RETRACE 61.8%"},
+{"entry_time":"2026-06-29T12:00:00","entry_price":79180,"exit_time":"2026-06-29T12:12:00","exit_price":79336,"color":"#00ff88","label":"+152"}
+]
+}

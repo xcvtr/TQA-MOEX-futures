@@ -5,13 +5,11 @@ import numpy as np
 
 def check_signal(bar_data: dict, ticker: str, params: dict = None) -> Optional[dict]:
     """
-    Stop Hunt: ложный пробой 20-барового диапазона.
-    
-    LONG:  low[i] < min(low[i-20:i]) AND close[i] > low[i] + 0.3*(high[i]-low[i])
-    SHORT: high[i] > max(high[i-20:i]) AND close[i] < high[i] - 0.3*(high[i]-low[i])
+    Stop Hunt: ложный пробой N-барового диапазона.
+    M1: lookback=40, retrace=0.1 (M1 бары волатильнее M5)
     """
     if params is None:
-        params = {'lookback': 20, 'retrace': 0.3}
+        params = {'lookback': 40, 'retrace': 0.1}
     
     lo = bar_data.get('lo', 0)
     hi = bar_data.get('hi', 0)
@@ -25,6 +23,9 @@ def check_signal(bar_data: dict, ticker: str, params: dict = None) -> Optional[d
     min_lo = min(lo_hist[-params['lookback']:])
     max_hi = max(hi_hist[-params['lookback']:])
     retrace = params['retrace']
+    
+    if prc <= 0 or lo <= 0 or hi <= 0:
+        return None
     
     if lo < min_lo and prc > lo + retrace * (hi - lo):
         score = (min_lo - lo) / (hi - lo + 0.001)

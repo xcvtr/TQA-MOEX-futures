@@ -1,0 +1,10 @@
+[{"time":"2026-06-29T09:00:00","price":80332,"label":"LONG ENTER","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T09:05:00","price":80170,"label":"LONG EXIT +158","color":"#00ff88","size":14,"symbol":"cross"},
+{"time":"2026-06-29T09:05:00","price":79774,"label":"LONG ENTER","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T09:17:00","price":79879,"label":"LONG EXIT +101","color":"#00ff88","size":14,"symbol":"cross"},
+{"time":"2026-06-29T10:05:00","price":80690,"label":"LONG ENTER","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T10:17:00","price":80073,"label":"LONG EXIT -621","color":"#ff4466","size":14,"symbol":"cross"},
+{"time":"2026-06-29T11:00:00","price":79975,"label":"LONG ENTER","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T11:12:00","price":79287,"label":"LONG EXIT +684","color":"#00ff88","size":14,"symbol":"cross"},
+{"time":"2026-06-29T12:00:00","price":79106,"label":"LONG ENTER","color":"#00ff88","size":22,"symbol":"triangle-up"},
+{"time":"2026-06-29T12:12:00","price":79335,"label":"LONG EXIT +225","color":"#00ff88","size":14,"symbol":"cross"}]

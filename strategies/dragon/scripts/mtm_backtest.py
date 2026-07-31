@@ -28,7 +28,7 @@ ALL_TICKERS = {
 PRIORITY = ['NG','SV','BR','MM','RN','CR','GZ','Si','AF','HY','VB','TT','MX']
 
 
-def load_bars(ticker, cutoff='2020-01-01'):
+def load_bars(ticker, cutoff='2025-07-16'):
     import clickhouse_connect as cc
     ch = cc.get_client(host='10.0.0.60', port=8123, database='moex')
     rows = ch.query(f"SELECT bt, opn, hi, lo, prc FROM moex.mt5_continuous WHERE ticker='{ticker}' AND bt >= '{cutoff}' ORDER BY bt").result_rows
@@ -67,7 +67,7 @@ def backtest():
     
     all_bars = {}
     for t in tickers:
-        b = load_bars(t, '2020-01-01')
+        b = load_bars(t, '2025-07-16')
         if b and len(b) > 5000:
             all_bars[t] = b
     
@@ -143,7 +143,7 @@ def backtest():
             # Add new tickers as equity grows
             for t in selected_new:
                 if t not in all_bars:
-                    b = load_bars(t, '2020-01-01')
+                    b = load_bars(t, '2025-07-16')
                     if b and len(b) > 5000:
                         all_bars[t] = b
                         m5_cache[t] = []
