@@ -93,7 +93,10 @@ def check_signal(bar_data: dict, ticker: str, params: dict = None) -> dict:
     
     if direction is None:
         return None
-    
+
+    # Устанавливаем cooldown ПОСЛЕ сигнала — блокирует повторные входы в тот же импульс
+    _cooldown_state[ticker] = cooldown
+
     return {
         'ticker': ticker,
         'direction': direction,
