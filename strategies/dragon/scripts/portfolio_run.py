@@ -20,16 +20,26 @@ FEES = {
     'MM': {'tc': 2, 'maker': 1},    # entry=1.51
     'RN': {'tc': 7, 'maker': 4},    # entry=7.22
     'NG': {'tc': 4, 'maker': 2},    # entry=4.0
+    'SNGP': {'tc': 4, 'maker': 2},   # entry=4.0
+    'GAZR': {'tc': 2, 'maker': 1},   # entry=1.96
+    'LKOH': {'tc': 4, 'maker': 2},   # entry=4.0
 }
 ENTRY_MODE = 'limit'  # 'market' or 'limit'
 
 # New portfolio: IR Si + Dragon GD/MM/NG + SH RN - равномерное распределение
 CONFIGS = [
-    {'ticker': 'MIX', 'strat': 'ir', 'tf': 15, 'risk': 0.15,
+
+    {'ticker': 'LKOH', 'strat': 'ir', 'tf': 5, 'risk': 0.15,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
-     'ms': 1.0, 'sp': 1.0, 'go': 2620,
-     'params': {'impulse_bars': 12, 'impulse_pct': 1.5, 'cooldown': 6, 'min_vol_pct': 0},
+     'ms': 1.0, 'sp': 1.0, 'go': 22913,
+     'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
+    {'ticker': 'SNGP', 'strat': 'ir', 'tf': 5, 'risk': 0.15,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 6000,
+     'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'cooldown': 6, 'min_vol_pct': 0},
+     'filters': {'trend': True}},
+
     {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.20,
      'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
      'ms': 0.1, 'sp': 7.84756, 'go': 55343,
