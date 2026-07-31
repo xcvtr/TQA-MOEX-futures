@@ -96,6 +96,7 @@ def load_portfolio():
             'timeout_bars': int(r[6]) if r[6] else 12,
             'stop_loss': float(params.get('stop_loss_pct', 0.7)) / 100.0,
             'tf': int(params.get('tf', 5)),  # detect timeframe (minutes)
+            'risk': float(params.get('risk', 0.2)),  # risk fraction of equity (как бэктест)
         })
     return dict(portfolio)
 
@@ -696,8 +697,13 @@ def run_tick(strategy_filter=None, mode=None):
 
                 # Realistic slippage: 2-5 tick based on position size — moved after contracts
                 
-                # Contract sizing
-                contracts = entry.get('contracts') or 1
+                # Contract sizing: фиксированные contracts из PG ИЛИ risk-based (как бэктест)
+                if entry.get('contracts'):
+                    contracts = entry['contracts']
+                else:
+                    risk = entry.get('risk', 0.2)
+                    go = s.get('go', 1)
+                    contracts = max(1, int(equity * risk / go)) if go > 0 else 1
 
                 # Volume cap
                 b_vol = bd.get('vol', 0)
