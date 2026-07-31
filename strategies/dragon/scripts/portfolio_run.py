@@ -29,18 +29,18 @@ ENTRY_MODE = 'limit'  # 'market' or 'limit'
 # New portfolio: IR Si + Dragon GD/MM/NG + SH RN - равномерное распределение
 CONFIGS = [
 
-    {'ticker': 'LKOH', 'strat': 'ir', 'tf': 5, 'risk': 0.15,
+    {'ticker': 'LKOH', 'strat': 'ir', 'tf': 5, 'risk': 0.45,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
      'ms': 1.0, 'sp': 1.0, 'go': 22913,
      'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
-    {'ticker': 'SNGP', 'strat': 'ir', 'tf': 5, 'risk': 0.15,
+    {'ticker': 'SNGP', 'strat': 'ir', 'tf': 5, 'risk': 0.45,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
      'ms': 1.0, 'sp': 1.0, 'go': 6000,
      'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
 
-    {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.20,
+    {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.55,
      'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
      'ms': 0.1, 'sp': 7.84756, 'go': 55343,
      'params': {'impulse_pct': 0.3, 'retrace_max_pct': 70, 'hump_extension': 0.1, 'lookback': 100},
@@ -51,7 +51,7 @@ CONFIGS = [
     #  'ms': 1.0, 'sp': 1.0, 'go': 13901,
     #  'params': {'lookback': 60, 'retrace': 0.05},
     #  'filters': {}},  # Без TRIZ — SH RN не фильтруется
-    {'ticker': 'NG', 'strat': 'dragon', 'tf': 3, 'risk': 0.20,
+    {'ticker': 'NG', 'strat': 'dragon', 'tf': 3, 'risk': 0.55,
      'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
      'ms': 0.001, 'sp': 7.70611, 'go': 11974,
      'params': {'impulse_pct': 0.3, 'retrace_max_pct': 70, 'hump_extension': 0.1, 'lookback': 100},
@@ -62,7 +62,7 @@ ch = cc.get_client(host='10.0.0.60', port=8123, database='moex')
 all_m1 = {}
 for cfg in CONFIGS:
     t = cfg['ticker']
-    rows = ch.query("SELECT bt,opn,hi,lo,prc,vol FROM moex.mt5_continuous WHERE ticker='" + t + "' AND bt>='2025-07-26' ORDER BY bt").result_rows
+    rows = ch.query("SELECT bt,opn,hi,lo,prc,vol FROM moex.mt5_continuous WHERE ticker='" + t + "' AND bt>='2024-01-01' ORDER BY bt").result_rows
     bars = []
     for r in rows:
         ts = r[0]; h, m = ts.hour, ts.minute
