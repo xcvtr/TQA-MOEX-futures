@@ -25,7 +25,7 @@ PG_USER = 'postgres'
 PG_PASS = os.getenv('PG_PASS', '')
 
 CAPITAL = 200000.0
-RISK_PCT = 0.03
+RISK_PCT = 0.045
 HOLD_MIN = 120
 SLIP_TICKS = 2
 
