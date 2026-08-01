@@ -23,39 +23,39 @@ FEES = {
     'SNGP': {'tc': 4, 'maker': 2},   # entry=4.0
     'GAZR': {'tc': 2, 'maker': 1},   # entry=1.96
     'LKOH': {'tc': 4, 'maker': 2},   # entry=4.0
+    'TATN': {'tc': 4, 'maker': 2},   # entry=4.0
+    'ROSN': {'tc': 7, 'maker': 4},   # entry=7.22
+    'HANG': {'tc': 4, 'maker': 2},   # entry=4.0
+    'MTSI': {'tc': 4, 'maker': 2},   # entry=4.0
+    'SNGR': {'tc': 4, 'maker': 2},   # entry=4.0
+    'SBPR': {'tc': 4, 'maker': 2},   # entry=4.0
+    'VTBR': {'tc': 4, 'maker': 2},   # entry=4.0
 }
 ENTRY_MODE = 'limit'  # 'market' or 'limit'
 
-# New portfolio: IR Si + Dragon GD/MM/NG + SH RN - равномерное распределение
+# Портфель: 4 тикера (лучший честный вариант, cooldown fix)
 CONFIGS = [
-
-    {'ticker': 'LKOH', 'strat': 'ir', 'tf': 5, 'risk': 0.45,
+    {'ticker': 'LKOH', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
      'ms': 1.0, 'sp': 1.0, 'go': 22913,
-     'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'cooldown': 6, 'min_vol_pct': 0},
+     'params': {'impulse_bars': 6, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
-    {'ticker': 'SNGP', 'strat': 'ir', 'tf': 5, 'risk': 0.45,
+    {'ticker': 'SNGP', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
      'ms': 1.0, 'sp': 1.0, 'go': 6000,
-     'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'cooldown': 6, 'min_vol_pct': 0},
+     'params': {'impulse_bars': 3, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
 
-    {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.55,
+    {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.35,
      'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
-     'ms': 0.1, 'sp': 7.84756, 'go': 55343,
+     'ms': 0.1, 'sp': 7.84756, 'go': 54380,
      'params': {'impulse_pct': 0.3, 'retrace_max_pct': 70, 'hump_extension': 0.1, 'lookback': 100},
      'filters': {'trend': True, 'min_vol_ratio': 0.8}},
-
-    # {'ticker': 'RN', 'strat': 'sh', 'tf': 1, 'risk': 0.20,
-    #  'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
-    #  'ms': 1.0, 'sp': 1.0, 'go': 13901,
-    #  'params': {'lookback': 60, 'retrace': 0.05},
-    #  'filters': {}},  # Без TRIZ — SH RN не фильтруется
-    {'ticker': 'NG', 'strat': 'dragon', 'tf': 3, 'risk': 0.55,
+    {'ticker': 'NG', 'strat': 'dragon', 'tf': 3, 'risk': 0.35,
      'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
      'ms': 0.001, 'sp': 7.70611, 'go': 11974,
      'params': {'impulse_pct': 0.3, 'retrace_max_pct': 70, 'hump_extension': 0.1, 'lookback': 100},
-     'filters': {'trend': True}},  # Без volume filter для NG — он слишком агрессивный
+     'filters': {'trend': True}},
 ]
 
 ch = cc.get_client(host='10.0.0.60', port=8123, database='moex')
@@ -165,7 +165,11 @@ for mi in range(60, max_len):
                 cfg['pos'] = None
         
         # Detect — only if no position (creates pos on this bar, ticked from NEXT bar)
+        # Cooldown: пропускаем обработку, но db_idx всегда растёт
         if not cfg['pos'] and db_idx < len(dbars) and db_idx not in df and mi >= d2m.get(db_idx, 999999999):
+            if db_idx < cfg.get('cd_until', 0):
+                cfg['db_idx'] += 1
+                continue
             df.add(db_idx)
             db = dbars[db_idx]
             dh = dbars[:db_idx]
@@ -228,6 +232,8 @@ for mi in range(60, max_len):
                 slip_total = cfg['ms'] * base_slip
                 ep = sig['entry_price'] + (slip_total if sig['direction'] == 'long' else -slip_total)
                 cfg['pos'] = {'dir': sig['direction'], 'ep': ep, 'bi': mi, 'shares': shares, 'tr': False}
+                # Cooldown: не входить повторно в один паттерн (24 detect бара)
+                cfg['cd_until'] = db_idx + 24
             cfg['db_idx'] += 1
 
     # MTM MDD
