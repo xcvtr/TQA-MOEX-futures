@@ -25,12 +25,11 @@ PG_USER = 'postgres'
 PG_PASS = os.getenv('PG_PASS', '')
 
 CAPITAL = 200000.0
-RISK_PCT = 0.02
+RISK_PCT = 0.03
 HOLD_MIN = 120
 SLIP_TICKS = 2
 
 SPECS = {
-    'SV': {'ms': 0.01, 'sp': 7.9357, 'go': 9867, 'fee': 4.0, 'thr': -5.0},
     'BR': {'ms': 0.01, 'sp': 7.70611, 'go': 8620, 'fee': 4.0, 'thr': -7.0},
     'NG': {'ms': 0.001, 'sp': 7.70611, 'go': 11974, 'fee': 4.0, 'thr': -5.0},
 }
