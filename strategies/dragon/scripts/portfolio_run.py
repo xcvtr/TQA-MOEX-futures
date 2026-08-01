@@ -46,60 +46,6 @@ ENTRY_MODE = 'limit'  # 'market' or 'limit'
 # Портфель: Retest (BR/GD/Si) + Dragon (GD/NG/BR) + IR (9 тикеров)
 CONFIGS = [
     # ── RETEST (возврат к проторговке) ──
-    {'ticker': 'BR', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
-     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
-     'ms': 0.01, 'sp': 7.70611, 'go': 8620,
-     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
-                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
-     'filters': {}},
-    {'ticker': 'GD', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
-     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
-     'ms': 0.1, 'sp': 7.84756, 'go': 54380,
-     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
-                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
-     'filters': {}},
-    {'ticker': 'Si', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
-     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
-     'ms': 1.0, 'sp': 1.0, 'go': 12654,
-     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
-                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
-     'filters': {}},
-    {'ticker': 'MM', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
-     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
-     'ms': 0.05, 'sp': 0.5, 'go': 4912,
-     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
-                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
-     'filters': {}},
-    {'ticker': 'GZ', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
-     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
-     'ms': 1.0, 'sp': 1.0, 'go': 3098,
-     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
-                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
-     'filters': {}},
-    {'ticker': 'LKOH', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
-     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
-     'ms': 1.0, 'sp': 1.0, 'go': 22913,
-     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
-                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
-     'filters': {}},
-    {'ticker': 'GAZR', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
-     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
-     'ms': 1.0, 'sp': 1.0, 'go': 3098,
-     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
-                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
-     'filters': {}},
-    {'ticker': 'SBPR', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
-     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
-     'ms': 1.0, 'sp': 1.0, 'go': 3000,
-     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
-                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
-     'filters': {}},
-    {'ticker': 'MTSI', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
-     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
-     'ms': 1.0, 'sp': 1.0, 'go': 2000,
-     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
-                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
-     'filters': {}},
     # ── DRAGON ──
     {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.40,
      'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
@@ -308,13 +254,15 @@ for mi in range(60, max_len):
             # сетап подтверждён на закрытии предыдущего H1, вход не раньше следующего.
             if mi - cfg.get('pending_ts', mi) < 60:
                 pass  # ждём следующий H1 бар
-            elif p['dir'] == 'short' and b['lo'] <= p['limit'] * 1.0005:
+            elif p['dir'] == 'short' and b['hi'] >= p['limit']:
+                # SHORT (sell limit): цена ВЫРОСЛА до лимитки
                 shares_r = max(1, int(equity * cfg['risk'] / cfg['go']))
                 cfg['pos'] = {'dir': 'short', 'ep': p['limit'], 'bi': mi,
                               'shares': shares_r, 'tr': False, 'tp': p['tp'], 'sl': p['sl'],
                               'retest': True}
                 cfg['pending'] = None
-            elif p['dir'] == 'long' and b['hi'] >= p['limit'] * 0.9995:
+            elif p['dir'] == 'long' and b['lo'] <= p['limit']:
+                # LONG (buy limit): цена УПАЛА до лимитки
                 shares_r = max(1, int(equity * cfg['risk'] / cfg['go']))
                 cfg['pos'] = {'dir': 'long', 'ep': p['limit'], 'bi': mi,
                               'shares': shares_r, 'tr': False, 'tp': p['tp'], 'sl': p['sl'],
