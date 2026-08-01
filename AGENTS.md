@@ -1,6 +1,6 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 203 (2026-08-01)** — OI-стратегия BR+NG+SV, +1,067% ROI, MDD 13.4%
+**Последний чекпойнт: 203 (2026-08-01)** — OI-стратегия BR+NG+SV, +920% ROI, MDD 12.2% (risk 2%, slippage 2, весь день)
 
 ## 🚨 Правила работы
 
@@ -25,10 +25,10 @@
 
 | Стратегия | Тикер | Detect | Риск | ROI | PF | MDD |
 |:----------|:------|:------:|:----:|:---:|:--:|:---:|
-| 🎯 **OI** | **BR** | после 19:00 | 5% | **+892%** | 3.17 | 72% |
-| 🎯 **OI** | **NG** | после 19:00 | 5% | **+1,981%** | 3.08 | 65% |
-| 🎯 **OI** | **SV** | после 19:00 | 5% | **+557%** | 3.20 | 63% |
-| **ПОРТФЕЛЬ OI** | **3 тикера** | **физ продают→long** | 5% | **+1,067%** | — | **13.4%** ✅ |
+| 🎯 **OI** | **BR** | весь день 15-23 | 2% | **+892%** | 3.17 | 72% |
+| 🎯 **OI** | **NG** | весь день 15-23 | 2% | **+1,981%** | 3.08 | 65% |
+| 🎯 **OI** | **SV** | весь день 15-23 | 2% | **+557%** | 3.20 | 63% |
+| **ПОРТФЕЛЬ OI** | **3 тикера** | **физ продают→long, 120 мин** | 2% | **+920%** | — | **12.2%** ✅ |
 
 ## 🚨 Баги исправлены (199)
 1. **Look-ahead Dragon** — bars_list: dh + [db] (вход по close текущего)
@@ -185,9 +185,8 @@ Common pool лучше т.к. сигналы редко пересекаются
 - CR — убыточен для SH
 
 ### 🤖 Paper Trader
+- **OI (новый):** `strategies/oi/paper_trader.py` — BR/NG/SV, физ продают→long 120 мин, risk 2%, cron `*/5 15-23`, state `paper_state_oi`
+- **Legacy:** `scripts/cron_paper_v5.sh` → `run_paper_trader.py --state-key portfolio_v5` (Dragon+IR)
 - **Cron (system):** `*/5 15-23,0-4 * * 1-5` — crontab пользователя
-- **Скрипт:** `scripts/cron_paper_v5.sh` → `run_paper_trader.py --state-key portfolio_v5`
-- **Портфель:** 5 стратегий (Si IR, GD/MM/NG Dragon, RN SH) из PG `futures.portfolio`
-- **State:** `futures.paper_state_portfolio_v5`, `futures.paper_trades_portfolio_v5`
-- **Лог:** `/tmp/paper_trader.log`
+- **OI loader:** `loader.py` → `moex.futoi`, cron `*/20 15-23` + `30 10`
 - **Дашборд:** `dashboard.py` — порт 8085
