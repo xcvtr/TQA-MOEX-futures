@@ -25,7 +25,7 @@ PG_USER = 'postgres'
 PG_PASS = os.getenv('PG_PASS', '')
 
 CAPITAL = 200000.0
-RISK_PCT = 0.05
+RISK_PCT = 0.02
 HOLD_MIN = 120
 SLIP_TICKS = 2
 
@@ -133,9 +133,9 @@ def run_tick():
         else:
             remaining.append(p)
     
-    # 2. Открыть новые (19:00-21:45 IRK — hold 120 мин укладывается в сессию до 23:45)
+    # 2. Открыть новые (весь день 15:00-23:45 IRK — hold 120 мин, в конце сессии закрываем)
     opened = 0
-    if 19 <= irk_hour < 22:
+    if 15 <= irk_hour < 24:
         # Проверяем каждый тикер
         active = {p['ticker'] for p in remaining}
         for ticker in SPECS:
