@@ -302,3 +302,18 @@
 - Stop Hunt не работал из-за lo_hist=20 < lookback=40
 - backtest.py не передавал params из PG в check_signal
 - backtest.py использовал устаревший mt5_bars вместо mt5_continuous
+
+## [204] 2026-08-02
+### Added
+- OI-стратегия финал: BR+NG, физ продают→long 120 мин, risk 4.5%, +5,905%, MTM DD 14.3%
+- Критический аудит: look-ahead нет, slippage 2/5 живёт, ручная верификация сошлась
+- scripts/oi/ — бэктесты (basic/sweep/portfolio)
+- strategies/oi/paper_trader.py — live, cron */5 15-23
+### Changed
+- OI loader: CH 10.0.0.64→10.0.0.60, таблица futoi_iss→futoi (была readonly)
+- SV отклонён (топ-3 дня=151% PnL), RN/LKOH слабеют в 2026
+- Фильтр «после 19:00» убран — edge весь день
+### Fixed
+- OI данные не собирались с 01.07 (CH readonly из-за zookeeper)
+- PnL без учёта шага цены (sp/ms)
+- Checkpoint: checkpoint/204-oi-final-br-ng-5905pct.md
