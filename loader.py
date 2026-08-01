@@ -53,7 +53,7 @@ except ImportError:
 
 # ── ClickHouse connection ───────────────────────────────────────────────────
 
-CH_HOST = os.getenv("CH_HOST", "10.0.0.64")
+CH_HOST = os.getenv("CH_HOST", "10.0.0.60")
 CH_PORT = int(os.getenv("CH_PORT", "8123"))
 CH_DB = "moex"
 CH_TABLE = "openinterest"
@@ -83,7 +83,7 @@ def get_last_time(ticker: str) -> Optional[datetime]:
 
 
 def save_oi_records(ticker: str, records: list[dict]) -> int:
-    """Insert OI records into CH moex.futoi_iss + PG futures.futoi_iss."""
+    """Insert OI records into CH moex.futoi + PG futures.futoi_iss."""
     if not records:
         return 0
 
@@ -107,11 +107,11 @@ def save_oi_records(ticker: str, records: list[dict]) -> int:
     rows = [(ticker, bt, v["buy_fiz"], v["sell_fiz"], v["buy_yur"], v["sell_yur"])
             for bt, v in sorted(groups.items())]
 
-    # ClickHouse moex.futoi_iss (только ISS -> CH)
+    # ClickHouse moex.futoi (только ISS -> CH)
     try:
         client = get_ch()
         client.insert(
-            "moex.futoi_iss", rows,
+            "moex.futoi", rows,
             column_names=["ticker", "bt", "buy_fiz", "sell_fiz", "buy_yur", "sell_yur"],
         )
         client.close()
