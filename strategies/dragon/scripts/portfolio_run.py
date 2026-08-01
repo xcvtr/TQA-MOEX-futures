@@ -43,8 +43,29 @@ FEES = {
 }
 ENTRY_MODE = 'limit'  # 'market' or 'limit'
 
-# Портфель: расширенный (Dragon GD/NG/BR + IR LKOH/SNGP/ROSN)
+# Портфель: Retest (BR/GD/Si) + Dragon (GD/NG/BR) + IR (9 тикеров)
 CONFIGS = [
+    # ── RETEST (возврат к проторговке) ──
+    {'ticker': 'BR', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
+     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
+     'ms': 0.01, 'sp': 7.70611, 'go': 8620,
+     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
+                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
+     'filters': {}},
+    {'ticker': 'GD', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
+     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
+     'ms': 0.1, 'sp': 7.84756, 'go': 54380,
+     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
+                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
+     'filters': {}},
+    {'ticker': 'Si', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
+     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
+     'ms': 1.0, 'sp': 1.0, 'go': 12654,
+     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
+                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
+     'filters': {}},
+
+    # ── DRAGON ──
     {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.40,
      'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
      'ms': 0.1, 'sp': 7.84756, 'go': 54380,
@@ -61,9 +82,20 @@ CONFIGS = [
      'params': {'impulse_pct': 0.7, 'retrace_max_pct': 70, 'hump_extension': 0.2, 'lookback': 100},
      'filters': {'trend': True}},
 
-    {'ticker': 'LKOH', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
+    # ── IR (проверенные с cooldown) ──
+    {'ticker': 'ROSN', 'strat': 'ir', 'tf': 15, 'risk': 0.25,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
-     'ms': 1.0, 'sp': 1.0, 'go': 22913,
+     'ms': 1.0, 'sp': 1.0, 'go': 13673,
+     'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'retrace': 0.5, 'cooldown': 6, 'min_vol_pct': 0},
+     'filters': {'trend': True}},
+    {'ticker': 'SNGR', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 4952,
+     'params': {'impulse_bars': 12, 'impulse_pct': 2.0, 'retrace': 0.5, 'cooldown': 6, 'min_vol_pct': 0},
+     'filters': {'trend': True}},
+    {'ticker': 'RTKM', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 2000,
      'params': {'impulse_bars': 6, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
     {'ticker': 'SNGP', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
@@ -71,10 +103,10 @@ CONFIGS = [
      'ms': 1.0, 'sp': 1.0, 'go': 6000,
      'params': {'impulse_bars': 3, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
-    {'ticker': 'ROSN', 'strat': 'ir', 'tf': 15, 'risk': 0.25,
+    {'ticker': 'LKOH', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
-     'ms': 1.0, 'sp': 1.0, 'go': 13673,
-     'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'retrace': 0.5, 'cooldown': 6, 'min_vol_pct': 0},
+     'ms': 1.0, 'sp': 1.0, 'go': 22913,
+     'params': {'impulse_bars': 6, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
     {'ticker': 'TATN', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
@@ -90,16 +122,6 @@ CONFIGS = [
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
      'ms': 1.0, 'sp': 1.0, 'go': 2000,
      'params': {'impulse_bars': 3, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
-     'filters': {'trend': True}},
-    {'ticker': 'RTKM', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
-     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
-     'ms': 1.0, 'sp': 1.0, 'go': 2000,
-     'params': {'impulse_bars': 6, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
-     'filters': {'trend': True}},
-    {'ticker': 'SNGR', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
-     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
-     'ms': 1.0, 'sp': 1.0, 'go': 4952,
-     'params': {'impulse_bars': 12, 'impulse_pct': 2.0, 'retrace': 0.5, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
     {'ticker': 'HYDR', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
@@ -137,6 +159,64 @@ def resample_n(m1, n):
             gg['lo'] = min(gg['lo'], b['lo'])
             gg['prc'] = b['prc']
     return sorted(g.values(), key=lambda x: x['ts'])
+
+
+def find_retest_setup(dbars, idx, win_size=24, touches=2, min_n_pct=0.5,
+                      width_min=0.5, width_max=8.0, stop_bars=6, limit_frac=0.15):
+    """Найти сетап «возврат к проторговке», затормаживание завершилось ровно на idx.
+
+    Проторговка: окно [idx-win_size, idx]. Импульс: бар idx-1 (после проторговки).
+    Затормаживание: 6 баров после пика, пик должен быть за stop_bars баров до idx.
+    Возвращает setup только если ready_idx == idx (свежий, без look-ahead).
+    """
+    n = len(dbars)
+    if idx < win_size + stop_bars + 2 or idx >= n:
+        return None
+    imp_idx = idx - stop_bars - 1  # бар импульса (сразу после проторговки)
+    if imp_idx - win_size < 0 or imp_idx >= n:
+        return None
+    win = dbars[imp_idx-win_size:imp_idx]  # полные win_size баров ДО импульса
+    if len(win) < win_size:
+        return None
+    H = max(b['hi'] for b in win); L = min(b['lo'] for b in win)
+    mid = (H + L) / 2
+    width = (H - L) / mid * 100 if mid > 0 else 0
+    if not (width_min <= width <= width_max):
+        return None
+    th = sum(1 for b in win if b['hi'] >= H * 0.999)
+    tl = sum(1 for b in win if b['lo'] <= L * 1.001)
+    if th < touches or tl < touches:
+        return None
+    closes = [b['prc'] for b in win]
+    slope = np.polyfit(np.arange(len(closes)), closes, 1)[0]
+    if abs(slope) / mid * 100 > 0.05:
+        return None
+    b0 = dbars[imp_idx]
+    # Период импульса: [imp_idx, imp_idx + stop_bars] (пик + затормаживание)
+    imp_zone = dbars[imp_idx:imp_idx+stop_bars+1]
+    if b0['prc'] > H:
+        peak = max(b['hi'] for b in imp_zone)
+        peak_pos = max(range(len(imp_zone)), key=lambda k: imp_zone[k]['hi'])
+        # Пик должен быть в начале зоны (не в последнем баре — иначе stall не завершён)
+        if peak_pos >= stop_bars:
+            return None
+        N = peak - H
+        if N / H * 100 < min_n_pct:
+            return None
+        return {'dir': 'short', 'limit': peak - limit_frac * N,
+                'tp': H, 'sl': peak * 1.003}
+    elif b0['prc'] < L:
+        trough = min(b['lo'] for b in imp_zone)
+        trough_pos = min(range(len(imp_zone)), key=lambda k: imp_zone[k]['lo'])
+        if trough_pos >= stop_bars:
+            return None
+        N = L - trough
+        if N / L * 100 < min_n_pct:
+            return None
+        return {'dir': 'long', 'limit': trough + limit_frac * N,
+                'tp': L, 'sl': trough * 0.997}
+    return None
+
 
 # Prepare detect bars for all configs
 for cfg in CONFIGS:
@@ -186,12 +266,37 @@ for mi in range(60, max_len):
         df = cfg['detect_fired']
         
         # Tick FIRST — manages positions from PREVIOUS bars only
+        # Retest: проверяем исполнение лимитки (если сетап найден)
+        if cfg.get('strat') == 'retest' and not cfg['pos'] and cfg.get('pending'):
+            p = cfg['pending']
+            # Исполнить если цена коснулась лимитки (с учётом допуска)
+            if p['dir'] == 'short' and b['lo'] <= p['limit'] * 1.0005:
+                shares_r = max(1, int(equity * cfg['risk'] / cfg['go']))
+                cfg['pos'] = {'dir': 'short', 'ep': p['limit'], 'bi': mi,
+                              'shares': shares_r, 'tr': False, 'tp': p['tp'], 'sl': p['sl'],
+                              'retest': True}
+                cfg['pending'] = None
+            elif p['dir'] == 'long' and b['hi'] >= p['limit'] * 0.9995:
+                shares_r = max(1, int(equity * cfg['risk'] / cfg['go']))
+                cfg['pos'] = {'dir': 'long', 'ep': p['limit'], 'bi': mi,
+                              'shares': shares_r, 'tr': False, 'tp': p['tp'], 'sl': p['sl'],
+                              'retest': True}
+                cfg['pending'] = None
+            # TTL лимитки: 24 H1 баров = 24*60 M1
+            elif mi - cfg.get('pending_ts', mi) > 24 * 60:
+                cfg['pending'] = None
         if cfg['pos']:
             pos = cfg['pos']
             ex = None
             slev = pos['ep'] * (1 - cfg['sl']) if pos['dir'] == 'long' else pos['ep'] * (1 + cfg['sl'])
             if (pos['dir'] == 'long' and b['lo'] <= slev) or (pos['dir'] == 'short' and b['hi'] >= slev):
                 ex = slev
+            # Retest: TP (проторговка) — приоритетнее trailing
+            if not ex and pos.get('retest'):
+                tp = pos.get('tp')
+                if tp:
+                    if (pos['dir'] == 'short' and b['lo'] <= tp) or (pos['dir'] == 'long' and b['hi'] >= tp):
+                        ex = tp
             if not ex:
                 if not pos.get('tr'):
                     act = pos['ep'] * (1 + cfg['ta']) if pos['dir'] == 'long' else pos['ep'] * (1 - cfg['ta'])
@@ -225,7 +330,12 @@ for mi in range(60, max_len):
             dh = dbars[:db_idx]
             
             sig = None
-            if cfg['strat'] == 'ir' and len(dh) >= 20:
+            if cfg['strat'] == 'retest' and len(dh) >= 24:
+                setup = find_retest_setup(dbars, db_idx)
+                if setup:
+                    cfg['pending'] = setup
+                    cfg['pending_ts'] = mi
+            elif cfg['strat'] == 'ir' and len(dh) >= 20:
                 bd = {'prc': db['prc'], 'hi': db['hi'], 'lo': db['lo'], 'vol': 100,
                       'bars_list': dh[-60:], 'lo_hist': [x['lo'] for x in dh[-50:]],
                       'hi_hist': [x['hi'] for x in dh[-50:]], 'close_hist': [x['prc'] for x in dh[-50:]],
