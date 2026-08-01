@@ -25,10 +25,12 @@ def _load_strategies():
     from strategies.cvd.prod.engine import check_signal as cvd_check
     from strategies.impulse_return.prod.engine import check_signal as imp_check
     from strategies.dragon.prod.engine import check_signal as dragon_check
+    from strategies.oi.prod.engine import check_signal as oi_check
     STRATEGY_MAP['stop_hunt'] = sh_check
     STRATEGY_MAP['cvd'] = cvd_check
     STRATEGY_MAP['impulse_return'] = imp_check
     STRATEGY_MAP['dragon'] = dragon_check
+    STRATEGY_MAP['oi'] = oi_check
 
 # ── Config ────────────────────────────────────────────────────────────────
 CH_HOST = os.getenv('MOEX_CH_HOST', '10.0.0.60')
@@ -380,6 +382,32 @@ def get_volume_data(ticker, n_bars=55):
         return [], [], []
 
 
+def fetch_day_net(ticker):
+    """Накопление нетто-позиции физлиц за день в % от OI.
+
+    day_net = ((последний buy_fiz - sell_fiz) - (первый buy_fiz - sell_fiz)) / total_oi * 100
+    Отрицательное значение = физлица продают. Из moex.futoi за сегодня.
+    """
+    try:
+        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+        rows = ch.query(f"""
+            SELECT
+              argMax(buy_fiz, bt) - argMax(sell_fiz, bt) AS cur_fiz,
+              argMin(buy_fiz, bt) - argMin(sell_fiz, bt) AS open_fiz,
+              argMax(buy_fiz, bt) + argMax(sell_fiz, bt) + argMax(buy_yur, bt) + argMax(sell_yur, bt) AS total
+            FROM moex.futoi
+            WHERE ticker = '{ticker}' AND bt >= today()
+        """).result_rows
+        ch.close()
+        if not rows or not rows[0] or rows[0][2] is None or rows[0][2] <= 0:
+            return None
+        cur_fiz, open_fiz, total = float(rows[0][0]), float(rows[0][1]), float(rows[0][2])
+        return (cur_fiz - open_fiz) / total * 100.0
+    except Exception as e:
+        log.warning("fetch_day_net error for %s: %s", ticker, e)
+        return None
+
+
 def calc_dcvd_z(vol_b_hist, vol_s_hist, period=20):
     """Calculate CVD z-score from vol_b/vol_s history.
     Returns z-score (float) or 0 if insufficient data.
@@ -641,6 +669,12 @@ def run_tick(strategy_filter=None, mode=None):
         lo_hist = [float(b['lo']) for b in detect_bars[:-1]][-61:]
         bar_data[ticker]['hi_hist'] = hi_hist
         bar_data[ticker]['lo_hist'] = lo_hist
+        # OI day_net для oi-стратегии: накопление нетто-физ за день из futoi
+        oi_strategies = [s for s in portfolio.get(ticker, []) if s.get('strategy') == 'oi']
+        if oi_strategies:
+            dn = fetch_day_net(ticker)
+            if dn is not None:
+                bar_data[ticker]['day_net'] = dn
         max_bar_idx = max(max_bar_idx, bar_idx)
 
     state['bar_idx'] = max_bar_idx
