@@ -26,7 +26,16 @@ FEES = {
     'LKOH': {'tc': 4, 'maker': 2},   # entry=4.0
     'TATN': {'tc': 4, 'maker': 2},   # entry=4.0
     'ROSN': {'tc': 7, 'maker': 4},   # entry=7.22
+    'TATN': {'tc': 4, 'maker': 2},   # entry=4.0
+    'MTSI': {'tc': 4, 'maker': 2},   # entry=4.0
     'HANG': {'tc': 4, 'maker': 2},   # entry=4.0
+    'RTKM': {'tc': 4, 'maker': 2},   # entry=4.0
+    'SNGR': {'tc': 4, 'maker': 2},   # entry=4.0
+    'HYDR': {'tc': 4, 'maker': 2},   # entry=4.0
+    'HANG': {'tc': 4, 'maker': 2},   # entry=4.0
+    'RTKM': {'tc': 4, 'maker': 2},   # entry=4.0
+    'SNGR': {'tc': 4, 'maker': 2},   # entry=4.0
+    'HYDR': {'tc': 4, 'maker': 2},   # entry=4.0
     'MTSI': {'tc': 4, 'maker': 2},   # entry=4.0
     'SNGR': {'tc': 4, 'maker': 2},   # entry=4.0
     'SBPR': {'tc': 4, 'maker': 2},   # entry=4.0
@@ -66,6 +75,36 @@ CONFIGS = [
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
      'ms': 1.0, 'sp': 1.0, 'go': 13673,
      'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'retrace': 0.5, 'cooldown': 6, 'min_vol_pct': 0},
+     'filters': {'trend': True}},
+    {'ticker': 'TATN', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 5000,
+     'params': {'impulse_bars': 6, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
+     'filters': {'trend': True}},
+    {'ticker': 'MTSI', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 2000,
+     'params': {'impulse_bars': 6, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
+     'filters': {'trend': True}},
+    {'ticker': 'HANG', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 2000,
+     'params': {'impulse_bars': 3, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
+     'filters': {'trend': True}},
+    {'ticker': 'RTKM', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 2000,
+     'params': {'impulse_bars': 6, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
+     'filters': {'trend': True}},
+    {'ticker': 'SNGR', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 4952,
+     'params': {'impulse_bars': 12, 'impulse_pct': 2.0, 'retrace': 0.5, 'cooldown': 6, 'min_vol_pct': 0},
+     'filters': {'trend': True}},
+    {'ticker': 'HYDR', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 932,
+     'params': {'impulse_bars': 6, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
 ]
 
