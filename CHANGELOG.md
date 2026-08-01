@@ -1,3 +1,14 @@
+## [203] 2026-08-01
+### Added
+- OI-стратегия (физ продают → long, hold 120): BR+NG+SV, +1,067%, MDD 13.4%
+- scripts/oi/ — oi_basic_test, oi_sweep_all, oi_portfolio_backtest
+- Cron OI loader: */20 15-23 + 30 10 (update_moex_oi.sh)
+### Fixed
+- OI loader: CH 10.0.0.64→10.0.0.60, futoi_iss(readonly)→futoi
+- Данные OI обновлены до 2026-07-31
+### Removed
+- Retest (убыточен на MOEX с честными лимитками)
+- Checkpoint: checkpoint/203-oi-strategy-1067pct.md
 ## [191] 2026-07-26
 ### Added
 - **Dashboard v5:** `dashboard_v5.py` — порт 8085, общий портфель + по стратегиям + floating PnL
