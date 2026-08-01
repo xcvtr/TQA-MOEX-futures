@@ -64,7 +64,42 @@ CONFIGS = [
      'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
                 'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
      'filters': {}},
-
+    {'ticker': 'MM', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
+     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
+     'ms': 0.05, 'sp': 0.5, 'go': 4912,
+     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
+                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
+     'filters': {}},
+    {'ticker': 'GZ', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
+     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
+     'ms': 1.0, 'sp': 1.0, 'go': 3098,
+     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
+                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
+     'filters': {}},
+    {'ticker': 'LKOH', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
+     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
+     'ms': 1.0, 'sp': 1.0, 'go': 22913,
+     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
+                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
+     'filters': {}},
+    {'ticker': 'GAZR', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
+     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
+     'ms': 1.0, 'sp': 1.0, 'go': 3098,
+     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
+                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
+     'filters': {}},
+    {'ticker': 'SBPR', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
+     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
+     'ms': 1.0, 'sp': 1.0, 'go': 3000,
+     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
+                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
+     'filters': {}},
+    {'ticker': 'MTSI', 'strat': 'retest', 'tf': 60, 'risk': 0.35,
+     'ta': 0.0, 'tt': 0.0, 'sl': 0.0, 'to': 48,
+     'ms': 1.0, 'sp': 1.0, 'go': 2000,
+     'params': {'win_size': 24, 'touches': 2, 'min_n_pct': 0.5,
+                'width_min': 0.5, 'width_max': 8.0, 'stop_bars': 6, 'limit_frac': 0.15},
+     'filters': {}},
     # ── DRAGON ──
     {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.40,
      'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
@@ -269,8 +304,11 @@ for mi in range(60, max_len):
         # Retest: проверяем исполнение лимитки (если сетап найден)
         if cfg.get('strat') == 'retest' and not cfg['pos'] and cfg.get('pending'):
             p = cfg['pending']
-            # Исполнить если цена коснулась лимитки (с учётом допуска)
-            if p['dir'] == 'short' and b['lo'] <= p['limit'] * 1.0005:
+            # Лимитка исполняется ТОЛЬКО со следующего H1 бара (минус look-ahead):
+            # сетап подтверждён на закрытии предыдущего H1, вход не раньше следующего.
+            if mi - cfg.get('pending_ts', mi) < 60:
+                pass  # ждём следующий H1 бар
+            elif p['dir'] == 'short' and b['lo'] <= p['limit'] * 1.0005:
                 shares_r = max(1, int(equity * cfg['risk'] / cfg['go']))
                 cfg['pos'] = {'dir': 'short', 'ep': p['limit'], 'bi': mi,
                               'shares': shares_r, 'tr': False, 'tp': p['tp'], 'sl': p['sl'],
@@ -282,15 +320,20 @@ for mi in range(60, max_len):
                               'shares': shares_r, 'tr': False, 'tp': p['tp'], 'sl': p['sl'],
                               'retest': True}
                 cfg['pending'] = None
-            # TTL лимитки: 24 H1 баров = 24*60 M1
             elif mi - cfg.get('pending_ts', mi) > 24 * 60:
                 cfg['pending'] = None
         if cfg['pos']:
             pos = cfg['pos']
             ex = None
-            slev = pos['ep'] * (1 - cfg['sl']) if pos['dir'] == 'long' else pos['ep'] * (1 + cfg['sl'])
-            if (pos['dir'] == 'long' and b['lo'] <= slev) or (pos['dir'] == 'short' and b['hi'] >= slev):
-                ex = slev
+            if pos.get('retest') and pos.get('sl'):
+                # Retest: SL из сетапа (пик * 1.003), не cfg['sl']
+                sl_price = pos['sl']
+                if (pos['dir'] == 'long' and b['lo'] <= sl_price) or (pos['dir'] == 'short' and b['hi'] >= sl_price):
+                    ex = sl_price
+            else:
+                slev = pos['ep'] * (1 - cfg['sl']) if pos['dir'] == 'long' else pos['ep'] * (1 + cfg['sl'])
+                if (pos['dir'] == 'long' and b['lo'] <= slev) or (pos['dir'] == 'short' and b['hi'] >= slev):
+                    ex = slev
             # Retest: TP (проторговка) — приоритетнее trailing
             if not ex and pos.get('retest'):
                 tp = pos.get('tp')
