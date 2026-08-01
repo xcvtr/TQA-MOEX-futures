@@ -22,6 +22,7 @@ FEES = {
     'NG': {'tc': 4, 'maker': 2},    # entry=4.0
     'SNGP': {'tc': 4, 'maker': 2},   # entry=4.0
     'GAZR': {'tc': 2, 'maker': 1},   # entry=1.96
+    'BR': {'tc': 4, 'maker': 2},   # entry=4.0
     'LKOH': {'tc': 4, 'maker': 2},   # entry=4.0
     'TATN': {'tc': 4, 'maker': 2},   # entry=4.0
     'ROSN': {'tc': 7, 'maker': 4},   # entry=7.22
@@ -33,8 +34,24 @@ FEES = {
 }
 ENTRY_MODE = 'limit'  # 'market' or 'limit'
 
-# Портфель: 4 тикера (лучший честный вариант, cooldown fix)
+# Портфель: расширенный (Dragon GD/NG/BR + IR LKOH/SNGP/ROSN)
 CONFIGS = [
+    {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.40,
+     'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
+     'ms': 0.1, 'sp': 7.84756, 'go': 54380,
+     'params': {'impulse_pct': 0.3, 'retrace_max_pct': 70, 'hump_extension': 0.1, 'lookback': 100},
+     'filters': {'trend': True, 'min_vol_ratio': 0.8}},
+    {'ticker': 'NG', 'strat': 'dragon', 'tf': 3, 'risk': 0.40,
+     'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
+     'ms': 0.001, 'sp': 7.70611, 'go': 11974,
+     'params': {'impulse_pct': 0.5, 'retrace_max_pct': 70, 'hump_extension': 0.2, 'lookback': 100},
+     'filters': {'trend': True}},
+    {'ticker': 'BR', 'strat': 'dragon', 'tf': 10, 'risk': 0.40,
+     'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
+     'ms': 0.01, 'sp': 7.70611, 'go': 8620,
+     'params': {'impulse_pct': 0.7, 'retrace_max_pct': 70, 'hump_extension': 0.2, 'lookback': 100},
+     'filters': {'trend': True}},
+
     {'ticker': 'LKOH', 'strat': 'ir', 'tf': 5, 'risk': 0.25,
      'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
      'ms': 1.0, 'sp': 1.0, 'go': 22913,
@@ -45,16 +62,10 @@ CONFIGS = [
      'ms': 1.0, 'sp': 1.0, 'go': 6000,
      'params': {'impulse_bars': 3, 'impulse_pct': 2.0, 'retrace': 0.7, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
-
-    {'ticker': 'GD', 'strat': 'dragon', 'tf': 10, 'risk': 0.35,
-     'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
-     'ms': 0.1, 'sp': 7.84756, 'go': 54380,
-     'params': {'impulse_pct': 0.3, 'retrace_max_pct': 70, 'hump_extension': 0.1, 'lookback': 100},
-     'filters': {'trend': True, 'min_vol_ratio': 0.8}},
-    {'ticker': 'NG', 'strat': 'dragon', 'tf': 3, 'risk': 0.35,
-     'ta': 0.015, 'tt': 0.005, 'sl': 0.01, 'to': 60,
-     'ms': 0.001, 'sp': 7.70611, 'go': 11974,
-     'params': {'impulse_pct': 0.3, 'retrace_max_pct': 70, 'hump_extension': 0.1, 'lookback': 100},
+    {'ticker': 'ROSN', 'strat': 'ir', 'tf': 15, 'risk': 0.25,
+     'ta': 0.005, 'tt': 0.003, 'sl': 0.007, 'to': 12,
+     'ms': 1.0, 'sp': 1.0, 'go': 13673,
+     'params': {'impulse_bars': 6, 'impulse_pct': 1.5, 'retrace': 0.5, 'cooldown': 6, 'min_vol_pct': 0},
      'filters': {'trend': True}},
 ]
 
