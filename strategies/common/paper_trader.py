@@ -165,14 +165,14 @@ def save_state(state):
         for t in state.get('trades', []):
             if t.get('saved', False):
                 continue
-            cur.execute(f"""
+            cur.execute(f""" 
                 INSERT INTO {tbl_trades}
                 (ticker, strategy, direction, entry_price, exit_price, entry_time, exit_time,
-                 pnl_rub, signal_type, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'closed')
+                 pnl_rub, signal_type, status, exit_reason)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'closed', %s)
             """, (t['ticker'], t.get('strategy', 'stop_hunt'), t['direction'], t['entry_price'], t.get('exit_price'),
                   t.get('entry_time', datetime.now(timezone.utc)), t.get('exit_time'),
-                  t.get('pnl'), t.get('exit_reason', '')))
+                  t.get('pnl'), t.get('exit_reason', ''), t.get('exit_reason', '')))
             t['saved'] = True
         conn.commit()
         # Delete old state, insert new
