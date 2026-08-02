@@ -763,12 +763,17 @@ def run_tick(strategy_filter=None, mode=None):
         lo_hist = [float(b['lo']) for b in detect_bars[:-1]][-61:]
         bar_data[ticker]['hi_hist'] = hi_hist
         bar_data[ticker]['lo_hist'] = lo_hist
-        # OI day_net для oi-стратегии: накопление нетто-физ за день из futoi
-        oi_strategies = [s for s in portfolio.get(ticker, []) if s.get('strategy') == 'oi']
+        # OI day_net для oi/oi_dom стратегий: накопление нетто-физ за день из futoi
+        oi_strategies = [s for s in portfolio.get(ticker, []) if s.get('strategy') in ('oi', 'oi_dom')]
         if oi_strategies:
             dn = fetch_day_net(ticker)
             if dn is not None:
                 bar_data[ticker]['day_net'] = dn
+            # dom подтверждение для oi_dom
+            if any(s.get('strategy') == 'oi_dom' for s in oi_strategies):
+                imb = fetch_dom_imbalance(ticker)
+                if imb is not None:
+                    bar_data[ticker]['dom_imb'] = imb
         max_bar_idx = max(max_bar_idx, bar_idx)
 
     state['bar_idx'] = max_bar_idx

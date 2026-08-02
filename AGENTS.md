@@ -188,7 +188,8 @@ Common pool лучше т.к. сигналы редко пересекаются
 ### 🤖 Paper Trader (общий фреймворк, единый крон)
 - **Watchdog OI:** `scripts/oi_watchdog.py` (крон */30 15-23,0-2 будни) → email m4slayer@ya.ru при простое/баге (futoi stale, mt5 stale, 0 сделок 3+ дня, DD>25%)
 - **Крон (общий на фреймворк):** `*/5 15-23,0-4 * * 1-5` → `~/.hermes/scripts/run_moex_paper_trader.sh` → `run_paper_trader.py --stdout` (без --strategy — ВСЕ enabled из PG)
-- **OI (единственная enabled):** `strategies/oi/prod/engine.py` (плагин, long+short) + `fetch_day_net()` в common. **BR/NG/SV/RN**, thr ±3%, long/short 60 мин, **risk 40%**, trailing/SL отключены (0.99). **+1,309%/год ROI, MTM DD 18.0%** (честно: свежий бар ≤5 мин; КСУР-ПГО ГО; ролл-фильтр: expiration_date из ISS + гэп >2% + roll_close позиций; размазывание K=400)
+- **2 стратегии live (05 тикеров):** oi (BR/NG/SV, contrarian) + oi_dom (RN/TATN, подтверждение стаканом: dom_imb). oi_dom: DD 35%→17.5%, TATN WR 67%, RN WR 61%.
+- **OI (старая):** `strategies/oi/prod/engine.py` (плагин, long+short) + `fetch_day_net()` в common. **BR/NG/SV/RN**, thr ±3%, long/short 60 мин, **risk 40%**, trailing/SL отключены (0.99). **+1,309%/год ROI, MTM DD 18.0%** (честно: свежий бар ≤5 мин; КСУР-ПГО ГО; ролл-фильтр: expiration_date из ISS + гэп >2% + roll_close позиций; размазывание K=400)
 - **Dragon/IR: ОТКЛЮЧЕНЫ** (02.08) — cron убран, `futures.portfolio.enabled=false` до разбирательства. ⚠️ Проверять enabled после работы других агентов!
 - **Legacy state сброшен** (02.08) — старые позиции Si IR / GD Dragon удалены из futures.paper_state
 - **Старый самописный `strategies/oi/paper_trader.py` оставлен** (не используется, для сравнения)
