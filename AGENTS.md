@@ -1,6 +1,6 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 206 (2026-08-02)** — OI + ролл-фильтр: risk 30% → +6,300% ROI, MTM DD 14.8% (thr -3%, hold 60, без сделок в дни экспирации)
+**Последний чекпойнт: 206 (2026-08-02)** — OI: risk 30%, +8,941% ROI, MTM DD 13.5% (thr -3%, hold 60, КСУР-ПГО ГО, ролл-фильтр)
 
 ## 🚨 Правила работы
 
@@ -27,7 +27,7 @@
 |:----------|:------|:------:|:----:|:---:|:--:|:---:|
 | 🎯 **OI** | **BR** | 10-18 MSK | 15% | **+368%** | 3.17 | 72% |
 | 🎯 **OI** | **NG** | 10-18 MSK | 15% | **+1,042%** | 3.08 | 69% |
-| **ПОРТФЕЛЬ OI** | **3 тикера** | **физ продают→long, 60 мин, ролл-фильтр** | 30% | **+6,300%** | — | **14.8%** ✅ |
+| **ПОРТФЕЛЬ OI** | **3 тикера** | **физ продают→long, 60 мин, ролл-фильтр** | 30% | **+8,941%** | — | **13.5%** ✅ |
 
 ## 🚨 Баги исправлены (199)
 1. **Look-ahead Dragon** — bars_list: dh + [db] (вход по close текущего)
@@ -185,9 +185,10 @@ Common pool лучше т.к. сигналы редко пересекаются
 
 ### 🤖 Paper Trader (общий фреймворк, единый крон)
 - **Крон (общий на фреймворк):** `*/5 15-23,0-4 * * 1-5` → `~/.hermes/scripts/run_moex_paper_trader.sh` → `run_paper_trader.py --stdout` (без --strategy — ВСЕ enabled из PG)
-- **OI (единственная enabled):** `strategies/oi/prod/engine.py` (плагин) + `fetch_day_net()` в common. BR/NG/SV, thr -3%, long 60 мин, risk 15% (⚠️ обновить до 30%), trailing/SL отключены (0.99). **+6,300% ROI, MTM DD 14.8% при risk 30% + ролл-фильтр** (не торговать в дни экспирации)
+- **OI (единственная enabled):** `strategies/oi/prod/engine.py` (плагин) + `fetch_day_net()` в common. BR/NG/SV, thr -3%, long 60 мин, **risk 30%**, trailing/SL отключены (0.99). **+8,941% ROI, MTM DD 13.5%** (КСУР-ПГО ГО: NG 3,987, SV 5,585, BR 27,657 medium)
 - **Dragon/IR: ОТКЛЮЧЕНЫ** (02.08) — cron убран, `futures.portfolio.enabled=false` до разбирательства. ⚠️ Проверять enabled после работы других агентов!
 - **Legacy state сброшен** (02.08) — старые позиции Si IR / GD Dragon удалены из futures.paper_state
 - **Старый самописный `strategies/oi/paper_trader.py` оставлен** (не используется, для сравнения)
 - **OI loader:** `loader.py` → `moex.futoi`, cron `*/5 15-23` + `30 10` (задержка ~5 мин, прогон 70с/64 тикера)
+- **ГО обновление:** `scripts/update_go_ksur_pgo.py`, cron `30 6` (MOEX go.xml + FINAM XLS, формула medium×КСУР)
 - **Дашборд:** `dashboard.py` — порт 8085
