@@ -5,7 +5,7 @@ Loads portfolio → loads latest bar → checks signals → manages positions.
 Works with any strategy that has check_signal(bar_data, ticker) -> dict|None.
 """
 import os, sys, json, time, logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from decimal import Decimal
 from collections import defaultdict
 
@@ -409,22 +409,47 @@ def fetch_day_net(ticker):
 
 
 def is_roll_day(ticker):
-    """День экспирации/ролла: был скачок цены >5% за 1 бар в mt5_continuous за сегодня.
+    """День экспирации/ролла контракта.
 
-    Continuous склеивает контракты с гэпами при ролле (5-15% за бар) — это не реальное
-    движение, а переход на новый контракт. В такие дни OI-сигналы ненадёжны → не торгуем.
+    Ролл continuous ALLFUT происходит в LASTTRADEDATE (последний день торговли
+    контрактом): вечером этого дня склейка переключается на новый контракт с
+    гэпом. Сигналы в этот день ненадёжны, а открытые позиции надо закрыть
+    заранее (см. manage_positions: roll_close).
+
+    Признаки:
+    1. Сегодня == expiration_date из PG futures.ticker_specs (ISS LASTTRADEDATE)
+    2. Гэп между последним баром вчера и первым баром сегодня > 2% (ролл случился ночью)
+    3. Скачок >2% за 1 бар сегодня (ролл случился в течение дня)
     """
     try:
+        # 1. Дата экспирации из PG
+        conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB,
+                                user=PG_USER, password=PG_PASS, connect_timeout=3)
+        cur = conn.cursor()
+        cur.execute("SELECT expiration_date FROM futures.ticker_specs WHERE ticker = %s", (ticker,))
+        row = cur.fetchone()
+        conn.close()
+        if row and row[0]:
+            if row[0] == date.today():
+                return True
+
+        # 2-3. Скачки в mt5_continuous: сегодня (внутри дня) и гэп вчера→сегодня
         ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         rows = ch.query(f"""
-            SELECT count() FROM (
-                SELECT prc, lagInFrame(prc) OVER (ORDER BY bt) prev
+            SELECT toDate(bt) d, prc, prev FROM (
+                SELECT bt, prc, lagInFrame(prc) OVER (ORDER BY bt) prev
                 FROM moex.mt5_continuous
-                WHERE ticker = '{ticker}' AND toDate(bt) = today()
-            ) WHERE prev > 0 AND abs(prc/prev - 1) > 0.05
+                WHERE ticker = '{ticker}' AND bt >= today() - 1
+            ) WHERE prev > 0
         """).result_rows
         ch.close()
-        return rows[0][0] > 0
+        today = date.today()
+        for d, prc, prev in rows:
+            chg = abs(prc / prev - 1)
+            if chg > 0.02:
+                # скачок сегодня (в течение дня) ИЛИ гэп вчера 23:xx → сегодня
+                return True
+        return False
     except Exception as e:
         log.warning("is_roll_day error for %s: %s", ticker, e)
         return False
@@ -495,6 +520,18 @@ def manage_positions(positions, bar_data, specs, bar_idx):
         except Exception:
             age_sec = 0
         if p['entry_bar'] >= bar_idx and age_sec < 60:
+            continue
+
+        # Ролл/экспирация: закрыть позицию заранее (склейка контракта вечером)
+        if is_roll_day(p.get('ticker', '')):
+            pnl = (close - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
+            pnl += p.get('part_pnl', 0)
+            p['pnl'] = pnl
+            p['exit_price'] = close
+            p['exit_reason'] = 'roll_close'
+            p['closed'] = True
+            p['exit_bar'] = bar_idx
+            closed.append(p)
             continue
         
         # Timeout (by bars or by real time)

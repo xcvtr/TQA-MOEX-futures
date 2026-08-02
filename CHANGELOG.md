@@ -370,3 +370,15 @@
 - TZ проверен (не кривой); AlgoPack — мусор; mt5_bars — другие цены
 ### Added
 - Checkpoint: checkpoint/209-oi-long-short-1094pct-year.md
+
+## [210] 2026-08-02
+### Fixed
+- Ролл-фильтр: топ-9 сделок бэктеста были артефактами склейки ALLFUT (BR 17.04, SV 30.01)
+- is_roll_day(): expiration_date из ISS + гэп >2% + скачок >2% (было только >5% за 1 бар)
+- manage_positions: roll_close — закрытие позиций в день экспирации ДО склейки
+### Added
+- scripts/update_expirations.py + крон 35 6 (ISS LASTTRADEDATE → PG)
+- Ролл-фильтр по гэпу >2% в oi_portfolio_backtest.py
+### Changed
+- risk 35% → 40% → +1,309%/год, MTM DD 18.0% (с ролл-фильтром)
+- Checkpoint: checkpoint/210-roll-filter-iss-expiration.md

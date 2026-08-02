@@ -1,6 +1,6 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 209 (2026-08-02)** — OI LONG+SHORT: BR+NG+SV+RN, thr ±3%, hold 60, **risk 35%**, **+1,094%/год ROI, MTM DD 14.0%** (честно: свежий бар ≤5 мин, без фантомов утра)
+**Последний чекпойнт: 210 (2026-08-02)** — OI LONG+SHORT: BR+NG+SV+RN, thr ±3%, hold 60, **risk 40%**, **+1,309%/год ROI, MTM DD 18.0%** (ролл-фильтр по ISS expiration_date, закрытие позиций до склейки)
 
 ## 🚨 Правила работы
 
@@ -187,7 +187,7 @@ Common pool лучше т.к. сигналы редко пересекаются
 
 ### 🤖 Paper Trader (общий фреймворк, единый крон)
 - **Крон (общий на фреймворк):** `*/5 15-23,0-4 * * 1-5` → `~/.hermes/scripts/run_moex_paper_trader.sh` → `run_paper_trader.py --stdout` (без --strategy — ВСЕ enabled из PG)
-- **OI (единственная enabled):** `strategies/oi/prod/engine.py` (плагин, long+short) + `fetch_day_net()` в common. **BR/NG/SV/RN**, thr ±3%, long/short 60 мин, **risk 35%**, trailing/SL отключены (0.99). **+1,094%/год ROI, MTM DD 14.0%** (честно: свежий бар ≤5 мин; КСУР-ПГО ГО, ролл-фильтр, размазывание K=400)
+- **OI (единственная enabled):** `strategies/oi/prod/engine.py` (плагин, long+short) + `fetch_day_net()` в common. **BR/NG/SV/RN**, thr ±3%, long/short 60 мин, **risk 40%**, trailing/SL отключены (0.99). **+1,309%/год ROI, MTM DD 18.0%** (честно: свежий бар ≤5 мин; КСУР-ПГО ГО; ролл-фильтр: expiration_date из ISS + гэп >2% + roll_close позиций; размазывание K=400)
 - **Dragon/IR: ОТКЛЮЧЕНЫ** (02.08) — cron убран, `futures.portfolio.enabled=false` до разбирательства. ⚠️ Проверять enabled после работы других агентов!
 - **Legacy state сброшен** (02.08) — старые позиции Si IR / GD Dragon удалены из futures.paper_state
 - **Старый самописный `strategies/oi/paper_trader.py` оставлен** (не используется, для сравнения)
