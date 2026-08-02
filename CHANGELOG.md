@@ -317,3 +317,15 @@
 - OI данные не собирались с 01.07 (CH readonly из-за zookeeper)
 - PnL без учёта шага цены (sp/ms)
 - Checkpoint: checkpoint/204-oi-final-br-ng-5905pct.md
+
+## [205] 2026-08-02
+### Fixed
+- 2 критических бага OI: (1) таймзона futoi MSK vs mt5 IRK (look-ahead 5ч), (2) guard CLOSE чужих позиций (5-мин сделки)
+- Backfill: +8ч → MSK (как loader)
+### Changed
+- OI: BR+NG+SV, thr -3%, hold 60, risk 15% → +1,042% ROI, MTM DD 20.9%
+- Свип 64 тикеров: рабочие BR/NG/SV (+RN слабее), ED/X5/SR — артефакты
+### Added
+- scripts/oi/backfill_futoi_iss.py (докачка ISS по датам), scripts/oi/oi_sweep_honest.py
+- Данные полные до 18.07 (пробел 19-28.07 → 16.08)
+- Checkpoint: checkpoint/205-oi-honest-br-ng-sv-1042pct.md
