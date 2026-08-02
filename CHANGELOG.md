@@ -360,3 +360,13 @@
 ### Added
 - Критический аудит размазывания: K=400 по DOM GAZR (25% M1 занижало в 400-500×)
 - Checkpoint: checkpoint/208-oi-risk-40-1199pct-year.md
+
+## [209] 2026-08-02
+### Changed
+- OI: LONG+SHORT (day_net ±3%), risk 35% → +1,094%/год, MTM DD 14.0% (честный бэктест)
+- Критический аудит: фильтр свежести ≤5 мин (фантомные утренние сигналы FINAM)
+- engine.py: добавлены short-сигналы (×6 ROI)
+### Fixed
+- TZ проверен (не кривой); AlgoPack — мусор; mt5_bars — другие цены
+### Added
+- Checkpoint: checkpoint/209-oi-long-short-1094pct-year.md
