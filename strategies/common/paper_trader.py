@@ -26,11 +26,13 @@ def _load_strategies():
     from strategies.impulse_return.prod.engine import check_signal as imp_check
     from strategies.dragon.prod.engine import check_signal as dragon_check
     from strategies.oi.prod.engine import check_signal as oi_check
+    from strategies.oi_dom.prod.engine import check_signal as oi_dom_check
     STRATEGY_MAP['stop_hunt'] = sh_check
     STRATEGY_MAP['cvd'] = cvd_check
     STRATEGY_MAP['impulse_return'] = imp_check
     STRATEGY_MAP['dragon'] = dragon_check
     STRATEGY_MAP['oi'] = oi_check
+    STRATEGY_MAP['oi_dom'] = oi_dom_check
 
 # ── Config ────────────────────────────────────────────────────────────────
 CH_HOST = os.getenv('MOEX_CH_HOST', '10.0.0.60')
@@ -405,6 +407,39 @@ def fetch_day_net(ticker):
         return (cur_fiz - open_fiz) / total * 100.0
     except Exception as e:
         log.warning("fetch_day_net error for %s: %s", ticker, e)
+        return None
+
+
+def fetch_dom_imbalance(ticker):
+    """Imbalance стакана (ask-bid)/(ask+bid) за последние ~10 минут из PG futures.dom.
+
+    Положительное = ask-heavy (покупки агрессивны) → подтверждает long.
+    Отрицательное = bid-heavy (продажи) → подтверждает short.
+    Возвращает float или None при ошибке/нет данных.
+    """
+    try:
+        conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB,
+                                user=PG_USER, password=PG_PASS, connect_timeout=3)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT side, sum(volume) FROM futures.dom
+            WHERE ticker = %s AND ts >= now() - interval '10 minutes'
+            GROUP BY side
+        """, (ticker,))
+        rows = cur.fetchall()
+        conn.close()
+        bid = ask = 0.0
+        for side, vol in rows:
+            if side == 1:
+                bid = float(vol)
+            elif side == 2:
+                ask = float(vol)
+        total = bid + ask
+        if total <= 0:
+            return None
+        return (ask - bid) / total
+    except Exception as e:
+        log.warning("fetch_dom_imbalance error for %s: %s", ticker, e)
         return None
 
 
