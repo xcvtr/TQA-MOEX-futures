@@ -183,8 +183,11 @@ Common pool лучше т.к. сигналы редко пересекаются
 - CVD, Churn, Lunch Reversal — нет edge
 - CR — убыточен для SH
 
-### 🤖 Paper Trader (общий фреймворк)
-- **OI (активен):** `run_paper_trader.py --strategy oi --state-key oi` → `strategies/common/paper_trader.py` + `strategies/oi/prod/engine.py`. BR/NG, физ продают→long 120 мин, risk 4.5%, cron `*/5 15-23`, state `paper_state_oi`
-- **Dragon/IR: ОТКЛЮЧЕНЫ** (02.08) — cron убран, `futures.portfolio.enabled=false` до разбирательства
+### 🤖 Paper Trader (общий фреймворк, единый крон)
+- **Крон (общий на фреймворк):** `*/5 15-23,0-4 * * 1-5` → `~/.hermes/scripts/run_moex_paper_trader.sh` → `run_paper_trader.py --stdout` (без --strategy — ВСЕ enabled из PG)
+- **OI (единственная enabled):** `strategies/oi/prod/engine.py` (плагин) + `fetch_day_net()` в common. BR/NG, физ продают→long 120 мин (timeout_bars=120), risk 4.5%, trailing/SL отключены (0.99)
+- **Dragon/IR: ОТКЛЮЧЕНЫ** (02.08) — cron убран, `futures.portfolio.enabled=false` до разбирательства. ⚠️ Проверять enabled после работы других агентов!
+- **Legacy state сброшен** (02.08) — старые позиции Si IR / GD Dragon удалены из futures.paper_state
+- **Старый самописный `strategies/oi/paper_trader.py` оставлен** (не используется, для сравнения)
 - **OI loader:** `loader.py` → `moex.futoi`, cron `*/20 15-23` + `30 10`
 - **Дашборд:** `dashboard.py` — порт 8085
