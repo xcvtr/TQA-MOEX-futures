@@ -382,3 +382,15 @@
 ### Changed
 - risk 35% → 40% → +1,309%/год, MTM DD 18.0% (с ролл-фильтром)
 - Checkpoint: checkpoint/210-roll-filter-iss-expiration.md
+
+## [211] 2026-08-02
+### Added
+- oi_dom: OI + подтверждение стаканом (imbalance) — DD 35%→17.5%, TATN WR 67%
+- dom_pg_to_ch.py: копия PG futures.dom → CH moex.dom + autopurge 30 дней
+- fetch_dom_imbalance для live
+### Fixed
+- Направление edge: сырьё contrarian, валюта momentum (Eu fiz momentum подтверждён)
+- Бэкфилл Eu 2019-2023 (1M баров) — загружен ALLFUTEu из терминала
+### Changed
+- Live: RN/TATN → oi_dom (подтверждение стаканом), BR/NG/SV → oi
+- Checkpoint: checkpoint/211-oi-dom-confirmation.md
