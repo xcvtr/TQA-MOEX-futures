@@ -189,5 +189,5 @@ Common pool лучше т.к. сигналы редко пересекаются
 - **Dragon/IR: ОТКЛЮЧЕНЫ** (02.08) — cron убран, `futures.portfolio.enabled=false` до разбирательства. ⚠️ Проверять enabled после работы других агентов!
 - **Legacy state сброшен** (02.08) — старые позиции Si IR / GD Dragon удалены из futures.paper_state
 - **Старый самописный `strategies/oi/paper_trader.py` оставлен** (не используется, для сравнения)
-- **OI loader:** `loader.py` → `moex.futoi`, cron `*/20 15-23` + `30 10`
+- **OI loader:** `loader.py` → `moex.futoi`, cron `*/5 15-23` + `30 10` (задержка ~5 мин, прогон 70с/64 тикера)
 - **Дашборд:** `dashboard.py` — порт 8085
