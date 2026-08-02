@@ -329,3 +329,14 @@
 - scripts/oi/backfill_futoi_iss.py (докачка ISS по датам), scripts/oi/oi_sweep_honest.py
 - Данные полные до 18.07 (пробел 19-28.07 → 16.08)
 - Checkpoint: checkpoint/205-oi-honest-br-ng-sv-1042pct.md
+
+## [206] 2026-08-02
+### Added
+- Ролл-фильтр + обработка экспирации в OI-бэктесте (исключение сделок в дни скачков >5%)
+- Результат: risk 30% → +6,300% ROI, MTM DD 14.8% (Calmar 425)
+### Fixed
+- Ролл-артефакты continuous: DD 22% → 7.5% (фантомные сделки через гэпы склейки)
+- Проверка марта 2026: реальный тренд BR (+49%), 24% мартовского = ролл-артефакт
+### Changed
+- Рекомендация: risk 30% (было 15%), нужен ролл-фильтр в live
+- Checkpoint: checkpoint/206-oi-roll-filter-6300pct.md
