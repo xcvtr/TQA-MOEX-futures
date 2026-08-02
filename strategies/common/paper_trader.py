@@ -408,6 +408,28 @@ def fetch_day_net(ticker):
         return None
 
 
+def is_roll_day(ticker):
+    """День экспирации/ролла: был скачок цены >5% за 1 бар в mt5_continuous за сегодня.
+
+    Continuous склеивает контракты с гэпами при ролле (5-15% за бар) — это не реальное
+    движение, а переход на новый контракт. В такие дни OI-сигналы ненадёжны → не торгуем.
+    """
+    try:
+        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+        rows = ch.query(f"""
+            SELECT count() FROM (
+                SELECT prc, lagInFrame(prc) OVER (ORDER BY bt) prev
+                FROM moex.mt5_continuous
+                WHERE ticker = '{ticker}' AND toDate(bt) = today()
+            ) WHERE prev > 0 AND abs(prc/prev - 1) > 0.05
+        """).result_rows
+        ch.close()
+        return rows[0][0] > 0
+    except Exception as e:
+        log.warning("is_roll_day error for %s: %s", ticker, e)
+        return False
+
+
 def calc_dcvd_z(vol_b_hist, vol_s_hist, period=20):
     """Calculate CVD z-score from vol_b/vol_s history.
     Returns z-score (float) or 0 if insufficient data.
@@ -708,6 +730,10 @@ def run_tick(strategy_filter=None, mode=None):
                 strategy_name = entry['strategy']
                 fn = STRATEGY_MAP.get(strategy_name)
                 if not fn:
+                    continue
+
+                # Ролл-фильтр (экспирация): не открывать в день скачка цены >5% (ролл контракта)
+                if strategy_name == 'oi' and is_roll_day(ticker):
                     continue
 
                 try:
