@@ -340,3 +340,15 @@
 ### Changed
 - Рекомендация: risk 30% (было 15%), нужен ролл-фильтр в live
 - Checkpoint: checkpoint/206-oi-roll-filter-6300pct.md
+
+## [207] 2026-08-02
+### Added
+- RN в портфель OI (BR+NG+SV+RN) → +1,364% ROI, MTM DD 10.9% (risk 30%)
+- Размазывание по ёмкости стакана (K=400, по DOM GAZR: стакан ~400× минутного объёма)
+### Fixed
+- ГО: формула КСУР-ПГО = medium(MOEX) × ставка_КСУР(XLS кол12); BR = medium (нет ПГО)
+- Размазывание 25% M1 занижало ёмкость в 400-500× (по данным DOM)
+### Changed
+- ticker_specs: NG 3,987, SV 5,585, BR 27,657, RN 3,479
+- Крон: ГО обновление 30 6 (MOEX XML + FINAM XLS)
+- Checkpoint: checkpoint/207-oi-final-4-tickers-1364pct.md
