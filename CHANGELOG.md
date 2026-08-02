@@ -352,3 +352,11 @@
 - ticker_specs: NG 3,987, SV 5,585, BR 27,657, RN 3,479
 - Крон: ГО обновление 30 6 (MOEX XML + FINAM XLS)
 - Checkpoint: checkpoint/207-oi-final-4-tickers-1364pct.md
+
+## [208] 2026-08-02
+### Changed
+- OI risk 30% → 40% → ROI +1,199%/год (цель ≥1000%), MTM DD 14.7%
+- Свип: других рабочих тикеров нет (ED — артефакт, остальные убыточны)
+### Added
+- Критический аудит размазывания: K=400 по DOM GAZR (25% M1 занижало в 400-500×)
+- Checkpoint: checkpoint/208-oi-risk-40-1199pct-year.md
