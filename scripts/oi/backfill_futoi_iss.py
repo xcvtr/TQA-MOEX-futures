@@ -55,18 +55,16 @@ def main():
     tickers = [t.strip() for t in args.tickers.split(',') if t.strip()]
     ch = cc.get_client(host=CH_HOST, port=8123, database='moex')
 
-    # Окна: от end назад до start
+    # Окна: по ОДНОЙ дате (from==till) — ISS отдаёт полный день тикера (~356 сырых).
+    # Окна по 3 дня упираются в лимит 1000 записей → теряют начало (понедельники).
     end_d = datetime.strptime(args.end, '%Y-%m-%d')
     start_d = datetime.strptime(args.start, '%Y-%m-%d')
     windows = []
-    cur_end = end_d
-    while cur_end >= start_d:
-        cur_start = cur_end - timedelta(days=args.window - 1)
-        if cur_start < start_d:
-            cur_start = start_d
-        windows.append((cur_start.strftime('%Y-%m-%d'), cur_end.strftime('%Y-%m-%d')))
-        cur_end = cur_start - timedelta(days=1)
-    print(f"Окон: {len(windows)} для {tickers}", flush=True)
+    cur = end_d
+    while cur >= start_d:
+        windows.append((cur.strftime('%Y-%m-%d'), cur.strftime('%Y-%m-%d')))
+        cur -= timedelta(days=1)
+    print(f"Дней: {len(windows)} для {tickers}", flush=True)
 
     total_inserted = 0
     for ticker in tickers:
@@ -88,9 +86,12 @@ def main():
                 pos_short = rec[8]
                 if pos_long is None or pos_short is None:
                     continue
-                # bt = MSK datetime + 8ч → IRK
+                # bt = MSK datetime как есть (без конвертации) — та же шкала, что у loader.py.
+                # Старые данные (2024-2026) в CH futoi хранят MSK-часы (09:05-23:50).
+                # day_net считается по MSK-дню (правильно для торгового дня).
+                # В бэктесте при матчинге с ценами (IRK) добавлять +5ч к bt.
                 msk = datetime.strptime(f"{tdate} {ttime}", '%Y-%m-%d %H:%M:%S')
-                bt = msk + timedelta(hours=8)
+                bt = msk
                 key = (tk, bt)
                 if key not in by_key:
                     by_key[key] = [tk, bt, 0, 0, 0, 0]
