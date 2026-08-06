@@ -134,6 +134,7 @@ Common pool лучше т.к. сигналы редко пересекаются
 ## 📁 Данные и артефакты
 
 ### ClickHouse (10.0.0.60:8123, db=moex)
+- `moex.dom_qsh` — стакан QScalp из SMB-шары (дельты, 192 дня 2026, ReplicatedReplacingMergeTree)
 - `moex.mt5_continuous` — M1 continuous + ALLFUT (33 контракта, 2024-2026)
 - `moex.mt5_bars` — M1 бары (запасной)
 - `moex.futoi` — OI fiz/yur (5min, свежие, loader починен 01.08)
