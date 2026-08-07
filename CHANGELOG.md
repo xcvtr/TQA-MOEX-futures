@@ -394,3 +394,12 @@
 ### Changed
 - Live: RN/TATN → oi_dom (подтверждение стаканом), BR/NG/SV → oi
 - Checkpoint: checkpoint/211-oi-dom-confirmation.md
+
+## [212] 2026-08-02
+### Added
+- QScalp импорт: dom_qsh 1.29 млрд строк, deals_qsh 27.8M, dom_imb_qsh (ближние уровни)
+- Калибровка oi_dom: TATN WR 67.4% (=PG), сырьё (BR/NG/SV) — стакан не помогает
+- Портфель: oi_dom (RN/TATN) — DD 45%→21%, ROI ~тот же, Calmar ×2
+### Changed
+- Risk: равномерный 50% оптимум (Calmar 21); per-symbol хуже
+- Checkpoint: checkpoint/212-qsh-oi-dom-calibration.md
