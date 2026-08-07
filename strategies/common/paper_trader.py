@@ -385,26 +385,26 @@ def get_volume_data(ticker, n_bars=55):
 
 
 def fetch_day_net(ticker):
-    """Накопление нетто-позиции физлиц за день в % от OI.
+    """Дисбаланс физлиц на текущий момент: (b-s)/(b+s) — как в бэктесте.
 
-    day_net = ((последний buy_fiz - sell_fiz) - (первый buy_fiz - sell_fiz)) / total_oi * 100
     Отрицательное значение = физлица продают. Из moex.futoi за сегодня.
     """
     try:
         ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         rows = ch.query(f"""
             SELECT
-              argMax(buy_fiz, bt) - argMax(sell_fiz, bt) AS cur_fiz,
-              argMin(buy_fiz, bt) - argMin(sell_fiz, bt) AS open_fiz,
-              argMax(buy_fiz, bt) + argMax(sell_fiz, bt) + argMax(buy_yur, bt) + argMax(sell_yur, bt) AS total
+              argMax(buy_fiz, bt) AS cur_b,
+              argMax(sell_fiz, bt) AS cur_s
             FROM moex.futoi
             WHERE ticker = '{ticker}' AND bt >= today()
         """).result_rows
         ch.close()
-        if not rows or not rows[0] or rows[0][2] is None or rows[0][2] <= 0:
+        if not rows or not rows[0] or rows[0][0] is None:
             return None
-        cur_fiz, open_fiz, total = float(rows[0][0]), float(rows[0][1]), float(rows[0][2])
-        return (cur_fiz - open_fiz) / total * 100.0
+        cur_b, cur_s = float(rows[0][0]), float(rows[0][1])
+        if cur_b + cur_s <= 0:
+            return None
+        return (cur_b - cur_s) / (cur_b + cur_s) * 100.0
     except Exception as e:
         log.warning("fetch_day_net error for %s: %s", ticker, e)
         return None
@@ -451,13 +451,11 @@ def is_roll_day(ticker):
     гэпом. Сигналы в этот день ненадёжны, а открытые позиции надо закрыть
     заранее (см. manage_positions: roll_close).
 
-    Признаки:
-    1. Сегодня == expiration_date из PG futures.ticker_specs (ISS LASTTRADEDATE)
-    2. Гэп между последним баром вчера и первым баром сегодня > 2% (ролл случился ночью)
-    3. Скачок >2% за 1 бар сегодня (ролл случился в течение дня)
+    ВАЖНО: признак ТОЛЬКО по expiration_date из PG (ISS LASTTRADEDATE).
+    Скачки цены >2% НЕ использовать — SV/NG/BR волатильны, ложные срабатывания
+    в 20-25% дней (проверено 2026-08-07: SV 51/197 дней).
     """
     try:
-        # 1. Дата экспирации из PG
         conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB,
                                 user=PG_USER, password=PG_PASS, connect_timeout=3)
         cur = conn.cursor()
@@ -465,25 +463,7 @@ def is_roll_day(ticker):
         row = cur.fetchone()
         conn.close()
         if row and row[0]:
-            if row[0] == date.today():
-                return True
-
-        # 2-3. Скачки в mt5_continuous: сегодня (внутри дня) и гэп вчера→сегодня
-        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-        rows = ch.query(f"""
-            SELECT toDate(bt) d, prc, prev FROM (
-                SELECT bt, prc, lagInFrame(prc) OVER (ORDER BY bt) prev
-                FROM moex.mt5_continuous
-                WHERE ticker = '{ticker}' AND bt >= today() - 1
-            ) WHERE prev > 0
-        """).result_rows
-        ch.close()
-        today = date.today()
-        for d, prc, prev in rows:
-            chg = abs(prc / prev - 1)
-            if chg > 0.02:
-                # скачок сегодня (в течение дня) ИЛИ гэп вчера 23:xx → сегодня
-                return True
+            return row[0] == date.today()
         return False
     except Exception as e:
         log.warning("is_roll_day error for %s: %s", ticker, e)
@@ -683,10 +663,10 @@ def run_tick(strategy_filter=None, mode=None):
 
     # ── Freshness check ────────────────────────────────────────────────────
     now = datetime.now(timezone.utc)
-    MARKET_OPEN_IRK = 15  # MOEX открывается в 10:00 MSK = 15:00 IRK
-    MARKET_CLOSE_IRK = 0  # 23:45 MSK следующий день = 00:00 IRK следующего дня
-    
-    # Проверка: рынок открыт? (MOEX: 15:00-23:45 IRK = 10:00-18:45 MSK)
+    MARKET_OPEN_IRK = 15   # MOEX дневная сессия 10:00 MSK = 15:00 IRK
+    MARKET_CLOSE_IRK = 5   # вечерняя сессия до 23:50 MSK = 04:50 IRK (след. сутки)
+
+    # Проверка: рынок открыт? (MOEX: дневная 15:00-23:45 IRK + вечерняя 00:00-04:50 IRK)
     irk_hour = now.hour + 8  # UTC → IRK
     if irk_hour >= 24:
         irk_hour -= 24

@@ -60,7 +60,7 @@ def load_data(ticker, year):
 
 
 def run(args):
-    futoi, prices, imb, (GO, MS, SP, FEE) = load_data(args.ticker, args.year)
+    futoi, prices, imb, (GO, MS, SP, FEE_ENTRY) = load_data(args.ticker, args.year)
     fts = sorted(futoi.keys())
     pts = prices[0]
     it = sorted(imb.keys()) if args.dom else []
@@ -118,7 +118,7 @@ def run(args):
                 pnl = (prc - pos[3]) / MS * SP * pos[2]
                 if pos[1] < 0:
                     pnl = (pos[3] - prc) / MS * SP * pos[2]
-                pnl -= FEE
+                pnl -= FEE_ENTRY * 2 * pos[2]
                 equity += pnl
                 n += 1
                 if pnl > 0:
@@ -181,7 +181,7 @@ def run(args):
         pnl = (prc - pos[3]) / MS * SP * pos[2]
         if pos[1] < 0:
             pnl = (pos[3] - prc) / MS * SP * pos[2]
-        pnl -= FEE
+        pnl -= FEE_ENTRY * 2 * pos[2]
         equity += pnl
         n += 1
         if pnl > 0:

@@ -138,8 +138,8 @@ def main():
     try:
         cur_pg.execute("""
             SELECT p.positions_json
-            FROM futures.paper_state_{0} p
-        """.format(state_key or ''))
+            FROM futures.paper_state{0} p
+        """.format('_' + state_key if state_key else ''))
         state_rows = cur_pg.fetchall()
         expiring = []
         if state_rows and state_rows[0][0]:

@@ -62,7 +62,7 @@ def run_portfolio(year, risk_map, thr_map, hold=60, max_pos=3, max_margin=0.9):
                     prc = data[t][1][1][idx]
                     pnl = (prc - p[3]) / specs[t][1] * specs[t][2] * p[2]
                     if p[1] < 0: pnl = (p[3] - prc) / specs[t][1] * specs[t][2] * p[2]
-                    pnl -= specs[t][3]
+                    pnl -= specs[t][3] * 2 * p[2]
                     eq += pnl; n += 1
                     if pnl > 0: wins += 1
                     pnl_sum += pnl
@@ -116,7 +116,7 @@ def run_portfolio(year, risk_map, thr_map, hold=60, max_pos=3, max_margin=0.9):
             prc = data[t][1][1][-1]
             pnl = (prc - p[3]) / specs[t][1] * specs[t][2] * p[2]
             if p[1] < 0: pnl = (p[3] - prc) / specs[t][1] * specs[t][2] * p[2]
-            pnl -= specs[t][3]
+            pnl -= specs[t][3] * 2 * p[2]
             eq += pnl; n += 1
             if pnl > 0: wins += 1
             pnl_sum += pnl
