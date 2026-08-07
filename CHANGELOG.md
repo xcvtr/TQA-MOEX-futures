@@ -413,3 +413,4 @@
 - TATN не убыточен (артефакт реинвеста); Si задушен маржой на 200K
 ### Added
 - Checkpoint: checkpoint/213-top3-margin-efficiency.md
+- ЧП 214
