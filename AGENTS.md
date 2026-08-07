@@ -1,6 +1,6 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 212 (2026-08-02)** — OI LONG+SHORT: BR+NG+SV+RN, thr ±3%, hold 60, **risk 40%**, **+1,309%/год ROI, MTM DD 18.0%** (ролл-фильтр по ISS expiration_date, закрытие позиций до склейки)
+**Последний чекпойнт: 213 (2026-08-02)** — OI LONG+SHORT: BR+NG+SV+RN, thr ±3%, hold 60, **risk 40%**, **+1,309%/год ROI, MTM DD 18.0%** (ролл-фильтр по ISS expiration_date, закрытие позиций до склейки)
 
 ## 🚨 Правила работы
 

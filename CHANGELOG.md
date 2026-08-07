@@ -403,3 +403,13 @@
 ### Changed
 - Risk: равномерный 50% оптимум (Calmar 21); per-symbol хуже
 - Checkpoint: checkpoint/212-qsh-oi-dom-calibration.md
+
+## [213] 2026-08-02
+### Changed
+- Портфель: ТОП-3 (SV/RN/TATN) по PnL/ГО — BR/NG/Si отключены (маржа, эффективность)
+- risk 20% (было 40%) → DD 22.8%, ROI +1,139%/7мес
+### Fixed
+- Занятость hold+5 (не hold+90) — ROI ×3.3 (504% → 1,686%)
+- TATN не убыточен (артефакт реинвеста); Si задушен маржой на 200K
+### Added
+- Checkpoint: checkpoint/213-top3-margin-efficiency.md
