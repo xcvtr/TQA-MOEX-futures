@@ -72,7 +72,10 @@ def materialize_contract(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--workers', type=int, default=6)
+    ap.add_argument('--tickers', default='BR,NG,SV,RN', help='префиксы через запятую')
     args = ap.parse_args()
+    global PREFIXES
+    PREFIXES = tuple(p.strip().upper() for p in args.tickers.split(','))
 
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     ch.command("""
@@ -87,10 +90,11 @@ def main():
         ORDER BY (ticker, min)
     """)
     # все контракты наших префиксов
-    r = ch.query("""
+    cond = ' OR '.join(f"startsWith(ticker, '{p}')" for p in PREFIXES)
+    r = ch.query(f"""
         SELECT DISTINCT ticker FROM moex.dom_qsh
         WHERE time > toDateTime64('2000-01-01', 3)
-          AND (startsWith(ticker,'BR') OR startsWith(ticker,'NG') OR startsWith(ticker,'SV') OR startsWith(ticker,'RN'))
+          AND ({cond})
     """).result_rows
     tickers = [x[0] for x in r]
     ch.close()
