@@ -796,8 +796,8 @@ def run_tick(strategy_filter=None, mode=None):
             bd = bar_data.get(ticker)
             if not bd:
                 continue
-            if any(not p.get('closed', False) and p.get('ticker') == ticker for p in positions):
-                continue
+            # Пирамидинг: максимум позиций на тикер (из params, default 1)
+            active = [p for p in positions if not p.get('closed', False) and p.get('ticker') == ticker]
             s = specs.get(ticker, {})
             ms = s.get('ms', 0.01)
             sp = s.get('sp', 1)
@@ -807,6 +807,13 @@ def run_tick(strategy_filter=None, mode=None):
                 strategy_name = entry['strategy']
                 fn = STRATEGY_MAP.get(strategy_name)
                 if not fn:
+                    continue
+
+                # Пирамидинг: лимит позиций на (тикер, стратегию)
+                params = entry.get('params', {})
+                max_pos = int(params.get('max_positions', 1))
+                active_same = [p for p in active if p.get('strategy') == strategy_name]
+                if len(active_same) >= max_pos:
                     continue
 
                 # Ролл-фильтр (экспирация): не открывать в день скачка цены >5% (ролл контракта)
