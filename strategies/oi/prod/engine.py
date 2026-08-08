@@ -14,7 +14,7 @@ bar_data expects:
 
 DEFAULT_PARAMS = {
     'thr': 3.0,       # порог |day_net| (%)
-    'direction': 'contrarian',  # 'contrarian' (сырьё/акции) или 'momentum' (валюта Si)
+    'direction': 'contrarian',  # 'contrarian' (сырьё/акции), 'momentum' (валюта Si) или 'long_only' (только long)
 }
 
 
@@ -23,6 +23,9 @@ def check_signal(bar_data: dict, ticker: str, params: dict = None) -> dict:
 
     Сигнал: |day_net| >= thr → long при продажах, short при покупках.
     direction=momentum: long при покупках, short при продажах (для валюты Si).
+    direction=long_only: только long при продажах (физ паникуют → отскок вверх);
+        short-сигналы (покупки толпы) игнорируются — по данным верификации
+        contrarian short убыточен (SV short WR 46.6%, BR short 49.1%).
     """
     if params is None:
         params = DEFAULT_PARAMS
@@ -42,6 +45,14 @@ def check_signal(bar_data: dict, ticker: str, params: dict = None) -> dict:
         elif day_net <= -thr:
             direction_out = 'short'
             reason = f'oi_mom_sell_{day_net:.1f}%'
+            score = round(min(abs(day_net + thr) / 10.0, 1.0), 3) + 0.05
+        else:
+            return None
+    elif direction == 'long_only':
+        # только long: физ продают (паника) → отскок вверх; покупки игнорируем
+        if day_net <= -thr:
+            direction_out = 'long'
+            reason = f'oi_fiz_sell_{day_net:.1f}%'
             score = round(min(abs(day_net + thr) / 10.0, 1.0), 3) + 0.05
         else:
             return None

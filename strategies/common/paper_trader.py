@@ -101,6 +101,7 @@ def load_portfolio():
             'stop_loss': float(params.get('stop_loss_pct', 0.7)) / 100.0,
             'tf': int(params.get('tf', 5)),  # detect timeframe (minutes)
             'risk': float(params.get('risk', 0.2)),  # risk fraction of equity (как бэктест)
+            'params': params,  # ВЕСЬ JSONB — direction/thr/max_positions для check_signal (live = бэктест)
         })
     return dict(portfolio)
 
@@ -801,7 +802,7 @@ def run_tick(strategy_filter=None, mode=None):
                     continue
 
                 try:
-                    signal = fn(bd, ticker)
+                    signal = fn(bd, ticker, entry.get('params', {}))
                 except Exception as e:
                     log.warning("Signal error %s/%s: %s", ticker, strategy_name, e)
                     continue
