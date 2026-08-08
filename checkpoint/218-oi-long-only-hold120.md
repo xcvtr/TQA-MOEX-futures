@@ -94,7 +94,32 @@ Calmar 258 (vs baseline 94). WR 57.3% (vs 48.2%).
 
 ## Состояние для продолжения
 
-1. Прогнать MC LONG+h120×1.5 (значимость)
-2. Решить: риск ×1.0 (MDD 14.2%, ROI +1306%) или ×1.5 (MDD 21.2%, ROI +5480%)
-3. При внедрении: обновить futures.portfolio (direction=long_only, hold=120), сбросить paper_state
-4. Проверить live paper trader после изменения
+1. Прогнать MC LONG+h120×1.5 (значимость) — СДЕЛАНО: p=0.0000 ✅ (см. ниже)
+2. Решить: риск ×1.0 или ×1.5 — РЕШЕНО: внедрён ×1.5
+3. При внедрении: обновить futures.portfolio (direction=long_only, hold=120), сбросить paper_state — СДЕЛАНО
+4. Проверить live paper trader после изменения — СДЕЛАНО
+
+## 🚀 Деплой LONG+h120×1.5 в live (2026-08-08, commit 7bd340a)
+
+### Изменения
+1. **`strategies/oi/prod/engine.py`** — добавлен режим `direction='long_only'` (только long при продажах физ; шорты игнорируются — contrarian short убыточен: SV WR 46.6%, BR 49.1%)
+2. **`strategies/common/paper_trader.py`** — **критический баг**: `signal = fn(bd, ticker)` вызывался БЕЗ params → live использовал дефолты (thr=3.0, contrarian, max_pos=1) вместо PG-конфига (thr=4.0, long_only, max_pos=3). **Live ≠ бэктест** всё это время. Исправлено: `fn(bd, ticker, entry.get('params', {}))` + сохранение params в entry.
+3. **PG futures.portfolio** (BR/NG/SV, strategy=oi): `direction='long_only'`, risk 0.375/0.375/0.225 (×1.5), timeout_bars=24 (120 мин = 24×5м), thr=4.0, max_positions=3
+4. **paper_state сброшен** (было Eq=504K от старых contrarian-сделок, включая SV short +305K)
+
+### Проверки после деплоя
+- ✅ Все 6 engine принимают `params: dict = None` — передача 3-го аргумента безопасна
+- ✅ load_portfolio читает: direction=long_only, thr=4.0, risk=0.375/0.225, max_pos=3, timeout_bars=24, stop_loss=0.99
+- ✅ run_paper_trader.py --stdout работает без ошибок, старт с Eq=200000₽, 0 позиций
+- ✅ Крон `*/5 15-23,0-4 * * 1-5` жив
+
+### Аудит LONG+h120 (scripts/oi_long_audit.py)
+- MC: p=0.0000 (83 204 сигнала) — значимо
+- Look-ahead: нет
+- Концентрация: равномерна по годам (9.6-25%), NG 68% / BR 20% / SV 12%
+- Buy&hold NG +1.6% (флэт) но сигналы дают 68% профита → edge в сигнале, не в тренде
+
+### Ожидание
+- 2024-26 бэктест: +5480% / MDD 21.2% / WR 57.3% / Calmar 258
+- OOS 21-23: +1129% / MDD 27.3%
+- **Реалистично: ~500-1000%/год при MDD 20-27%** (с учётом концентрации в волатильные годы)
