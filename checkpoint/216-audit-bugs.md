@@ -45,3 +45,16 @@ tags: [checkpoint, audit, bugs, commission, realistic]
 1. live-код нужно СВЕРЯТЬ с бэктестом, а не только регрессить бэктесты
 2. Комиссия × контракты критична для high-frequency стратегий
 3. Данные (mt5_continuous) неполные: вечерняя сессия, обеденный гэп — влияют на live
+
+---
+
+## 🔧 Хотфикс (08.08.2026): watchdog OI — 2 бага
+
+После верификации стратегий найден и исправлен watchdog (`scripts/oi_watchdog.py`):
+
+| # | Баг | Исправление |
+|:--|:-----|:------------|
+| 7 | futoi stale: ложная тревога — bt в CH хранится в **MSK**, а watchdog приписывал ему IRK (+8ч вместо +5ч сдвига). В торговые часы всегда показывал «stale 305+ мин» | `last.replace(tzinfo=+5)` (MSK→IRK) |
+| 8 | «paper_trades_oi пуст»: общий фреймворк пишет сделки в `futures.paper_trades` (strategy='oi'), а watchdog смотрел старую пустую `paper_trades_oi` | смотреть `paper_trades WHERE strategy='oi'`; DD — из `paper_state` |
+
+Проверка: `trades_7d=3` (реальные сделки), алерты отсутствуют, `trading_hours_now` работает корректно.

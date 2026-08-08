@@ -103,13 +103,15 @@ def check():
     now = datetime.now(timezone(timedelta(hours=8)))
 
     # 1. futoi свежесть
+    # ВАЖНО: futoi bt хранится в MSK, цены mt5_continuous — в IRK (+5ч от MSK).
+    # Для сравнения с now (IRK) прибавляем 5 часов к MSK-времени futoi.
     try:
         ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         r = ch.query("SELECT max(bt) FROM moex.futoi").result_rows
         ch.close()
         last = r[0][0]
         if last:
-            last = last.replace(tzinfo=timezone(timedelta(hours=8)))
+            last = last.replace(tzinfo=timezone(timedelta(hours=5)))  # MSK → IRK
             age = (now - last).total_seconds() / 60
             info['futoi_age_min'] = round(age, 1)
             if trading_hours_now() and age > FUTOI_STALE_MIN:
@@ -119,14 +121,14 @@ def check():
     except Exception as e:
         issues.append(f'❌ futoi check error: {e}')
 
-    # 2. mt5_continuous свежесть
+    # 2. mt5_continuous свежесть (mt5_continuous bt уже IRK)
     try:
         ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         r = ch.query("SELECT max(bt) FROM moex.mt5_continuous WHERE ticker='BR'").result_rows
         ch.close()
         last = r[0][0]
         if last:
-            last = last.replace(tzinfo=timezone(timedelta(hours=8)))
+            last = last.replace(tzinfo=timezone(timedelta(hours=8)))  # IRK
             age = (now - last).total_seconds() / 60
             info['mt5_age_min'] = round(age, 1)
             if trading_hours_now() and age > MT5_STALE_MIN:
@@ -135,34 +137,35 @@ def check():
         issues.append(f'❌ mt5 check error: {e}')
 
     # 3. Сделки OI за последние N торговых дней
+    # ВАЖНО: общий фреймворк пишет ВСЕ сделки в futures.paper_trades (strategy='oi'),
+    # а НЕ в paper_trades_oi (старая таблица, пустая).
     try:
         conn = pg_conn()
         cur = conn.cursor()
         cur.execute("""
             SELECT count(*), coalesce(max(entry_time), NULL)
-            FROM futures.paper_trades_oi
-            WHERE entry_time >= now() - interval '7 days'
+            FROM futures.paper_trades
+            WHERE strategy = 'oi' AND entry_time >= now() - interval '7 days'
         """)
         cnt, last_trade = cur.fetchone()
         info['trades_7d'] = cnt
         info['last_trade'] = str(last_trade) if last_trade else None
         if cnt == 0:
             # сколько торговых дней прошло с последней сделки
-            cur.execute("SELECT max(entry_time) FROM futures.paper_trades_oi")
+            cur.execute("SELECT max(entry_time) FROM futures.paper_trades WHERE strategy = 'oi'")
             last_any = cur.fetchone()[0]
             if last_any is None:
                 # таблица вообще пуста — алертим только в торговые часы буднего дня
-                # (до старта live в пн 04.08 — не спамим в выходные)
                 if trading_hours_now():
-                    issues.append('🕳 Нет НИ ОДНОЙ сделки OI (paper_trades_oi пуст)')
+                    issues.append('🕳 Нет НИ ОДНОЙ сделки OI (paper_trades пуст)')
             else:
                 days_since = (date.today() - last_any.date()).days
                 if days_since >= NO_TRADES_DAYS:
                     issues.append(f'🕳 Нет сделок OI {days_since} дн (последняя {last_any.date()})')
 
-        # 4. DD по paper_state_oi
+        # 4. DD по paper_state (общий фреймворк), не paper_state_oi
         try:
-            cur.execute("SELECT equity, peak FROM futures.paper_state_oi ORDER BY id DESC LIMIT 1")
+            cur.execute("SELECT equity, peak FROM futures.paper_state ORDER BY id DESC LIMIT 1")
             row = cur.fetchone()
             if row and row[0] and row[1]:
                 eq, peak = float(row[0]), float(row[1])
