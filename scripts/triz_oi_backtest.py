@@ -19,7 +19,9 @@ import clickhouse_connect as cc, psycopg2
 from datetime import timedelta, datetime
 
 TZ_SHIFT = 5 * 3600  # futoi MSK → цены IRK
-MT = {'SV': 'SILV', 'TATN': 'TATN', 'RN': 'RN', 'BR': 'BR', 'NG': 'NG', 'Si': 'Si', 'Eu': 'Eu_ALLFUT'}
+MT = {'SV': 'SILV', 'TATN': 'TATN', 'RN': 'RN', 'BR': 'BR', 'NG': 'NG', 'Si': 'Si', 'Eu': 'Eu_ALLFUT',
+      'GD': 'GD', 'MM': 'MM', 'GZ': 'GZ', 'CR': 'CR', 'SBER': 'SBRF', 'VTBR': 'VTBR', 'GAZP': 'GAZR',
+      'LKOH': 'LKOH', 'MGNT': 'MGNT', 'ROSN': 'ROSN', 'SNGP': 'SNGP', 'SP': 'SP', 'ED': 'ED'}
 
 
 def load_data(ticker, year):
@@ -30,7 +32,9 @@ def load_data(ticker, year):
     def q(sql): return ch.query(sql).result_rows
 
     # futoi (MSK) → +5ч
-    ft_map = {'SV': 'SV', 'RN': 'RN', 'TATN': 'TT', 'BR': 'BR', 'NG': 'NG', 'Si': 'Si', 'Eu': 'Eu'}
+    ft_map = {'SV': 'SV', 'RN': 'RN', 'TATN': 'TT', 'BR': 'BR', 'NG': 'NG', 'Si': 'Si', 'Eu': 'Eu',
+              'GD': 'GD', 'MM': 'MM', 'GZ': 'GZ', 'CR': 'CR', 'SBER': 'SBERF', 'VTBR': 'VB', 'GAZP': 'GAZPF',
+              'LKOH': 'LK', 'MGNT': 'MG', 'ROSN': 'RN'}
     r = q(f"SELECT bt, (buy_fiz - sell_fiz) * 1.0 / NULLIF(buy_fiz + sell_fiz, 0) * 100 as dn "
           f"FROM moex.futoi WHERE ticker='{ft_map[ticker]}' AND bt >= '{START} 00:00:00' AND bt <= '{END} 23:59:59'")
     futoi = {bt.replace(tzinfo=None).timestamp() + TZ_SHIFT: dn for bt, dn in r}

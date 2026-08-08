@@ -1,3 +1,10 @@
+## [217] 2026-08-08
+### Changed
+- Верификация всех стратегий: IR Si / SH RN / Dragon GD — артефакты (разреженные mt5_bars + in-sample), OI NG/BR/SV — реальный edge (p=0.0015, OOS 2021-23 плюс)
+- Watchdog OI: 2 бага (TZ futoi MSK→IRK +5ч, таблица paper_trades вместо paper_trades_oi)
+- Vol-фильтр бэктест: персистентность/сезонность волатильности НЕ улучшает OI (только сезонный риск +9%)
+- Новые рынки: US-индексы (NASD/ES) нет edge; US-акции NVDA — слабая затухающая зацепка
+- Checkpoint: checkpoint/217-strategy-verification-vol-filter.md
 ## [203] 2026-08-01
 ### Added
 - OI-стратегия (физ продают → long, hold 120): BR+NG+SV, +1,067%, MDD 13.4%
