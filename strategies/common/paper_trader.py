@@ -839,10 +839,10 @@ def run_tick(strategy_filter=None, mode=None):
                 if s.get('go', 0) * contracts > equity:
                     contracts = max(1, int(equity * 0.1 / s.get('go', 1)))
 
-                # Realistic slippage: 2-5 tick based on position size
+                # Realistic slippage: 1 тик (лимитка по текущей цене, как бэктест LONG+h120)
+                # НЕ 2-5 тиков: на NG (ms=0.001, цена ~2.7) 3 тика = 0.11% — убивает edge
                 ms_val = ms
-                base_slip = 2 + min(contracts // 3, 3)
-                slip_total = ms_val * base_slip
+                slip_total = ms_val * 1
                 entry_price = float(bd['prc']) + (slip_total if signal['direction'] == 'long' else -slip_total)
                 entry_price = round(entry_price / ms_val) * ms_val
 
