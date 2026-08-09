@@ -46,12 +46,55 @@ PG_USER = os.getenv('MOEX_PG_USER', 'postgres')
 PG_PASS = os.getenv('MOEX_PG_PASSWORD', '')
 
 TRADE_COST = 4  # fallback, per-ticker из PG
-MAX_CONTRACTS = 20
-# Per-ticker лимит контрактов (реальная ликвидность стакана dom_qsh, 2026)
+MAX_CONTRACTS = 1000
+# Per-ticker лимит контрактов — ОБНОВЛЯЕТСЯ из реальных дневных объёмов AlgoPack при старте.
+# Старые значения (100/80) душили компаунд: volume cap 0.2×tick_volume давал макс 11 лотов на BR.
 TICKER_LIMITS = {'BR': 100, 'NG': 100, 'SV': 80, 'RN': 80, 'RI': 50, 'TT': 30}
 VOLUME_CAP = 0.2  # 20% of M1 volume (0.5 for Si)
+LIQ_FRAC = 0.10   # доля реального ДНЕВНОГО объёма (AlgoPack) как лимит лотов — ёмкость рынка
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
 STATE_KEY = ''  # модульный уровень — задаётся в __main__ или run_paper_trader.py
+
+# ── Реальные дневные объёмы (AlgoPack контракты) — для лимита лотов ──
+DAILY_VOL = {}
+
+def load_daily_volumes():
+    """Загрузить реальный дневной объём (контракты/день) из AlgoPack.
+    mt5 vol = tick_volume (число сделок), НЕ контракты — использовать его нельзя.
+    Перпетуалы (USDRUBF и др.) в AlgoPack не покрыты — оценка mt5 tick_vol × 1440 × 20."""
+    global DAILY_VOL
+    try:
+        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+        rows = ch.query("""
+            SELECT asset_code, round(sum(vol) / NULLIF(count(DISTINCT tradedate), 0))
+            FROM moex.tradestats_fo
+            WHERE tradedate >= toDate(now()) - INTERVAL 400 DAY AND vol > 0
+            GROUP BY asset_code
+        """).result_rows
+        new_vol = {r[0]: float(r[1]) for r in rows}
+        # перпетуалы: оценка
+        rows2 = ch.query("""
+            SELECT ticker, round(avg(vol)) FROM moex.mt5_continuous
+            WHERE ticker IN ('USDRUBF','EURRUBF','CNYRUBF','GLDRUBF','Si','Eu','CNY')
+              AND bt >= now() - INTERVAL 400 DAY GROUP BY ticker
+        """).result_rows
+        for tk, avg_vol in rows2:
+            new_vol.setdefault(tk, float(avg_vol) * 1440 * 20)
+        ch.close()
+        # мутируем существующий dict (imported references остаются валидными)
+        DAILY_VOL.clear()
+        DAILY_VOL.update(new_vol)
+        # маппинг AlgoPack SILV → наш SV, GOLD → GD
+        alias = {'SILV': 'SV', 'GOLD': 'GD'}
+        for src, dst in alias.items():
+            if src in DAILY_VOL:
+                DAILY_VOL[dst] = DAILY_VOL[src]
+        # Применить к TICKER_LIMITS: лимит = 10% дневного объёма (ёмкость рынка)
+        for tk in list(TICKER_LIMITS.keys()):
+            if tk in DAILY_VOL:
+                TICKER_LIMITS[tk] = max(10, int(DAILY_VOL[tk] * LIQ_FRAC))
+    except Exception as e:
+        log.warning("load_daily_volumes failed (keep old limits): %s", e)
 
 # PnL formula: (exit-entry)/ms*sp*contracts - TC*contracts
 # MOEX STEPPRICE = RUB per tick per contract. NO *lot.
@@ -900,12 +943,15 @@ def run_tick(strategy_filter=None, mode=None):
                     go = s.get('go', 1)
                     contracts = max(1, int(equity * risk / go)) if go > 0 else 1
 
-                # Volume cap
+                # Volume cap: реальный дневной объём AlgoPack × LIQ_FRAC (ёмкость рынка).
+                # Старый вариант b_vol×0.2 использовал tick_volume (число сделок) — душил до 11 лотов.
                 b_vol = bd.get('vol', 0)
-                if b_vol and b_vol > 0:
+                if DAILY_VOL.get(ticker):
+                    contracts = min(contracts, max(1, int(DAILY_VOL[ticker] * LIQ_FRAC)))
+                elif b_vol and b_vol > 0:
                     vc = 0.5 if strategy_name == 'impulse_return' else 0.2
                     contracts = min(contracts, max(1, int(b_vol * vc)))
-                # Per-ticker лимит контрактов (реальная ликвидность стакана)
+                # Per-ticker лимит контрактов (обновлён из реальных объёмов при старте)
                 max_lots = TICKER_LIMITS.get(ticker, MAX_CONTRACTS)
                 contracts = min(contracts, max_lots)
                 if s.get('go', 0) * contracts > equity:
@@ -989,5 +1035,8 @@ if __name__ == '__main__':
         import __main__
         __main__.STATE_KEY = args.state_key
         STATE_KEY = args.state_key
+    
+    load_daily_volumes()  # реальные дневные объёмы AlgoPack → лимиты лотов (компаунд)
+    log.info("TICKER_LIMITS после загрузки объёмов: %s", {k: v for k, v in TICKER_LIMITS.items() if k in ('BR','NG','SV','RN','RI','TT')})
     
     run_tick(strategy_filter=args.strategy, mode=args.mode)

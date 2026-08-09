@@ -225,6 +225,22 @@ SHORT-only, z>1.5, hold 168ч, Si+Eu+CNY
 Символы исполнения: OI = квартальные `BRQ6`/`NGQ6`/`SVQ6` (не ALLFUT — indicative);
 базис = `Si`, `USDRUBF`, `Eu`, `EURRUBF`, `CNY`, `CNYRUBF`.
 
+### 🔧 Реинвест/компаунд в live — лимиты исправлены (09.08.2026)
+
+**Проблема:** реинвест в коде был (`equity += pnl`, `contracts = equity×risk/go`),
+но 3 лимита душили компаунд: volume cap `b_vol×0.2` (tick_volume = 55 для BR →
+макс 11 лотов!), TICKER_LIMITS 100/100/80, MAX_CONTRACTS=20.
+
+**Фикс в `strategies/common/paper_trader.py`:**
+1. `load_daily_volumes()` — грузит реальные дневные объёмы AlgoPack (контракты),
+   перпетуалы — оценка mt5 tick×1440×20
+2. Volume cap теперь: `DAILY_VOL[ticker] × LIQ_FRAC (10%)` вместо `b_vol×0.2`
+3. TICKER_LIMITS обновляются при старте из объёмов: **BR 75083, NG 158978, SV 84614**
+   (было 100/100/80) — компаунд теперь не упирается до ~100M+
+4. MAX_CONTRACTS 20 → 1000
+
+Проверено: live-трейдер запускается, Eq=200K чисто, лимиты загружаются.
+
 ## Live-статус (не менялся)
 
 - OI (BR/NG/SV) enabled, paper state 200K чистый старт, крон активен
