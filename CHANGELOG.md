@@ -1,3 +1,13 @@
+## [222] 2026-08-09
+### Added
+- Стратегия базис-арбитража: Si/Eu/CNY ↔ перпетуалы MOEX (USDRUBF/EURRUBF/CNYRUBF)
+- Ключевое открытие: КСУР-ГО перпетуалов в 16× меньше полного (USDRUBF 2633 vs 82170)
+- Загружены данные перпетуалов: USDRUBF/EURRUBF/CNYRUBF/GLDRUBF/IMOEXF (M1+H1)
+- Финал: SHORT-only z>1.5 hold 168 risk 5% → CAGR 55%, DD 13%, Calmar 4.3, N=45
+- OOS walk-forward (калибровка 22-23 → тест 24-26): CAGR 77%, DD 14%, WR 100% (N=21)
+- AlfaForex отброшен: своп −500/ночь, нет lead-lag (проверено H1/M5/M1)
+- Скрипты: scripts/basis_arb/backtest.py + short_only/short_wf/distribution/ksur_sim/leadlag
+- Checkpoint: checkpoint/222-basis-arbitrage-ksur.md
 ## [221] 2026-08-09
 ### Changed
 - Критический аудит OI (ТРИЗ-дебаты): все 5 проверок пройдены
