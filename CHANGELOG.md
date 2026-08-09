@@ -1,3 +1,12 @@
+## [223] 2026-08-09
+### Fixed
+- Live реинвест/компаунд: 3 лимита душили рост лотов (volume cap 0.2×tick_volume → макс 11 лотов BR!)
+- load_daily_volumes(): реальные дневные объёмы AlgoPack (контракты) вместо mt5 tick_volume
+- TICKER_LIMITS при старте: BR 75083, NG 158978, SV 84614 (было 100/100/80)
+- MAX_CONTRACTS 20 → 1000; volume cap = 10% дневного объёма (ёмкость рынка)
+- Компаунд теперь работает до ~100M+ (реинвест был: equity+=pnl, contracts=eq×risk/go)
+- Проверено: live-трейдер запускается, Eq=200K чисто
+- Checkpoint: checkpoint/223-live-compounding-liquidity-fix.md
 ## [222] 2026-08-09
 ### Added
 - Стратегия базис-арбитража: Si/Eu/CNY ↔ перпетуалы MOEX (USDRUBF/EURRUBF/CNYRUBF)
