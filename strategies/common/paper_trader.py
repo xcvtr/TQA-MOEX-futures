@@ -47,6 +47,8 @@ PG_PASS = os.getenv('MOEX_PG_PASSWORD', '')
 
 TRADE_COST = 4  # fallback, per-ticker из PG
 MAX_CONTRACTS = 20
+# Per-ticker лимит контрактов (реальная ликвидность стакана dom_qsh, 2026)
+TICKER_LIMITS = {'BR': 100, 'NG': 100, 'SV': 80, 'RN': 80, 'RI': 50, 'TT': 30}
 VOLUME_CAP = 0.2  # 20% of M1 volume (0.5 for Si)
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
 STATE_KEY = ''  # модульный уровень — задаётся в __main__ или run_paper_trader.py
@@ -386,26 +388,45 @@ def get_volume_data(ticker, n_bars=55):
 
 
 def fetch_day_net(ticker):
-    """Дисбаланс физлиц на текущий момент: (b-s)/(b+s) — как в бэктесте.
+    """Накопленный дневной дисбаланс физлиц — КАК В БЭКТЕСТЕ.
 
-    Отрицательное значение = физлица продают. Из moex.futoi за сегодня.
+    day_net = (cur_b - day_start_b) / total_oi * 100
+    где day_start_b = (buy_fiz - sell_fiz) первой записи дня,
+    total_oi = buy_fiz + sell_fiz + buy_yur + sell_yur последней записи.
+
+    Граница дня — как в бэктесте: день начинается в 07:00 UTC (=15:00 IRK),
+    irk_day(ts) = int((ts - 7*3600) // 86400). НЕ today() (00:00 IRK)!
+
+    Отрицательное = физлица за день НАКОПИЛИ продажи (паника → long).
+    Из moex.futoi.
     """
     try:
         ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         rows = ch.query(f"""
-            SELECT
-              argMax(buy_fiz, bt) AS cur_b,
-              argMax(sell_fiz, bt) AS cur_s
+            SELECT toUnixTimestamp(toDateTime(bt)), buy_fiz, sell_fiz, buy_yur, sell_yur
             FROM moex.futoi
-            WHERE ticker = '{ticker}' AND bt >= today()
-        """).result_rows
+            WHERE ticker = '{ticker}'
+              AND toUnixTimestamp(toDateTime(bt)) >= %(start_ts)s
+            ORDER BY bt
+        """, {'start_ts': int(datetime.now(timezone.utc).timestamp()) - 72 * 3600}).result_rows
         ch.close()
-        if not rows or not rows[0] or rows[0][0] is None:
+        if not rows:
             return None
-        cur_b, cur_s = float(rows[0][0]), float(rows[0][1])
-        if cur_b + cur_s <= 0:
+        # Дневной старт: первая запись текущего IRK-дня (граница 07:00 UTC = 15:00 IRK)
+        DAY_SEC = 86400
+        cur_day = int((rows[-1][0] - 7 * 3600) // DAY_SEC)
+        day_rows = [r for r in rows if int((r[0] - 7 * 3600) // DAY_SEC) == cur_day]
+        if len(day_rows) < 2:
             return None
-        return (cur_b - cur_s) / (cur_b + cur_s) * 100.0
+        first = day_rows[0]
+        day_start_net = int(first[1]) - int(first[2])
+        # Текущее состояние: последняя запись дня
+        last = day_rows[-1]
+        cur_net = int(last[1]) - int(last[2])
+        total = int(last[1]) + int(last[2]) + int(last[3]) + int(last[4])
+        if total <= 0:
+            return None
+        return (cur_net - day_start_net) / total * 100.0
     except Exception as e:
         log.warning("fetch_day_net error for %s: %s", ticker, e)
         return None
@@ -553,6 +574,10 @@ def manage_positions(positions, bar_data, specs, bar_idx):
         # Timeout (by bars or by real time)
         age_bars = bar_idx - p['entry_bar']
         timeout_triggered = age_bars >= p.get('timeout_bars', 12) or age_sec > p.get('timeout_bars', 12) * 300
+        # Для OI: max_hold_h (часы) — как бэктест (age_sec > max_hold_h*3600)
+        if p.get('strategy') == 'oi' and not timeout_triggered:
+            max_hold_h = p.get('max_hold_h', 120)
+            timeout_triggered = age_sec > max_hold_h * 3600
         if timeout_triggered:
             pnl = (close - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
             pnl += p.get('part_pnl', 0)
@@ -563,6 +588,51 @@ def manage_positions(positions, bar_data, specs, bar_idx):
             p['exit_bar'] = bar_idx
             closed.append(p)
             continue
+
+        # Пирамидинг для OI: добавка лота при движении +pyra_pct от входа (как бэктест pyr/pyra_pct)
+        if p.get('strategy') == 'oi' and not p.get('closed'):
+            pyra_max = int(p.get('pyra_max', 0))
+            pyra_pct = float(p.get('pyra_pct', 0.5))
+            pyra_added = int(p.get('pyra_added', 0))
+            if pyra_added < pyra_max:
+                gain_pct = 0.0
+                if p['direction'] == 'long':
+                    if hi and p['entry_price'] > 0:
+                        gain_pct = (hi - p['entry_price']) / p['entry_price'] * 100
+                else:
+                    if lo and p['entry_price'] > 0:
+                        gain_pct = (p['entry_price'] - lo) / p['entry_price'] * 100
+                if gain_pct >= (pyra_added + 1) * pyra_pct:
+                    add_lots = int(p.get('base_contracts', p.get('contracts', 1)))
+                    max_lots = TICKER_LIMITS.get(ticker, MAX_CONTRACTS)
+                    new_contracts = min(p.get('contracts', 1) + add_lots, max_lots)
+                    if new_contracts > p.get('contracts', 1):
+                        p['contracts'] = new_contracts
+                        p['pyra_added'] = pyra_added + 1
+                        log.info("PYRAMID %s %s: contracts %d→%d (gain=%.2f%%)",
+                                 ticker, p['direction'], new_contracts - add_lots, new_contracts, gain_pct)
+
+        # Выход по ОИ (обратное условие входа) — для стратегии oi
+        # long закрывается, когда day_net ≥ exit_thr (физ начали покупать — паника кончилась)
+        # short закрывается, когда day_net ≤ -exit_thr (физ начали продавать)
+        if p.get('strategy') == 'oi':
+            dn = bd.get('day_net')
+            exit_thr = p.get('exit_thr', 3)
+            if dn is not None:
+                oi_exit = (p['direction'] == 'long' and dn >= exit_thr) or \
+                          (p['direction'] == 'short' and dn <= -exit_thr)
+                if oi_exit:
+                    # slippage на выходе: 1 тик (как бэктест: exit = close - ms для long)
+                    exit_px = close - ms if p['direction'] == 'long' else close + ms
+                    pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
+                    pnl += p.get('part_pnl', 0)
+                    p['pnl'] = pnl
+                    p['exit_price'] = exit_px
+                    p['exit_reason'] = 'oi_exit'
+                    p['closed'] = True
+                    p['exit_bar'] = bar_idx
+                    closed.append(p)
+                    continue
 
         # Trailing TP
         if p['direction'] == 'long':
@@ -835,9 +905,12 @@ def run_tick(strategy_filter=None, mode=None):
                 if b_vol and b_vol > 0:
                     vc = 0.5 if strategy_name == 'impulse_return' else 0.2
                     contracts = min(contracts, max(1, int(b_vol * vc)))
-                contracts = min(contracts, MAX_CONTRACTS)
+                # Per-ticker лимит контрактов (реальная ликвидность стакана)
+                max_lots = TICKER_LIMITS.get(ticker, MAX_CONTRACTS)
+                contracts = min(contracts, max_lots)
                 if s.get('go', 0) * contracts > equity:
                     contracts = max(1, int(equity * 0.1 / s.get('go', 1)))
+                    contracts = min(contracts, max_lots)
 
                 # Realistic slippage: 1 тик (лимитка по текущей цене, как бэктест LONG+h120)
                 # НЕ 2-5 тиков: на NG (ms=0.001, цена ~2.7) 3 тика = 0.11% — убивает edge
@@ -845,6 +918,13 @@ def run_tick(strategy_filter=None, mode=None):
                 slip_total = ms_val * 1
                 entry_price = float(bd['prc']) + (slip_total if signal['direction'] == 'long' else -slip_total)
                 entry_price = round(entry_price / ms_val) * ms_val
+
+                # Timeout для OI: max_hold_h (часы) → минуты (M1-бары), как бэктест
+                if strategy_name == 'oi':
+                    max_hold_h = params.get('max_hold_h', 120)
+                    timeout_bars = max_hold_h * 60
+                else:
+                    timeout_bars = entry.get('timeout_bars', 12)
 
                 pos = {
                     'id': next_id,
@@ -861,15 +941,21 @@ def run_tick(strategy_filter=None, mode=None):
                 'trailing_level': None,
                 'rem': 1,
                 'part_pnl': 0,
+                'exit_thr': params.get('exit_thr', 3),
+                'max_hold_h': params.get('max_hold_h', 120),
+                'base_contracts': contracts,
+                'pyra_max': max(0, int(params.get('max_positions', 1)) - 1),
+                'pyra_pct': float(params.get('pyra_pct', 0.5)),
+                'pyra_added': 0,
                 'activation': entry.get('trailing_activation', 0.005),
                 'trail': entry.get('trailing_trail', 0.003),
                 'stop_loss': entry.get('stop_loss', 0.007),
-                'timeout_bars': entry.get('timeout_bars', 12),
+                'timeout_bars': timeout_bars,
                 'pct': specs.get(ticker, {}).get('pct', 1.0),
                 }
                 next_id += 1
                 positions.append(pos)
-                log.info("New %s %s %s @ %.1f", ticker, strategy_name, signal['direction'], entry_price)
+                log.info("New %s %s %s @ %.1f (%d ct, thr=%.1f exit=%.1f)", ticker, strategy_name, signal['direction'], entry_price, contracts, params.get('thr', 0), params.get('exit_thr', 0))
 
     # Save
     state['positions'] = [p for p in positions if not p.get('closed', False)]
