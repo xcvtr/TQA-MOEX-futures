@@ -7,6 +7,11 @@
 - OOS walk-forward (калибровка 22-23 → тест 24-26): CAGR 77%, DD 14%, WR 100% (N=21)
 - AlfaForex отброшен: своп −500/ночь, нет lead-lag (проверено H1/M5/M1)
 - Скрипты: scripts/basis_arb/backtest.py + short_only/short_wf/distribution/ksur_sim/leadlag
+### Changed
+- Портфельный тест OI+BA (общий капитал): pyr=2 risk=5% lots≤1000 → CAGR 1831%, MTM 15%, Calmar 122
+- Ликвидность: mt5 vol = tick_volume, реальные объёмы AlgoPack в 10-50× (BR 631K/день)
+- Реоптимизатор OI (oi_reopt_monthly): добавлен MTM DD ≤ 20% фильтр в выбор конфигов
+- Live-исполнение: решение = MT5 (FINAM) или Finam API, мост ещё писать (iceberg 20-50)
 - Checkpoint: checkpoint/222-basis-arbitrage-ksur.md
 ## [221] 2026-08-09
 ### Changed

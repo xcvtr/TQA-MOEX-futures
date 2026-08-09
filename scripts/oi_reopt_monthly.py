@@ -113,10 +113,12 @@ def gen_signals(data, specs, thr, exit_thr, max_hold=120, pyr=3, pyra_pct=0.5):
                                 pos['pyra_prices'].append(lo - ms)  # реальная цена добавки
     return sigs
 
-def simulate(sigs, start_cap=200000.0, risk=0.10):
+def simulate(sigs, start_cap=200000.0, risk=0.10, data=None):
     """Честная симуляция: лоты от текущего eq, лимит контрактов,
-    суммарная маржа ≤ MAX_MARGIN, пирамидинг по РЕАЛЬНЫМ ценам частей."""
+    суммарная маржа ≤ MAX_MARGIN, пирамидинг по РЕАЛЬНЫМ ценам частей.
+    Считает и Cash DD, и MTM DD (по lo/hi барам внутри сделок)."""
     eq = start_cap; peak = eq; cash_mdd = 0.0
+    peak_mtm = eq; mtm_mdd = 0.0
     n = 0; wins = 0
     open_pos = []
     for s in sorted(sigs, key=lambda x: x['entry_ts']):
@@ -143,14 +145,32 @@ def simulate(sigs, start_cap=200000.0, risk=0.10):
                 pnl += ((s['exit_p'] - p_in) / s['ms'] * s['sp'] - s['fee']*2) * base_lots
             else:
                 pnl += ((p_in - s['exit_p']) / s['ms'] * s['sp'] - s['fee']*2) * base_lots
+        # ── MTM: худший внутрисделочный уровень (lo для long, hi для short) ──
+        if data is not None and s['tk'] in data:
+            bars = data[s['tk']][1]
+            pts = bars[:, 0]
+            i0 = bisect.bisect_right(pts, s['entry_ts']) - 1
+            i1 = bisect.bisect_right(pts, s['exit_ts']) - 1
+            for bi in range(max(0, i0), min(i1 + 1, len(bars))):
+                lo = bars[bi, 3]; hi = bars[bi, 2]
+                mtm_pnl = 0.0
+                for p_in in all_prices:
+                    if s['dir'] == 'long':
+                        mtm_pnl += ((lo - p_in) / s['ms'] * s['sp'] - s['fee']*2) * base_lots
+                    else:
+                        mtm_pnl += ((p_in - hi) / s['ms'] * s['sp'] - s['fee']*2) * base_lots
+                mtm_eq = eq + mtm_pnl
+                peak_mtm = max(peak_mtm, mtm_eq)
+                if peak_mtm > 0:
+                    mtm_mdd = max(mtm_mdd, (peak_mtm - mtm_eq) / peak_mtm * 100)
         eq += pnl; n += 1
         if pnl > 0: wins += 1
         peak = max(peak, eq)
         cash_mdd = max(cash_mdd, (peak - eq) / peak * 100)
         open_pos.append((s['exit_ts'], go_total))
-    return eq, cash_mdd, n, wins
+    return eq, cash_mdd, mtm_mdd, n, wins
 
-def optimize(data, specs):
+def optimize(data, specs, mtm_max=20.0):
     grid = []
     for thr in [3, 4, 5]:
         for exit_thr in [2, 3]:
@@ -161,19 +181,21 @@ def optimize(data, specs):
     for thr, exit_thr, risk in grid:
         sigs = gen_signals(data, specs, thr, exit_thr)
         if len(sigs) < 20: continue
-        eq_f, mdd, n, w = simulate(sigs, risk=risk)
+        eq_f, mdd, mtm, n, w = simulate(sigs, risk=risk, data=data)
         roi = (eq_f / 200000 - 1) * 100
-        calmar = roi / mdd if mdd > 0 else 0
+        calmar = roi / mtm if mtm > 0 else 0
         results.append({'thr': thr, 'exit_thr': exit_thr, 'risk': risk,
-                        'roi': round(roi, 1), 'mdd': round(mdd, 1), 'calmar': round(calmar, 1),
+                        'roi': round(roi, 1), 'mdd': round(mdd, 1), 'mtm': round(mtm, 1),
+                        'calmar': round(calmar, 1),
                         'trades': len(sigs), 'wr': round(w / n * 100, 1) if n else 0})
-        if calmar > best_score:
+        # Выбор: ТОЛЬКО конфиги с MTM DD ≤ порога, лучший по MTM-Calmar
+        if mtm <= mtm_max and calmar > best_score:
             best_score = calmar
-            best = (thr, exit_thr, risk, roi, mdd, len(sigs))
+            best = (thr, exit_thr, risk, roi, mdd, mtm, len(sigs))
     return best, results
 
 def update_pg(best):
-    thr, exit_thr, risk, roi, mdd, ntr = best
+    thr, exit_thr, risk, roi, mdd, mtm, ntr = best
     conn = psycopg2.connect(host=PG_HOST, dbname='moex', user='postgres', connect_timeout=5)
     cur = conn.cursor()
     cur.execute("SELECT ticker, strategy, params FROM futures.portfolio WHERE strategy='oi' AND enabled")
@@ -201,15 +223,16 @@ def main():
     print(f"Данные: {len(data)} тикеров, {n_sigs_total} сигнальных точек за 12 мес")
     best, results = optimize(data, specs)
     if best is None:
-        print("НЕТ достаточно данных — не обновляю параметры")
+        print("НЕТ конфига с MTM DD ≤ 20% или недостаточно данных — не обновляю параметры")
         return
-    thr, exit_thr, risk, roi, mdd, ntr = best
-    print(f"\nЛучший: thr={thr} exit_thr={exit_thr} risk={risk:.0%} "
-          f"ROI={roi:+.1f}% MDD={mdd:.1f}% trades={ntr}")
+    thr, exit_thr, risk, roi, mdd, mtm, ntr = best
+    print(f"\nЛучший (MTM≤20%): thr={thr} exit_thr={exit_thr} risk={risk:.0%} "
+          f"ROI={roi:+.1f}% CashMDD={mdd:.1f}% MTMDD={mtm:.1f}% trades={ntr}")
     print("\nВсе конфиги:")
     for r in sorted(results, key=lambda x: -x['calmar'])[:8]:
         print(f"  thr{r['thr']} ex{r['exit_thr']} r{r['risk']:.0%}: "
-              f"ROI {r['roi']:+.1f}% MDD {r['mdd']:.1f}% Calmar {r['calmar']:.1f} WR {r['wr']}% ({r['trades']}t)")
+              f"ROI {r['roi']:+.1f}% CashMDD {r['mdd']:.1f}% MTMDD {r['mtm']:.1f}% "
+              f"Calmar {r['calmar']:.1f} WR {r['wr']}% ({r['trades']}t)")
     update_pg(best)
     print("\n✅ Параметры обновлены в futures.portfolio")
 
