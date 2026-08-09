@@ -8,7 +8,10 @@
 - AlfaForex отброшен: своп −500/ночь, нет lead-lag (проверено H1/M5/M1)
 - Скрипты: scripts/basis_arb/backtest.py + short_only/short_wf/distribution/ksur_sim/leadlag
 ### Changed
-- Портфельный тест OI+BA (общий капитал): pyr=2 risk=5% lots≤1000 → CAGR 1831%, MTM 15%, Calmar 122
+- Критический аудит: исправлены 3 бага (look-ahead базиса, пирамидинг без маржи, MTM по close→lo/hi)
+- Портфель после аудита: риск=8% pyr=1 lots≤1000 → CAGR 1550%, MTM 13%, Calmar 119 (лучший по Calmar)
+- Пирамидинг потерял привлекательность: pyr=1 лучший (часть добавок была бесплатной маржей)
+- Портфельный тест OI+BA (общий капитал): pyr=2 risk=5% lots≤1000 → CAGR 1830%, MTM 17%
 - Ликвидность: mt5 vol = tick_volume, реальные объёмы AlgoPack в 10-50× (BR 631K/день)
 - Реоптимизатор OI (oi_reopt_monthly): добавлен MTM DD ≤ 20% фильтр в выбор конфигов
 - Live-исполнение: решение = MT5 (FINAM) или Finam API, мост ещё писать (iceberg 20-50)

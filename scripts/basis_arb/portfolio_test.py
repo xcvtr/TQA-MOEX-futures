@@ -77,6 +77,31 @@ def load_h1_clean(f, p):
     ts = [t for t in common if 7 <= t.hour <= 23]
     return ts, np.array([fu[t] for t in ts]), np.array([pf[t] for t in ts])
 
+def load_h1_ohlc(f, p, scale):
+    """H1 close + hi/lo базиса (для честного MTM). fu_hi−pf_lo = макс базис, fu_lo−pf_hi = мин."""
+    def load(tk):
+        rows = ch.query(f"""
+            SELECT toStartOfHour(bt) h, argMax(prc, bt) c, max(hi) hi, min(lo) lo
+            FROM moex.mt5_continuous WHERE ticker='{tk}' AND bt >= '2024-01-01'
+            GROUP BY h ORDER BY h
+        """).result_rows
+        out = {}
+        prev = None
+        for r in rows:
+            t = r[0]; c, h, l = float(r[1]), float(r[2]), float(r[3])
+            if prev is not None and abs(c/prev - 1) > 0.05:
+                continue
+            out[t] = (c, h, l)
+            prev = c
+        return out
+    fu = load(f); pf = load(p)
+    common = sorted(set(fu) & set(pf))
+    ts = [t for t in common if 7 <= t.hour <= 23]
+    b_close = np.array([fu[t][0]/scale - pf[t][0] for t in ts])
+    b_hi = np.array([fu[t][1]/scale - pf[t][2] for t in ts])
+    b_lo = np.array([fu[t][2]/scale - pf[t][1] for t in ts])
+    return ts, b_close, b_hi, b_lo
+
 def zscore_arr(arr, win):
     out = np.full(len(arr), np.nan)
     for i in range(win, len(arr)):
@@ -106,15 +131,14 @@ def run(capital=200000, enable_oi=True, enable_basis=True, liq_frac=0.10):
     eq = capital; peak_mtm = eq; peak_cash = eq
     cash_mdd = mtm_mdd = 0.0
     trades = []
-    pos_oi = {}; pos_basis = {}
+    pos_oi = {}; pos_basis = {}; pending_basis = {}
 
-    # базис-данные (проверенные)
+    # базис-данные (close + hi/lo для честного MTM)
     basis_data = {}
     for f, p, scale, go in BASIS_PAIRS:
-        ts, fu, pf = load_h1_clean(f, p)
-        basis = fu/scale - pf
-        z = zscore_arr(basis, 120)
-        basis_data[f] = {'ts': ts, 'basis': basis, 'z': z, 'go': go}
+        ts, b_close, b_hi, b_lo = load_h1_ohlc(f, p, scale)
+        z = zscore_arr(b_close, 120)
+        basis_data[f] = {'ts': ts, 'basis': b_close, 'basis_hi': b_hi, 'basis_lo': b_lo, 'z': z, 'go': go}
     # индекс ts→позиция в массиве
     b_idx = {f: {t: i for i, t in enumerate(d['ts'])} for f, d in basis_data.items()}
 
@@ -176,15 +200,18 @@ def run(capital=200000, enable_oi=True, enable_basis=True, liq_frac=0.10):
                 hi, lo, cur_p = oi_prices[fut_tk][kk[idx]]
                 exit_cond = (dn >= OI_EXIT) if p['side'] == 'long' else (dn <= -OI_EXIT)
                 hold_h = (ts - p['entry_ts']) / 3600
-                # ── пирамидинг (как oi_audit_final pyr=3, pyra_pct=0.5) ──
+                # ── пирамидинг (как oi_audit_final pyr=3, pyra_pct=0.5) + проверка маржи ──
                 go, ms, sp, fee = SPECS.get(fut_tk, (10000, 1.0, 1.0, 3.81))
                 if len(p['pyra_prices']) < OI_PYR - 1:
-                    if p['side'] == 'long':
-                        if (hi - p['entry_p']) / p['entry_p'] * 100 >= (len(p['pyra_prices'])+1) * OI_PYRA_PCT:
-                            p['pyra_prices'].append(hi + ms)
-                    else:
-                        if (p['entry_p'] - lo) / p['entry_p'] * 100 >= (len(p['pyra_prices'])+1) * OI_PYRA_PCT:
-                            p['pyra_prices'].append(lo - ms)
+                    # добавка требует ГО на доп. лот — только если маржа позволяет
+                    add_margin = go * p['lots']
+                    if margin_used() + add_margin <= eq * 0.80:
+                        if p['side'] == 'long':
+                            if (hi - p['entry_p']) / p['entry_p'] * 100 >= (len(p['pyra_prices'])+1) * OI_PYRA_PCT:
+                                p['pyra_prices'].append(hi + ms)
+                        else:
+                            if (p['entry_p'] - lo) / p['entry_p'] * 100 >= (len(p['pyra_prices'])+1) * OI_PYRA_PCT:
+                                p['pyra_prices'].append(lo - ms)
                 if exit_cond or hold_h >= OI_HOLD_H:
                     exit_p = cur_p - ms if p['side'] == 'long' else cur_p + ms
                     pnl = 0.0
@@ -236,10 +263,18 @@ def run(capital=200000, enable_oi=True, enable_basis=True, liq_frac=0.10):
                 if margin_used() + go * lots <= eq * 0.80:
                     pos_oi[fut_tk] = {'side': side, 'entry_ts': ts, 'entry_p': fill, 'lots': lots, 'pyra_prices': []}
 
-        # ── 4. Открытие базис ──
+        # ── 4. Открытие базис (вход по close СЛЕДУЮЩЕГО бара — анти-look-ahead) ──
         if enable_basis:
+            # 4a. Сначала исполняем отложенные сигналы (сигнал был на prev баре → вход по close текущего)
+            for f in list(pending_basis):
+                d = basis_data[f]
+                i = b_idx[f].get(datetime.fromtimestamp(ts, tz=timezone.utc))
+                if i is None: continue
+                lots = pending_basis.pop(f)
+                pos_basis[f] = {'entry_ts': ts, 'entry_b': d['basis'][i], 'lots': lots}
+            # 4b. Новые сигналы → ставим в pending (вход на следующем баре)
             for f, d in basis_data.items():
-                if f in pos_basis: continue
+                if f in pos_basis or f in pending_basis: continue
                 i = b_idx[f].get(datetime.fromtimestamp(ts, tz=timezone.utc))
                 if i is None or i < 120 or np.isnan(d['z'][i]): continue
                 if d['ts'][i].weekday() not in BASIS_DOW: continue
@@ -251,9 +286,9 @@ def run(capital=200000, enable_oi=True, enable_basis=True, liq_frac=0.10):
                 perp_map = {'Si': 'USDRUBF', 'Eu': 'EURRUBF', 'CNY': 'CNYRUBF'}
                 lots = min(lots, liq_limit(f), liq_limit(perp_map[f]))
                 if margin_used() + d['go'] * lots <= eq * 0.80:
-                    pos_basis[f] = {'entry_ts': ts, 'entry_b': d['basis'][i], 'lots': lots}
+                    pending_basis[f] = lots
 
-        # ── MTM ──
+        # ── MTM (по lo/hi — худший внутрисделочный уровень) ──
         mtm = eq
         if enable_oi:
             for fut_tk, p in pos_oi.items():
@@ -262,15 +297,17 @@ def run(capital=200000, enable_oi=True, enable_basis=True, liq_frac=0.10):
                 if idx < 0: continue
                 hi, lo, cur = oi_prices[fut_tk][kk[idx]]
                 go, ms, sp, fee = SPECS.get(fut_tk, (10000, 1.0, 1.0, 3.81))
+                worst = lo if p['side'] == 'long' else hi  # long: худший = lo; short: худший = hi
                 for p_in in [p['entry_p']] + p['pyra_prices']:
-                    if p['side'] == 'long': mtm += ((cur - p_in)/ms*sp - fee*2) * p['lots']
-                    else: mtm += ((p_in - cur)/ms*sp - fee*2) * p['lots']
+                    if p['side'] == 'long': mtm += ((worst - p_in)/ms*sp - fee*2) * p['lots']
+                    else: mtm += ((p_in - worst)/ms*sp - fee*2) * p['lots']
         if enable_basis:
             for f, p in pos_basis.items():
                 d = basis_data[f]
                 i = b_idx[f].get(datetime.fromtimestamp(ts, tz=timezone.utc))
                 if i is not None:
-                    mtm += (p['entry_b'] - d['basis'][i]) * 1000.0 * p['lots']
+                    # SHORT базиса: худший = базис максимален (basis_hi)
+                    mtm += (p['entry_b'] - d['basis_hi'][i]) * 1000.0 * p['lots']
         peak_mtm = max(peak_mtm, mtm)
         if peak_mtm > 0:
             mtm_mdd = max(mtm_mdd, (peak_mtm-mtm)/peak_mtm*100)
