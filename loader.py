@@ -232,6 +232,11 @@ def fetch_oi_snapshot(ticker: str) -> Optional[list[dict]]:
                 try:
                     dt = datetime.strptime(
                         f"{row[2].strip()} {row[3].strip()}", "%Y-%m-%d %H:%M:%S")
+                    # ISS отдаёт время в МСК (UTC+3). CH хранит в таймзоне сервера
+                    # (Asia/Irkutsk, +8). Чтобы unix был правильным (МСК-момент),
+                    # naive datetime интерпретируется CH как IRK → сдвиг −5ч.
+                    # Фикс: добавить 5 часов (МСК → IRK), тогда unix = истинный.
+                    dt = dt + timedelta(hours=5)
                 except ValueError:
                     continue
 
