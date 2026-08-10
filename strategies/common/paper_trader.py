@@ -990,7 +990,7 @@ def run_tick(strategy_filter=None, mode=None):
                 'exit_thr': params.get('exit_thr', 3),
                 'max_hold_h': params.get('max_hold_h', 120),
                 'base_contracts': contracts,
-                'pyra_max': max(0, int(params.get('max_positions', 1)) - 1),
+                'pyra_max': max(0, int(params.get('pyra_max', 0)) or (int(params.get('max_positions', 1)) - 1)),
                 'pyra_pct': float(params.get('pyra_pct', 0.5)),
                 'pyra_added': 0,
                 'activation': entry.get('trailing_activation', 0.005),
