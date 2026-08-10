@@ -5,6 +5,9 @@
 - TICKER_LIMITS при старте: BR 75083, NG 158978, SV 84614 (было 100/100/80)
 - MAX_CONTRACTS 20 → 1000; volume cap = 10% дневного объёма (ёмкость рынка)
 - Компаунд теперь работает до ~100M+ (реинвест был: equity+=pnl, contracts=eq×risk/go)
+- **ПГО формула: ГО = medium × kpur/ksur** (понижение ~2 раза; было med×ksur — фейк 8.6×)
+- PG ГО: Si 11947, USDRUBF 11758, Eu 13897, EURRUBF 13785, CNYRUBF 958, NG 6093, SV 10509
+- ROI за год: с ПГО +1801%, без ПГО +494% (MTM 8.1% / 5.3%)
 - Проверено: live-трейдер запускается, Eq=200K чисто
 - Checkpoint: checkpoint/223-live-compounding-liquidity-fix.md
 ## [222] 2026-08-09

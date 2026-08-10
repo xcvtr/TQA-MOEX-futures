@@ -112,8 +112,10 @@ def main():
             if xkey not in finam:
                 print(f'{ticker:5s} {code:12s} {med:>8.0f} NO XLS RATE ({xkey})'); continue
             kpur, ksur = finam[xkey]
-            # GO = medium (MOEX КСУР) × ставка_КСУР_уменьшения (XLS кол12)
-            go_new = round(med * ksur, 0)
+            # GO = medium (КСУР, buy_deposit_medium_risk из go.xml) × kpur/ksur
+            # medium — это КСУР-ставка (стандартный уровень риска). ПГО ФИНАМ понижает именно её.
+            # kpur/ksur ≈ 0.51-0.56 → понижение ~45-49% (в ~2 раза)
+            go_new = round(med * kpur / ksur, 0)
 
         cur.execute("SELECT go FROM futures.ticker_specs WHERE ticker = %s", (ticker,))
         row = cur.fetchone()
