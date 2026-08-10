@@ -65,13 +65,29 @@ def load_daily_volumes():
     global DAILY_VOL
     try:
         ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+        # Только АКТИВНЫЙ контракт (из PG active_symbols), не все кварталы!
+        # Старый запрос суммировал BRV6+BRQ6+BRU6... → завышение объёма в 6-17 раз.
+        try:
+            import psycopg2
+            conn_pg = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
+            cur = conn_pg.cursor()
+            cur.execute("SELECT prefix, symbol FROM futures.active_symbols")
+            active_map = dict(cur.fetchall())
+            cur.close(); conn_pg.close()
+        except Exception:
+            active_map = {}
         rows = ch.query("""
-            SELECT asset_code, round(sum(vol) / NULLIF(count(DISTINCT tradedate), 0))
+            SELECT secid, round(sum(vol) / NULLIF(count(DISTINCT tradedate), 0))
             FROM moex.tradestats_fo
             WHERE tradedate >= toDate(now()) - INTERVAL 400 DAY AND vol > 0
-            GROUP BY asset_code
+            GROUP BY secid
         """).result_rows
-        new_vol = {r[0]: float(r[1]) for r in rows}
+        sec_vol = {r[0]: float(r[1]) for r in rows}
+        new_vol = {}
+        # Маппинг активного символа → наш тикер
+        for prefix, sym in active_map.items():
+            if sym in sec_vol:
+                new_vol[prefix] = sec_vol[sym]
         # перпетуалы: оценка
         rows2 = ch.query("""
             SELECT ticker, round(avg(vol)) FROM moex.mt5_continuous
