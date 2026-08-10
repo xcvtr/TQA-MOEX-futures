@@ -84,7 +84,7 @@ for p in positions:
     issues = []
     now = now_msk()
 
-    # 1) время: не в будущем, торговые часы 10:00-18:45 МСК будни
+    # 1) время: не в будущем, торговые часы (10:00-02:00 МСК: дневная + вечерняя сессия, будни)
     if et_msk is None:
         issues.append("entry_time не парсится")
     else:
@@ -92,7 +92,10 @@ for p in positions:
             issues.append(f"entry_time В БУДУЩЕМ ({et_msk:%H:%M})")
         if et_msk.weekday() >= 5:
             issues.append(f"вход в выходной ({et_msk:%a})")
-        if not (datetime.time(10, 0) <= et_msk.time() <= datetime.time(18, 50)):
+        t_min = et_msk.hour * 60 + et_msk.minute
+        # Live-папер: крон 15-23,0-4 IRK = 10:00-02:00 МСК (дневная + вечерняя сессия)
+        market_ok = (t_min >= 10 * 60) or (t_min < 2 * 60 + 50)
+        if not market_ok:
             issues.append(f"вход вне торговых часов ({et_msk:%H:%M})")
 
     # 2) цена: реальная цена mt5_continuous в момент входа
