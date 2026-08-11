@@ -39,7 +39,7 @@ for y in [2023,2024,2025,2026]:
         DATA[(y,fut_tk)] = (net_map, arr)
     print(f'loaded {y}', flush=True)
 
-def run(risks, pyr=5, pyra_pct=0.3, stop_pct=1.5, years=[2023,2024,2025,2026], eq_cap=None):
+def run(risks, pyr=5, pyra_pct=0.3, stop_pct=1.5, years=[2023,2024,2025,2026], eq_cap=None, hold_limit=120):
     eq = 200000.0; peak_cash = eq; cash_mdd = 0.0
     peak_mtm = eq; mtm_mdd = 0.0; n = 0; wins = 0
     max_lots = 0
@@ -59,7 +59,9 @@ def run(risks, pyr=5, pyra_pct=0.3, stop_pct=1.5, years=[2023,2024,2025,2026], e
                         idx = bisect.bisect_right(pts, ts) - 1
                         if idx < 0: continue
                         cur_p = bars[idx,4]; lo = bars[idx,3]; hi = bars[idx,2]
-                        mtm_px = lo if direction=='long' else hi
+                        # MTM по CLOSE бара (как папер calc_mtm_equity: prc = bd['prc'])
+                        # НЕ по lo/hi — иначе DD завышен внутридневными хвостами
+                        mtm_px = cur_p
                         avg_entry = pos['avg_entry']
                         if direction=='long':
                             mtm_pnl = (mtm_px - avg_entry)/ms*sp*pos['lots'] - fee*2*pos['lots']
@@ -73,7 +75,7 @@ def run(risks, pyr=5, pyra_pct=0.3, stop_pct=1.5, years=[2023,2024,2025,2026], e
                         stop_hit = False
                         if direction=='long' and lo <= pos['entry_p']*(1-stop_pct/100): stop_hit = True
                         if direction=='short' and hi >= pos['entry_p']*(1+stop_pct/100): stop_hit = True
-                        if exit_cond or hold_h >= 120 or stop_hit:
+                        if exit_cond or hold_h >= hold_limit or stop_hit:
                             slip = 1 if tk=='NG' else 2
                             if stop_hit:
                                 gap = STOP_GAP[tk]
@@ -102,14 +104,14 @@ def run(risks, pyr=5, pyra_pct=0.3, stop_pct=1.5, years=[2023,2024,2025,2026], e
                             max_lots = max(max_lots, lots)
                             slip = 1 if tk=='NG' else 2
                             entry_p = fill_p + slip*ms if direction=='long' else fill_p - slip*ms
-                            pos = {'entry_ts':ts, 'entry_p':entry_p, 'avg_entry':entry_p, 'pyra_prices':[], 'lots':lots, 'base_price':entry_p}
+                            pos = {'entry_ts':ts, 'entry_p':entry_p, 'avg_entry':entry_p, 'pyra_prices':[], 'lots':lots, 'base_lots':lots, 'base_price':entry_p}
                     elif pos is not None and len(pos['pyra_prices']) < pyr-1:
                         idx = bisect.bisect_right(pts, ts) - 1
                         if idx >= 0:
                             if direction=='long':
                                 hi_b = bars[idx,2]
                                 if (hi_b-pos['base_price'])/pos['base_price']*100 >= (len(pos['pyra_prices'])+1)*pyra_pct:
-                                    add_lots = pos['lots']; slip = 1 if tk=='NG' else 2
+                                    add_lots = pos.get('base_lots', pos['lots']); slip = 1 if tk=='NG' else 2
                                     pyra_px = hi_b + slip*ms
                                     old_ct = pos['lots']; old_avg = pos['avg_entry']; new_ct = old_ct + add_lots
                                     pos['avg_entry'] = (old_ct*old_avg + add_lots*pyra_px)/new_ct
@@ -117,7 +119,7 @@ def run(risks, pyr=5, pyra_pct=0.3, stop_pct=1.5, years=[2023,2024,2025,2026], e
                             else:
                                 lo_b = bars[idx,3]
                                 if (pos['base_price']-lo_b)/pos['base_price']*100 >= (len(pos['pyra_prices'])+1)*pyra_pct:
-                                    add_lots = pos['lots']; slip = 1 if tk=='NG' else 2
+                                    add_lots = pos.get('base_lots', pos['lots']); slip = 1 if tk=='NG' else 2
                                     pyra_px = lo_b - slip*ms
                                     old_ct = pos['lots']; old_avg = pos['avg_entry']; new_ct = old_ct + add_lots
                                     pos['avg_entry'] = (old_ct*old_avg + add_lots*pyra_px)/new_ct

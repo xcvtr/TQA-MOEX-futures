@@ -1072,9 +1072,10 @@ def run_tick(strategy_filter=None, mode=None):
                 else:
                     risk = entry.get('risk', 0.2)
                     go = s.get('go', 1)
-                    # Кап eq для sizing: при eq > SIZING_EQ_CAP лоты НЕ растут (slippage убивает edge).
-                    # Оптимум из бэктеста: cap 10M → CAGR +382%, MTM DD 15% (риски 10/7/4, pyr3).
-                    sizing_eq = min(equity, SIZING_EQ_CAP)
+                    # Кап eq для sizing: при eq > капа лоты НЕ растут (slippage убивает edge).
+                    # Кап из PG (sizing_eq_cap, оптимум бэктеста 600K для OI) или константа.
+                    cap_eq = params.get('sizing_eq_cap', SIZING_EQ_CAP)
+                    sizing_eq = min(equity, cap_eq)
                     contracts = max(1, int(sizing_eq * risk / go)) if go > 0 else 1
 
                 # Volume cap: реальный дневной объём × LIQ_FRAC (ёмкость рынка).
