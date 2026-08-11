@@ -58,6 +58,17 @@ LIQ_FRAC = 0.05   # доля реального ДНЕВНОГО объёма (I
                   # Бэктест (реальная ёмкость): CAGR +1415-2128%, MTM 18.5%.
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
 STATE_KEY = ''  # модульный уровень — задаётся в __main__ или run_paper_trader.py
+BROKER = os.environ.get('MOEX_BROKER', 'sim')  # 'sim' (close+1тик) или 'dom' (исполнение по стакану из PG futures.dom)
+
+# ── DOM-брокер (исполнение по стакану) ──
+DOM_BROKER = None
+def get_dom_broker():
+    """Ленивая инициализация BrokerDOM (только для BROKER='dom')."""
+    global DOM_BROKER
+    if DOM_BROKER is None:
+        from strategies.common.broker_dom import BrokerDOM
+        DOM_BROKER = BrokerDOM(commission=4)
+    return DOM_BROKER
 
 # ── Реальные дневные объёмы (AlgoPack контракты) — для лимита лотов ──
 DAILY_VOL = {}
@@ -706,9 +717,18 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                           (p['direction'] == 'short' and dn <= -exit_thr)
                 if oi_exit:
                     # slippage на выходе: 1 тик (как бэктест: exit = close - ms для long)
-                    exit_px = close - ms if p['direction'] == 'long' else close + ms
-                    pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
-                    pnl += p.get('part_pnl', 0)
+                    # или исполнение по стакану (BROKER='dom')
+                    if BROKER == 'dom':
+                        bk = get_dom_broker()
+                        if p['direction'] == 'long':
+                            exit_px, pnl_dom, slip = bk.exit_long(ticker, p['entry_price'], p.get('contracts', 1), ms, sp, p.get('pct', 1.0), specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST))
+                        else:
+                            exit_px, pnl_dom, slip = bk.exit_short(ticker, p['entry_price'], p.get('contracts', 1), ms, sp, p.get('pct', 1.0), specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST))
+                        pnl = pnl_dom + p.get('part_pnl', 0)
+                    else:
+                        exit_px = close - ms if p['direction'] == 'long' else close + ms
+                        pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
+                        pnl += p.get('part_pnl', 0)
                     p['pnl'] = pnl
                     p['exit_price'] = exit_px
                     p['exit_reason'] = 'oi_exit'
@@ -1001,7 +1021,12 @@ def run_tick(strategy_filter=None, mode=None):
                 # Realistic slippage: 1 тик (лимитка по текущей цене, как бэктест LONG+h120)
                 # НЕ 2-5 тиков: на NG (ms=0.001, цена ~2.7) 3 тика = 0.11% — убивает edge
                 ms_val = ms
-                slip_total = ms_val * 1
+                if BROKER == 'dom':
+                    # Исполнение по стакану: сколько тиков нужно для contracts лотов
+                    dom_slip = get_dom_broker().entry_slippage(ticker, signal['direction'], contracts, ms_val)
+                    slip_total = ms_val * dom_slip
+                else:
+                    slip_total = ms_val * 1
                 entry_price = float(bd['prc']) + (slip_total if signal['direction'] == 'long' else -slip_total)
                 entry_price = round(entry_price / ms_val) * ms_val
 
@@ -1067,7 +1092,12 @@ if __name__ == '__main__':
     parser.add_argument('--strategy', type=str, default=None, help='Strategy name filter (e.g. impulse_return)')
     parser.add_argument('--state-key', type=str, default=None, help='State key suffix for separate instance')
     parser.add_argument('--mode', type=str, default=None, choices=['tick', 'detect'], help='tick=only manage, detect=only signals')
+    parser.add_argument('--broker', type=str, default='sim', choices=['sim', 'dom'], help='sim=close+1тик, dom=исполнение по стакану (PG futures.dom)')
     args = parser.parse_args()
+    
+    if args.broker == 'dom':
+        os.environ['MOEX_BROKER'] = 'dom'
+        log.info("BrokerDOM: исполнение по стакану (PG futures.dom)")
     
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
     

@@ -27,8 +27,8 @@ class BrokerDOM:
         cur = conn.cursor()
         cur.execute("""
             SELECT side, price, volume FROM futures.dom
-            WHERE ticker = %s AND ts > now() - INTERVAL '10 seconds'
-            ORDER BY ts DESC LIMIT 60
+            WHERE ticker = %s AND ts > now() - INTERVAL '180 seconds'
+            ORDER BY ts DESC LIMIT 500
         """, (ticker,))
         rows = cur.fetchall()
         cur.close(); conn.close()

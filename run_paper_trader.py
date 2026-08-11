@@ -179,8 +179,10 @@ def main():
 
     # ── Run tick ────────────────────────────────────────────────────────
     import subprocess
-    script = 'strategies/common/paper_trader_v6.py' if broker == 'dom' else 'strategies/common/paper_trader.py'
-    cmd = [sys.executable, script] + pt_args
+    # Основной paper_trader.py поддерживает --broker dom (исполнение по стакану)
+    # (v6 устарел: нет TZ-фиксов, per-ticker risk, pyra_max, ISS-лимитов)
+    script = 'strategies/common/paper_trader.py'
+    cmd = [sys.executable, script, '--broker', broker] + pt_args
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
         print(f"❌ PaperTrader ошибка (exit={result.returncode}): {result.stderr.strip() or result.stdout.strip()}")
