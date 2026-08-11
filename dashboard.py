@@ -29,7 +29,8 @@ def ch(query):
     except: return []
 
 def get_state(sk):
-    rows = q(f"SELECT capital, equity, peak, mtm_equity, mtm_peak, positions_json, updated_at FROM futures.paper_state_{sk} ORDER BY updated_at DESC LIMIT 1")
+    tbl = f"futures.paper_state_{sk}" if sk else "futures.paper_state"
+    rows = q(f"SELECT capital, equity, peak, mtm_equity, mtm_peak, positions_json, updated_at FROM {tbl} ORDER BY updated_at DESC LIMIT 1")
     if not rows: return None
     r = rows[0]
     pos = json.loads(r[5]) if r[5] else []
@@ -38,7 +39,8 @@ def get_state(sk):
             'positions': pos, 'pos_count': len(pos), 'ts': str(r[6])[:19]}
 
 def get_trades(sk, limit=10):
-    rows = q(f"SELECT ticker, strategy, direction, pnl_rub, exit_reason, exit_time FROM futures.paper_trades_{sk} ORDER BY exit_time DESC NULLS LAST LIMIT {limit}")
+    tbl = f"futures.paper_trades_{sk}" if sk else "futures.paper_trades"
+    rows = q(f"SELECT ticker, strategy, direction, pnl_rub, exit_reason, exit_time FROM {tbl} ORDER BY exit_time DESC NULLS LAST LIMIT {limit}")
     return rows
 
 def get_latest_bars():
@@ -170,8 +172,10 @@ class Handler(BaseHTTPRequestHandler):
     def _build_page(self):
         state_v5 = get_state('portfolio_v5')
         state_v6 = get_state('portfolio_v6')
+        state_oi = get_state('')  # текущий OI папер (state без суффикса)
         trades_v5 = get_trades('portfolio_v5') if state_v5 else []
         trades_v6 = get_trades('portfolio_v6') if state_v6 else []
+        trades_oi = get_trades('') if state_oi else []
         prices = get_current_prices()
         specs = get_specs()
         bars = get_latest_bars()
@@ -225,6 +229,7 @@ h3 {{ color:#8b949e; font-size:13px; margin:12px 0 6px; }}
 <div class="grid">
             {state_card('v5 (BrokerSim)', 'v5', state_v5, trades_v5, prices, specs)}
             {state_card('v6 (BrokerDOM)', 'v6', state_v6, trades_v6, prices, specs)}
+            {state_card('OI (LIVE, dom)', 'oi', state_oi, trades_oi, prices, specs)}
     {acc_html}
 </div>
 <div class="grid" style="margin-top:16px">
