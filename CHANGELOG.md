@@ -1,3 +1,14 @@
+## [224] 2026-08-11
+### Changed
+- Финальный оптимум OI под MTM DD ≤ 20%: риски BR 15%/NG 10%/SV 5%, pyr3 (pyra_max=2), max_hold_h=72ч, sizing_eq_cap=2M
+- hold 72ч — ключ к DD: 120ч давал MTM DD 55-64% (свинг-просадка), 72ч → 12-13%
+- SIZING_EQ_CAP читается из PG (было хардкод 10M)
+- Баг бэктеста: add_lots = весь lots вместо base_lots (пирамидинг удваивал лоты) — исправлен
+- MTM в бэктесте по close (как папер), не по lo/hi
+- Cron fix: run_moex_eod_oi.sh → venv tqa-moex-futures (system python3 без requests)
+- Known issue: CH openinterest readonly (реплика 2, zookeeper metadata lost) — папер не затронут (futoi жива)
+- Checkpoint: checkpoint/224-oi-final-optimum-hold72-cap2m.md
+
 ## [223] 2026-08-09
 ### Fixed
 - Live реинвест/компаунд: 3 лимита душили рост лотов (volume cap 0.2×tick_volume → макс 11 лотов BR!)
