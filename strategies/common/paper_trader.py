@@ -645,6 +645,29 @@ def resample_m1_to_tf(df, tf_min):
 
 # ── Position management ──────────────────────────────────────────────────
 
+def _close_pos(p, close, ms, sp, specs, ticker, reason):
+    """Единое закрытие позиции: по стакану (dom) или close±ms (sim).
+    Возвращает (exit_price, pnl)."""
+    fee = specs.get(ticker, {}).get('fee', TRADE_COST)
+    if BROKER == 'dom':
+        bk = get_dom_broker()
+        try:
+            if p['direction'] == 'long':
+                exit_px, pnl, _ = bk.exit_long(ticker, p['entry_price'], p.get('contracts', 1), ms, sp, p.get('pct', 1.0), fee)
+            else:
+                exit_px, pnl, _ = bk.exit_short(ticker, p['entry_price'], p.get('contracts', 1), ms, sp, p.get('pct', 1.0), fee)
+            # Если стакан пуст — fallback на close±ms
+            if pnl == 0.0 and exit_px == p['entry_price']:
+                raise ValueError('empty book')
+            return exit_px, pnl + p.get('part_pnl', 0)
+        except Exception:
+            pass
+    # sim fallback
+    exit_px = close - ms if p['direction'] == 'long' else close + ms
+    pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - fee * 2 * p.get('contracts', 1)
+    return exit_px, pnl + p.get('part_pnl', 0)
+
+
 def manage_positions(positions, bar_data, specs, bar_idx):
     """Update all open positions. Return closed trades."""
     closed = []
@@ -671,10 +694,9 @@ def manage_positions(positions, bar_data, specs, bar_idx):
 
         # Ролл/экспирация: закрыть позицию заранее (склейка контракта вечером)
         if is_roll_day(p.get('ticker', '')):
-            pnl = (close - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
-            pnl += p.get('part_pnl', 0)
+            exit_px, pnl = _close_pos(p, close, ms, sp, specs, ticker, 'roll_close')
             p['pnl'] = pnl
-            p['exit_price'] = close
+            p['exit_price'] = exit_px
             p['exit_reason'] = 'roll_close'
             p['closed'] = True
             p['exit_bar'] = bar_idx
@@ -689,10 +711,9 @@ def manage_positions(positions, bar_data, specs, bar_idx):
             max_hold_h = p.get('max_hold_h', 120)
             timeout_triggered = age_sec > max_hold_h * 3600
         if timeout_triggered:
-            pnl = (close - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
-            pnl += p.get('part_pnl', 0)
+            exit_px, pnl = _close_pos(p, close, ms, sp, specs, ticker, 'timeout')
             p['pnl'] = pnl
-            p['exit_price'] = close
+            p['exit_price'] = exit_px
             p['exit_reason'] = 'timeout'
             p['closed'] = True
             p['exit_bar'] = bar_idx
@@ -795,11 +816,15 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                 p['exit_reason'] = 'stop_loss'
 
             if exit_price:
-                rem = max(0.001, p.get('rem', 1))
-                pnl = (exit_price - p['entry_price']) / ms * sp * p.get('pct', 1.0) * rem - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
-                pnl += p.get('part_pnl', 0)
+                # Исполнение по стакану (dom) или по цене срабатывания (sim)
+                if BROKER == 'dom':
+                    exit_px2, pnl = _close_pos(p, close, ms, sp, specs, ticker, p['exit_reason'])
+                    p['exit_price'] = exit_px2
+                else:
+                    pnl = (exit_price - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
+                    pnl += p.get('part_pnl', 0)
+                    p['exit_price'] = exit_price
                 p['pnl'] = pnl
-                p['exit_price'] = exit_price
                 p['closed'] = True
                 p['exit_bar'] = bar_idx
                 closed.append(p)
@@ -821,11 +846,15 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                 p['exit_reason'] = 'stop_loss'
 
             if exit_price:
-                rem = max(0.001, p.get('rem', 1))
-                pnl = (p['entry_price'] - exit_price) / ms * sp * p.get('pct', 1.0) * rem - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
-                pnl += p.get('part_pnl', 0)
+                # Исполнение по стакану (dom) или по цене срабатывания (sim)
+                if BROKER == 'dom':
+                    exit_px2, pnl = _close_pos(p, close, ms, sp, specs, ticker, p['exit_reason'])
+                    p['exit_price'] = exit_px2
+                else:
+                    pnl = (p['entry_price'] - exit_price) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
+                    pnl += p.get('part_pnl', 0)
+                    p['exit_price'] = exit_price
                 p['pnl'] = pnl
-                p['exit_price'] = exit_price
                 p['closed'] = True
                 p['exit_bar'] = bar_idx
                 closed.append(p)
