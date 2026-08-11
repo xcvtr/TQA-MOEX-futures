@@ -1,5 +1,5 @@
 #!/usr/bin/env python3 -u
-"""Отображение открытых позиций OI папера в канал monitor MOEX (!CwXBuPBmDSGprggUtR).
+"""Отображение открытых позиций OI папера в канал monitor MOEX options (!WDeUiNFGfJyHeAzGLW).
 
 Cron: каждые 30 мин в торговые часы (15:00-23:00, 0:00-4:00 IRK будни):
   */30 15-23,0-4 * * 1-5
@@ -18,7 +18,7 @@ Eq=200 000₽ | DD=0.0% | MTM=-77₽ | позиций=1
 """
 import json, os, sys, datetime, subprocess
 
-ROOM_ID = '!CwXBuPBmDSGprggUtR:matrix.local'
+ROOM_ID = '!WDeUiNFGfJyHeAzGLW:matrix.local'  # monitor MOEX options
 PG_HOST = '10.0.0.60'
 STATE_TBL = 'futures.paper_state'  # текущий OI папер (без суффикса)
 
