@@ -56,6 +56,8 @@ LIQ_FRAC = 0.05   # доля реального ДНЕВНОГО объёма (I
                   # tradestats_fo (AlgoPack) стух 13.07 и занижал в 180 раз — больше не источник.
                   # 5% дн.объёма: BR 40K, NG 31K, SV 21K лотов — не ограничивает до eq ~100M.
                   # Бэктест (реальная ёмкость): CAGR +1415-2128%, MTM 18.5%.
+SIZING_EQ_CAP = 10_000_000  # кап eq для sizing лотов: при eq>10M лоты НЕ растут (slippage убивает edge).
+                            # Оптимум бэктеста: CAGR +382%, MTM DD 15% (риски 10/7/4, pyr3, cap 10M).
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
 STATE_KEY = ''  # модульный уровень — задаётся в __main__ или run_paper_trader.py
 BROKER = os.environ.get('MOEX_BROKER', 'sim')  # 'sim' (close+1тик) или 'dom' (исполнение по стакану из PG futures.dom)
@@ -1070,7 +1072,10 @@ def run_tick(strategy_filter=None, mode=None):
                 else:
                     risk = entry.get('risk', 0.2)
                     go = s.get('go', 1)
-                    contracts = max(1, int(equity * risk / go)) if go > 0 else 1
+                    # Кап eq для sizing: при eq > SIZING_EQ_CAP лоты НЕ растут (slippage убивает edge).
+                    # Оптимум из бэктеста: cap 10M → CAGR +382%, MTM DD 15% (риски 10/7/4, pyr3).
+                    sizing_eq = min(equity, SIZING_EQ_CAP)
+                    contracts = max(1, int(sizing_eq * risk / go)) if go > 0 else 1
 
                 # Volume cap: реальный дневной объём × LIQ_FRAC (ёмкость рынка).
                 # ВАЖНО: b_vol×0.2 (tick_volume M1) ДУШИТ до 1 лота при малом объёме утром —
