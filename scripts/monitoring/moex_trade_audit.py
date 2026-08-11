@@ -95,7 +95,33 @@ def main():
         d = p.get('direction', '?')
         ct = int(p.get('contracts', p.get('base_contracts', 1)))
         ep = float(p.get('entry_price', 0))
-        lines.append(f"✅ ВХОД {tk} {d.upper()} x{ct} @ {ep}")
+        # Доп. проверка входа: day_net в момент входа + цена vs рынок
+        detail = ''
+        et_raw = p.get('entry_time', '')
+        try:
+            et_dt = datetime.fromisoformat(et_raw.replace('Z', '+00:00'))
+            et_ts = int(et_dt.timestamp())
+            ch = clickhouse_connect.get_client(host='10.0.0.60', port=8123, database='moex')
+            # day_net в момент входа (futoi)
+            r = ch.query(f"SELECT buy_fiz, sell_fiz, buy_yur, sell_yur FROM moex.futoi WHERE ticker='{tk}' AND abs(toUnixTimestamp(toDateTime(bt)) - {et_ts}) < 600 ORDER BY abs(toUnixTimestamp(toDateTime(bt)) - {et_ts}) LIMIT 1").result_rows
+            if r:
+                fb, fs, yb, ys = [float(x or 0) for x in r[0]]
+                total = fb + fs + yb + ys
+                if total > 0:
+                    dn = (fb - fs) / total * 100
+                    detail += f" day_net={dn:+.2f}%"
+            # цена в момент входа vs текущая
+            r2 = ch.query(f"SELECT prc FROM moex.mt5_continuous WHERE ticker='{tk}' AND abs(toUnixTimestamp(bt) - {et_ts}) < 300 ORDER BY abs(toUnixTimestamp(bt) - {et_ts}) LIMIT 1").result_rows
+            r3 = ch.query(f"SELECT prc FROM moex.mt5_continuous WHERE ticker='{tk}' ORDER BY bt DESC LIMIT 1").result_rows
+            if r2 and r3:
+                px_enter = float(r2[0][0])
+                px_now = float(r3[0][0])
+                dev = abs(px_now - px_enter) / px_enter * 100
+                detail += f" px_enter={px_enter} px_now={px_now} (Δ{dev:.2f}%)"
+            ch.close()
+        except Exception:
+            pass
+        lines.append(f"✅ ВХОД {tk} {d.upper()} x{ct} @ {ep}{detail}")
 
     # ── 3. Закрытые сделки за окно (выходы) ──
     cur.execute("SELECT id, ticker, direction, entry_price, exit_price, pnl_rub, exit_reason, exit_time FROM futures.paper_trades WHERE exit_time > %s ORDER BY exit_time", (since,))
