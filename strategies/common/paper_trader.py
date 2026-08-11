@@ -91,24 +91,40 @@ def load_daily_volumes():
             cur.close(); conn_pg.close()
         except Exception:
             active_map = {}
-        # Реальный объём из ISS API: VOLTODAY для активного контракта
+        # Реальный объём из ISS API: СРЕДНИЙ дневной объём за 5 дней (candles D1).
+        # ВАЖНО: VOLTODAY (объём сегодня) утром мал (рынок не открыт) — лимиты прыгали ×17.
+        # Дневные свечи дают полный объём за завершённые дни.
         import urllib.request, json as _json
         new_vol = {}
         for prefix, sym in active_map.items():
+            vol = 0.0
             try:
                 req = urllib.request.Request(
-                    f'https://iss.moex.com/iss/engines/futures/markets/forts/securities/{sym}.json?iss.meta=off&iss.only=marketdata',
+                    f'https://iss.moex.com/iss/engines/futures/markets/forts/securities/{sym}/candles.json?iss.meta=off&interval=24',
                     headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req, timeout=10) as resp:
                     d = _json.loads(resp.read().decode())
-                cols = d['marketdata']['columns']
-                row = d['marketdata']['data'][0]
-                info = dict(zip(cols, row))
-                voltoday = info.get('VOLTODAY')
-                if voltoday and voltoday > 0:
-                    new_vol[prefix] = float(voltoday)
+                cols = d['candles']['columns']
+                vi = cols.index('volume')
+                vols = [float(r[vi]) for r in d['candles']['data'][-5:] if r[vi] and r[vi] > 0]
+                if vols:
+                    vol = sum(vols) / len(vols)
             except Exception:
-                continue
+                pass
+            if vol <= 0:
+                # Fallback: VOLTODAY (объём сегодня) — но может быть мал утром
+                try:
+                    req = urllib.request.Request(
+                        f'https://iss.moex.com/iss/engines/futures/markets/forts/securities/{sym}.json?iss.meta=off&iss.only=marketdata',
+                        headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        d = _json.loads(resp.read().decode())
+                    info = dict(zip(d['marketdata']['columns'], d['marketdata']['data'][0]))
+                    vol = float(info.get('VOLTODAY') or 0)
+                except Exception:
+                    vol = 0
+            if vol > 0:
+                new_vol[prefix] = vol
         # Фолбэк: tradestats_fo (если ISS не дал)
         if not new_vol:
             ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
@@ -701,10 +717,28 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                     max_lots = TICKER_LIMITS.get(ticker, MAX_CONTRACTS)
                     new_contracts = min(p.get('contracts', 1) + add_lots, max_lots)
                     if new_contracts > p.get('contracts', 1):
+                        # Цена добавки: по стакану (ask для long, bid для short) или hi/lo как раньше
+                        if BROKER == 'dom':
+                            bk = get_dom_broker()
+                            bids, asks = bk._get_book(ticker)
+                            if p['direction'] == 'long' and asks:
+                                pyra_px = asks[0][0]  # лучший ask
+                            elif p['direction'] == 'short' and bids:
+                                pyra_px = bids[0][0]  # лучший bid
+                            else:
+                                pyra_px = hi if p['direction'] == 'long' else lo
+                        else:
+                            pyra_px = hi if p['direction'] == 'long' else lo
+                        # Пересчёт средней цены входа (как бэктест pyra_prices):
+                        # avg = (old_ct * old_entry + add_lots * pyra_px) / new_ct
+                        old_ct = p.get('contracts', 1)
+                        old_entry = p['entry_price']
+                        new_entry = (old_ct * old_entry + add_lots * pyra_px) / new_contracts
+                        p['entry_price'] = round(new_entry, 6)
                         p['contracts'] = new_contracts
                         p['pyra_added'] = pyra_added + 1
-                        log.info("PYRAMID %s %s: contracts %d→%d (gain=%.2f%%)",
-                                 ticker, p['direction'], new_contracts - add_lots, new_contracts, gain_pct)
+                        log.info("PYRAMID %s %s: %d→%d @%.4f (avg %.4f, gain=%.2f%%)",
+                                 ticker, p['direction'], old_ct, new_contracts, pyra_px, p['entry_price'], gain_pct)
 
         # Выход по ОИ (обратное условие входа) — для стратегии oi
         # long закрывается, когда day_net ≥ exit_thr (физ начали покупать — паника кончилась)
