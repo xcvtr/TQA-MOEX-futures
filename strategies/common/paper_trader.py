@@ -51,9 +51,11 @@ MAX_CONTRACTS = 1000
 # Старые значения (100/80) душили компаунд: volume cap 0.2×tick_volume давал макс 11 лотов на BR.
 TICKER_LIMITS = {'BR': 100, 'NG': 100, 'SV': 80, 'RN': 80, 'RI': 50, 'TT': 30}
 VOLUME_CAP = 0.2  # 20% of M1 volume (0.5 for Si)
-LIQ_FRAC = 0.02   # доля реального ДНЕВНОГО объёма (AlgoPack, активный контракт) как лимит лотов.
-                  # 2% дн.объёма на позицию: исполнимо без проскальзывания (10% = 2820 лотов SV — нереально).
-                  # Бэктест: CAGR +570%, MTM 13.6% (1% → +466%, 10% → +894% но нереально).
+LIQ_FRAC = 0.05   # доля реального ДНЕВНОГО объёма (ISS VOLTODAY, активный контракт) как лимит лотов.
+                  # Реальная ёмкость ОГРОМНАЯ: BR 813K, NG 629K, SV 415K лотов/день (ISS API!).
+                  # tradestats_fo (AlgoPack) стух 13.07 и занижал в 180 раз — больше не источник.
+                  # 5% дн.объёма: BR 40K, NG 31K, SV 21K лотов — не ограничивает до eq ~100M.
+                  # Бэктест (реальная ёмкость): CAGR +1415-2128%, MTM 18.5%.
 TIMEOUT_BARS = 12  # дефолт, берётся из PG если есть
 STATE_KEY = ''  # модульный уровень — задаётся в __main__ или run_paper_trader.py
 
@@ -61,14 +63,14 @@ STATE_KEY = ''  # модульный уровень — задаётся в __ma
 DAILY_VOL = {}
 
 def load_daily_volumes():
-    """Загрузить реальный дневной объём (контракты/день) из AlgoPack.
+    """Загрузить реальный дневной объём (контракты/день) активного контракта из ISS API.
+    ВАЖНО: tradestats_fo (AlgoPack) стух 13.07.2026 и содержит лишь часть сделок —
+    его объёмы занижены в 15-180 раз. Правильный источник: ISS VOLTODAY (объём сегодня).
     mt5 vol = tick_volume (число сделок), НЕ контракты — использовать его нельзя.
-    Перпетуалы (USDRUBF и др.) в AlgoPack не покрыты — оценка mt5 tick_vol × 1440 × 20."""
+    Перпетуалы (USDRUBF и др.) не в ISS futures — оценка mt5 tick_vol × 1440 × 20."""
     global DAILY_VOL
     try:
-        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-        # Только АКТИВНЫЙ контракт (из PG active_symbols), не все кварталы!
-        # Старый запрос суммировал BRV6+BRQ6+BRU6... → завышение объёма в 6-17 раз.
+        # Только АКТИВНЫЙ контракт (из PG active_symbols)
         try:
             import psycopg2
             conn_pg = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
@@ -78,19 +80,39 @@ def load_daily_volumes():
             cur.close(); conn_pg.close()
         except Exception:
             active_map = {}
-        rows = ch.query("""
-            SELECT secid, round(sum(vol) / NULLIF(count(DISTINCT tradedate), 0))
-            FROM moex.tradestats_fo
-            WHERE tradedate >= toDate(now()) - INTERVAL 400 DAY AND vol > 0
-            GROUP BY secid
-        """).result_rows
-        sec_vol = {r[0]: float(r[1]) for r in rows}
+        # Реальный объём из ISS API: VOLTODAY для активного контракта
+        import urllib.request, json as _json
         new_vol = {}
-        # Маппинг активного символа → наш тикер
         for prefix, sym in active_map.items():
-            if sym in sec_vol:
-                new_vol[prefix] = sec_vol[sym]
+            try:
+                req = urllib.request.Request(
+                    f'https://iss.moex.com/iss/engines/futures/markets/forts/securities/{sym}.json?iss.meta=off&iss.only=marketdata',
+                    headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    d = _json.loads(resp.read().decode())
+                cols = d['marketdata']['columns']
+                row = d['marketdata']['data'][0]
+                info = dict(zip(cols, row))
+                voltoday = info.get('VOLTODAY')
+                if voltoday and voltoday > 0:
+                    new_vol[prefix] = float(voltoday)
+            except Exception:
+                continue
+        # Фолбэк: tradestats_fo (если ISS не дал)
+        if not new_vol:
+            ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+            rows = ch.query("""
+                SELECT secid, round(sum(vol) / NULLIF(count(DISTINCT tradedate), 0))
+                FROM moex.tradestats_fo
+                WHERE tradedate >= toDate(now()) - INTERVAL 400 DAY AND vol > 0
+                GROUP BY secid
+            """).result_rows
+            sec_vol = {r[0]: float(r[1]) for r in rows}
+            for prefix, sym in active_map.items():
+                if sym in sec_vol:
+                    new_vol[prefix] = sec_vol[sym]
         # перпетуалы: оценка
+        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
         rows2 = ch.query("""
             SELECT ticker, round(avg(vol)) FROM moex.mt5_continuous
             WHERE ticker IN ('USDRUBF','EURRUBF','CNYRUBF','GLDRUBF','Si','Eu','CNY')
