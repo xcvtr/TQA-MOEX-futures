@@ -16,6 +16,7 @@ PG = dict(host='10.0.0.60', dbname='moex', user='postgres')
 STATE_FILE = os.path.expanduser('~/.hermes/scripts/.moex_audit_state.json')
 PAUSE_FILE = os.path.expanduser('~/.hermes/scripts/.moex_pause_flag')
 REVIEW_FILE = os.path.expanduser('~/.hermes/scripts/.moex_review_pending')
+DEAL_FILE = os.path.expanduser('~/.hermes/scripts/.moex_deal_pending')  # флаг для глубокого ИИ-отчёта
 
 PORTFOLIO = {'BR', 'NG', 'SV'}          # live OI тикеры
 RISKS = {'BR': 0.15, 'NG': 0.10, 'SV': 0.05}
@@ -41,6 +42,26 @@ def save_state(st):
     try:
         with open(STATE_FILE, 'w') as f:
             json.dump(st, f)
+    except Exception:
+        pass
+
+def write_deal_flag(deal_info):
+    """Пишет флаг сделки для LLM-агента (глубокий отчёт при входе/выходе).
+    Накапливает до 5 последних сделок в JSON-списке."""
+    try:
+        pending = []
+        if os.path.exists(DEAL_FILE):
+            try:
+                with open(DEAL_FILE) as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        pending = data
+            except Exception:
+                pending = []
+        pending.append(deal_info)
+        pending = pending[-5:]
+        with open(DEAL_FILE, 'w') as f:
+            json.dump(pending, f, ensure_ascii=False)
     except Exception:
         pass
 
@@ -95,21 +116,30 @@ def main():
         d = p.get('direction', '?')
         ct = int(p.get('contracts', p.get('base_contracts', 1)))
         ep = float(p.get('entry_price', 0))
-        # Доп. проверка входа: day_net в момент входа + цена vs рынок
+        # Доп. проверка входа: day_net (дневная дельта КАК ПАПЕР) + цена vs рынок
         detail = ''
         et_raw = p.get('entry_time', '')
         try:
             et_dt = datetime.fromisoformat(et_raw.replace('Z', '+00:00'))
             et_ts = int(et_dt.timestamp())
             ch = clickhouse_connect.get_client(host='10.0.0.60', port=8123, database='moex')
-            # day_net в момент входа (futoi)
-            r = ch.query(f"SELECT buy_fiz, sell_fiz, buy_yur, sell_yur FROM moex.futoi WHERE ticker='{tk}' AND abs(toUnixTimestamp(toDateTime(bt)) - {et_ts}) < 600 ORDER BY abs(toUnixTimestamp(toDateTime(bt)) - {et_ts}) LIMIT 1").result_rows
-            if r:
-                fb, fs, yb, ys = [float(x or 0) for x in r[0]]
-                total = fb + fs + yb + ys
-                if total > 0:
-                    dn = (fb - fs) / total * 100
-                    detail += f" day_net={dn:+.2f}%"
+            # Дневная дельта физлиц (как папер fetch_day_net):
+            # day_start = первая запись IRK-дня (граница 07:00 UTC), day_net = (тек.−старт)/total
+            DAY_SEC = 86400
+            rows = ch.query(f"SELECT toUnixTimestamp(toDateTime(bt)), buy_fiz, sell_fiz, buy_yur, sell_yur FROM moex.futoi WHERE ticker='{tk}' AND bt >= toDateTime({et_ts - 72*3600}) ORDER BY bt").result_rows
+            if rows:
+                # День входа (граница 07:00 UTC)
+                cur_day = int((et_ts - 7 * 3600) // DAY_SEC)
+                day_rows = [r for r in rows if int((r[0] - 7 * 3600) // DAY_SEC) == cur_day]
+                if len(day_rows) >= 2:
+                    day_start_net = int(day_rows[0][1]) - int(day_rows[0][2])
+                    # строка, ближайшая к моменту входа
+                    best = min(day_rows, key=lambda r: abs(r[0] - et_ts))
+                    cur_net = int(best[1]) - int(best[2])
+                    total = int(best[1]) + int(best[2]) + int(best[3]) + int(best[4])
+                    if total > 0:
+                        dn = (cur_net - day_start_net) / total * 100
+                        detail += f" day_net={dn:+.2f}%"
             # цена в момент входа vs текущая
             r2 = ch.query(f"SELECT prc FROM moex.mt5_continuous WHERE ticker='{tk}' AND abs(toUnixTimestamp(bt) - {et_ts}) < 300 ORDER BY abs(toUnixTimestamp(bt) - {et_ts}) LIMIT 1").result_rows
             r3 = ch.query(f"SELECT prc FROM moex.mt5_continuous WHERE ticker='{tk}' ORDER BY bt DESC LIMIT 1").result_rows
@@ -121,6 +151,11 @@ def main():
             ch.close()
         except Exception:
             pass
+        # Собираем детали для глубокого ИИ-отчёта
+        deal_info = {'type': 'ВХОД', 'ticker': tk, 'direction': d.upper(),
+                     'contracts': ct, 'entry_price': ep, 'detail': detail.strip(),
+                     'ts': now.isoformat()}
+        write_deal_flag(deal_info)
         lines.append(f"✅ ВХОД {tk} {d.upper()} x{ct} @ {ep}{detail}")
 
     # ── 3. Закрытые сделки за окно (выходы) ──
@@ -130,6 +165,11 @@ def main():
         if key in seen_exits:
             continue
         seen_exits.add(key)
+        # Детали для глубокого ИИ-отчёта (выход)
+        deal_info = {'type': 'ВЫХОД', 'ticker': tk, 'direction': d.upper(),
+                     'entry_price': float(ep or 0), 'exit_price': float(xp or 0),
+                     'pnl_rub': float(pnl or 0), 'reason': reason, 'ts': now.isoformat()}
+        write_deal_flag(deal_info)
         lines.append(f"✅ ВЫХОД {tk} {d.upper()} PnL={float(pnl or 0):+,.0f}₽ reason={reason}")
 
     # ── 4. ПРОБЛЕМЫ: автозакрытие неверных позиций ──
@@ -228,16 +268,13 @@ def main():
     conn.close()
 
     # ── Вывод ──
-    if not lines and not alerts:
-        return  # тишина
+    # Глубокий отчёт по сделкам делает LLM-агент (флаг DEAL_FILE). Скрипт шлёт в stdout
+    # ТОЛЬКО алерты проблем (force_close/пауза) — они дублируются в канал через cron deliver.
+    if not alerts:
+        return  # тишина (сделки → DEAL_FILE для агента)
 
     out = []
-    if lines:
-        out.append("🔍 MOEX OI сделки:")
-        out.extend(lines)
-    if alerts:
-        out.append("")
-        out.extend(alerts)
+    out.extend(alerts)
     out.append(f"\nEq {equity:,.0f}₽ | DD {dd_pct:.1f}% | MTM DD {mtm_dd:.1f}% | открыто {len(open_pos)}: {', '.join(sorted({p.get('ticker') for p in open_pos})) or 'нет'}")
     text = "\n".join(out)
     print(text)
