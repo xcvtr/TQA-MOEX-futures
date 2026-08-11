@@ -1072,14 +1072,11 @@ def run_tick(strategy_filter=None, mode=None):
                     go = s.get('go', 1)
                     contracts = max(1, int(equity * risk / go)) if go > 0 else 1
 
-                # Volume cap: реальный дневной объём AlgoPack × LIQ_FRAC (ёмкость рынка).
-                # Старый вариант b_vol×0.2 использовал tick_volume (число сделок) — душил до 11 лотов.
-                b_vol = bd.get('vol', 0)
+                # Volume cap: реальный дневной объём × LIQ_FRAC (ёмкость рынка).
+                # ВАЖНО: b_vol×0.2 (tick_volume M1) ДУШИТ до 1 лота при малом объёме утром —
+                # отключено. Только DAILY_VOL (средний дневной объём) — стабильный лимит.
                 if DAILY_VOL.get(ticker):
                     contracts = min(contracts, max(1, int(DAILY_VOL[ticker] * LIQ_FRAC)))
-                elif b_vol and b_vol > 0:
-                    vc = 0.5 if strategy_name == 'impulse_return' else 0.2
-                    contracts = min(contracts, max(1, int(b_vol * vc)))
                 # Per-ticker лимит контрактов (обновлён из реальных объёмов при старте)
                 max_lots = TICKER_LIMITS.get(ticker, MAX_CONTRACTS)
                 contracts = min(contracts, max_lots)
