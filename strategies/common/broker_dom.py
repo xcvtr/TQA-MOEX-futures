@@ -41,10 +41,12 @@ class BrokerDOM:
             if key in seen:
                 continue
             seen.add(key)
-            if side == 1:  # bid
-                bids.append((price, vol))
-            else:           # ask
+            # ВАЖНО: в futures.dom side=1 = ASK (продавцы, выше mid), side=2 = BID (покупатели, ниже mid).
+            # Проверено по MT5 tick: NGQ6 bid=2.794 ask=2.796, а dom side=1: 2.806-2.825, side=2: 2.774-2.793.
+            if side == 1:  # ask
                 asks.append((price, vol))
+            else:           # bid
+                bids.append((price, vol))
         bids.sort(key=lambda x: -x[0])
         asks.sort(key=lambda x: x[0])
         return bids[:15], asks[:15]
