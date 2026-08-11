@@ -704,14 +704,17 @@ def manage_positions(positions, bar_data, specs, bar_idx):
             pyra_max = int(p.get('pyra_max', 0))
             pyra_pct = float(p.get('pyra_pct', 0.5))
             pyra_added = int(p.get('pyra_added', 0))
+            # Базовая цена для порога пирамиды = ПЕРВОНАЧАЛЬНЫЙ вход (как бэктест entry_p).
+            # НЕ пересчитанная средняя! Иначе пороги сдвигаются и live≠бэктест.
+            pyra_base = p.get('pyra_base_price') or p['entry_price']
             if pyra_added < pyra_max:
                 gain_pct = 0.0
                 if p['direction'] == 'long':
-                    if hi and p['entry_price'] > 0:
-                        gain_pct = (hi - p['entry_price']) / p['entry_price'] * 100
+                    if hi and pyra_base > 0:
+                        gain_pct = (hi - pyra_base) / pyra_base * 100
                 else:
-                    if lo and p['entry_price'] > 0:
-                        gain_pct = (p['entry_price'] - lo) / p['entry_price'] * 100
+                    if lo and pyra_base > 0:
+                        gain_pct = (pyra_base - lo) / pyra_base * 100
                 if gain_pct >= (pyra_added + 1) * pyra_pct:
                     add_lots = int(p.get('base_contracts', p.get('contracts', 1)))
                     max_lots = TICKER_LIMITS.get(ticker, MAX_CONTRACTS)
@@ -737,8 +740,11 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                         p['entry_price'] = round(new_entry, 6)
                         p['contracts'] = new_contracts
                         p['pyra_added'] = pyra_added + 1
-                        log.info("PYRAMID %s %s: %d→%d @%.4f (avg %.4f, gain=%.2f%%)",
-                                 ticker, p['direction'], old_ct, new_contracts, pyra_px, p['entry_price'], gain_pct)
+                        # Сохраняем базовую цену для следующих порогов (если ещё не задана)
+                        if not p.get('pyra_base_price'):
+                            p['pyra_base_price'] = pyra_base
+                        log.info("PYRAMID %s %s: %d→%d @%.4f (avg %.4f, base %.4f, gain=%.2f%%)",
+                                 ticker, p['direction'], old_ct, new_contracts, pyra_px, p['entry_price'], pyra_base, gain_pct)
 
         # Выход по ОИ (обратное условие входа) — для стратегии oi
         # long закрывается, когда day_net ≥ exit_thr (физ начали покупать — паника кончилась)
@@ -1090,6 +1096,7 @@ def run_tick(strategy_filter=None, mode=None):
                 'exit_thr': params.get('exit_thr', 3),
                 'max_hold_h': params.get('max_hold_h', 120),
                 'base_contracts': contracts,
+                'pyra_base_price': entry_price,  # первоначальный вход — порог пирамиды (как бэктест)
                 'pyra_max': max(0, int(params.get('pyra_max', 0)) or (int(params.get('max_positions', 1)) - 1)),
                 'pyra_pct': float(params.get('pyra_pct', 0.5)),
                 'pyra_added': 0,
