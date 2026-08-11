@@ -694,6 +694,18 @@ def manage_positions(positions, bar_data, specs, bar_idx):
         if p['entry_bar'] >= bar_idx and age_sec < 60:
             continue
 
+        # Внешний аудит (moex_trade_audit.py): force_close → принудительное закрытие
+        if p.get('force_close'):
+            exit_px, pnl = _close_pos(p, close, ms, sp, specs, ticker, 'audit_close')
+            p['pnl'] = pnl
+            p['exit_price'] = exit_px
+            p['exit_reason'] = 'audit_close'
+            p['closed'] = True
+            p['exit_bar'] = bar_idx
+            closed.append(p)
+            log.warning("AUDIT force_close %s %s", ticker, p.get('direction'))
+            continue
+
         # Ролл/экспирация: закрыть позицию заранее (склейка контракта вечером)
         if is_roll_day(p.get('ticker', '')):
             exit_px, pnl = _close_pos(p, close, ms, sp, specs, ticker, 'roll_close')
@@ -1017,6 +1029,11 @@ def run_tick(strategy_filter=None, mode=None):
 
     # Check for new signals (only when market is open)
     if mode != 'tick' and market_open:
+        # Аудит-пауза (moex_trade_audit.py): DD>20% или проблемы → флаг-файл → не открывать
+        pause_file = os.path.expanduser('~/.hermes/scripts/.moex_pause_flag')
+        audited_paused = os.path.exists(pause_file)
+        if audited_paused:
+            log.warning("AUDIT pause: .moex_pause_flag существует — новые сигналы заблокированы")
         for ticker in tickers:
             bd = bar_data.get(ticker)
             if not bd:
@@ -1052,6 +1069,11 @@ def run_tick(strategy_filter=None, mode=None):
                     continue
 
                 if not signal:
+                    continue
+
+                # Аудит-пауза: не открывать новые позиции (DD>20% или проблемы)
+                if audited_paused:
+                    log.info("AUDIT pause active — skip new %s %s signal", ticker, strategy_name)
                     continue
 
                 # Trend filter (SMA50) from params
