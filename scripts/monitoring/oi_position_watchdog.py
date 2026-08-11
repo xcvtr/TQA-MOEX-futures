@@ -98,18 +98,23 @@ for p in positions:
         if not market_ok:
             issues.append(f"вход вне торговых часов ({et_msk:%H:%M})")
 
-    # 2) цена: реальная цена mt5_continuous в момент входа
+    # 2) цена: реальная цена в момент входа
+    # Папер исполняет по квартальному контракту через стакан (futures.dom),
+    # а НЕ по mt5_continuous (непрерывный) — базис до 1%!
+    # Сначала ищем в стакане (dom), fallback mt5_continuous
     if et is not None:
-        ts0 = int(et.timestamp()) - 180
-        ts1 = int(et.timestamp()) + 180
-        prc_row = sh(f"clickhouse-client --host 10.0.0.60 --database moex --query \"SELECT prc FROM moex.mt5_continuous WHERE ticker='{tk}' AND toUnixTimestamp(bt) BETWEEN {ts0} AND {ts1} ORDER BY ABS(toUnixTimestamp(bt) - {int(et.timestamp())}) LIMIT 1\"")
+        ts0 = int(et.timestamp()) - 300
+        ts1 = int(et.timestamp()) + 300
+        prc_row = sh(f"psql -h 10.0.0.60 -U postgres -d moex -t -A -c \"SELECT price FROM futures.dom WHERE ticker='{tk}' AND ts >= to_timestamp({ts0}) AND ts <= to_timestamp({ts1}) ORDER BY ABS(EXTRACT(EPOCH FROM ts) - {int(et.timestamp())}) LIMIT 1\"")
+        if not prc_row:
+            prc_row = sh(f"clickhouse-client --host 10.0.0.60 --database moex --query \"SELECT prc FROM moex.mt5_continuous WHERE ticker='{tk}' AND toUnixTimestamp(bt) BETWEEN {ts0} AND {ts1} ORDER BY ABS(toUnixTimestamp(bt) - {int(et.timestamp())}) LIMIT 1\"")
         if prc_row:
             real = float(prc_row)
             dev = abs(real - ep) / real * 100
-            if dev > 0.5:
+            if dev > 1.5:  # шире допуск: базис квартального vs непрерывного
                 issues.append(f"цена входа {ep} ≠ реальной {real:.2f} ({dev:.2f}%)")
         else:
-            issues.append("нет бара mt5_continuous на момент входа")
+            issues.append("нет цены на момент входа (dom/mt5)")
 
     # 3) day_net в момент входа
     if et is not None:
