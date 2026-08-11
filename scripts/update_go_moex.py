@@ -49,12 +49,14 @@ for item in re.findall(r'<item[^>]*/>', content):
     code = c.group(1)
     prefix = code.split('-')[0]
     im = float(re.search(r'initial_margin="([\d.]+)"', item).group(1))
+    med = re.search(r'buy_deposit_medium_risk="([\d.]+)"', item)
+    medium = float(med.group(1)) if med else im
     dd_str = re.search(r'delivery_date="([\d\s]+)"', item)
     dd = None
     if dd_str:
         try: dd = datetime.strptime(dd_str.group(1).strip(), '%Y%m%d').date()
         except: pass
-    contracts.setdefault(prefix, []).append((code, im, dd))
+    contracts.setdefault(prefix, []).append((code, im, medium, dd))
 
 updates = []
 for prefix, ticker in PREFIX_MAP.items():
@@ -69,21 +71,23 @@ for prefix, ticker in PREFIX_MAP.items():
         continue
     
     # Find front-month (>30d to delivery)
-    valid = [c for c in cts if c[2] and (c[2] - today).days >= 30]
+    valid = [c for c in cts if c[3] and (c[3] - today).days >= 30]
     if not valid:
-        valid = sorted(cts, key=lambda x: x[2] if x[2] else date.max, reverse=True)
+        valid = sorted(cts, key=lambda x: x[3] if x[3] else date.max, reverse=True)
     else:
-        valid.sort(key=lambda x: x[2])
-    code, im, dd = valid[0]
-    
+        valid.sort(key=lambda x: x[3])
+    code, im, medium, dd = valid[0]
+
+    # ПГО (пониженное ГО для КВАЛ):
+    # ГО_ПГО = medium (КСУР) × kpur/ksur  — понижение ~0.5×
     rate_kpur, rate_ksur = rates
-    go = round(im * rate_ksur / rate_kpur, 0)
-    
+    go = round(medium * rate_kpur / rate_ksur, 0)
+
     r = subprocess.run(['psql', PG, '-c',
         f"UPDATE futures.ticker_specs SET go={go:.0f}, updated_at=NOW() WHERE ticker='{ticker}'"],
         capture_output=True, text=True)
     ok = 'UPDATE 1' in r.stdout
     ok_str = 'OK' if ok else 'FAIL'
-    print(f'{ticker}: {ok_str} -> GO={go:.0f} (contract={code}, im={im:.0f})')
+    print(f'{ticker}: {ok_str} -> GO={go:.0f} (contract={code}, im={im:.0f}, medium={medium:.0f}, kpur/ksur={rate_kpur/rate_ksur:.3f})')
 
 print(f'\nUpdated {len(updates)} tickers ({len(raw)} bytes)')
