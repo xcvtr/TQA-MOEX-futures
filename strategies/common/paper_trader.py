@@ -1021,6 +1021,7 @@ def run_tick(strategy_filter=None, mode=None):
                 # Realistic slippage: 1 тик (лимитка по текущей цене, как бэктест LONG+h120)
                 # НЕ 2-5 тиков: на NG (ms=0.001, цена ~2.7) 3 тика = 0.11% — убивает edge
                 ms_val = ms
+                dom_slip = 1
                 if BROKER == 'dom':
                     # Исполнение по стакану: сколько тиков нужно для contracts лотов
                     dom_slip = get_dom_broker().entry_slippage(ticker, signal['direction'], contracts, ms_val)
@@ -1066,7 +1067,7 @@ def run_tick(strategy_filter=None, mode=None):
                 }
                 next_id += 1
                 positions.append(pos)
-                log.info("New %s %s %s @ %.1f (%d ct, thr=%.1f exit=%.1f)", ticker, strategy_name, signal['direction'], entry_price, contracts, params.get('thr', 0), params.get('exit_thr', 0))
+                log.info("New %s %s %s @ %.1f (%d ct, thr=%.1f exit=%.1f slip=%s)", ticker, strategy_name, signal['direction'], entry_price, contracts, params.get('thr', 0), params.get('exit_thr', 0), f"{dom_slip}t" if BROKER == 'dom' else "1t")
 
     # Save
     state['positions'] = [p for p in positions if not p.get('closed', False)]
