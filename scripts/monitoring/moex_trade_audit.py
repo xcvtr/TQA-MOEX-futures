@@ -199,12 +199,22 @@ def main():
             auto_close.append((p, f"лот {ct} >> расчётного {expect_ct} (risk {risk:.0%})"))
             alerts.append(f"🚨 ЗАКРЫВАЮ {tk}: лот {ct} вне формулы (ожидалось ~{expect_ct})!")
 
-    # Stale вход: entry далеко от текущей цены
+    # Stale вход: entry далеко от цены В МОМЕНТ ВХОДА (только для свежих позиций < 1ч)
+    # НЕ сравнивать с ТЕКУЩЕЙ ценой — для старых позиций цена закономерно ушла (это PnL, не ошибка)
+    STALE_AGE_H = 1.0  # проверять только позиции младше 1 часа
     for p in open_pos:
         tk = p.get('ticker', '')
         ep = float(p.get('entry_price', 0) or 0)
-        if not tk or ep <= 0:
+        et_raw = p.get('entry_time', '')
+        if not tk or ep <= 0 or not et_raw:
             continue
+        try:
+            et_dt = datetime.fromisoformat(et_raw.replace('Z', '+00:00'))
+            age_h = (now - et_dt).total_seconds() / 3600
+        except Exception:
+            continue
+        if age_h > STALE_AGE_H:
+            continue  # старая позиция — цена ушла закономерно, это не stale вход
         try:
             r = ch.query(f"SELECT prc FROM moex.mt5_continuous WHERE ticker='{tk}' ORDER BY bt DESC LIMIT 1").result_rows
             if r:
@@ -216,6 +226,10 @@ def main():
         except Exception:
             pass
     ch.close()
+
+    # Дедуп force_close: если force_close уже стоит на позиции — не дублировать алерт
+    already_closing = {p.get('ticker') for p in open_pos if p.get('force_close')}
+    auto_close = [(p, reason) for p, reason in auto_close if p.get('ticker') not in already_closing]
 
     if auto_close:
         # Ставим force_close на позиции (папер закроет при следующем тике)
