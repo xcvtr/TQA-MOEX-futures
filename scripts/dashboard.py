@@ -201,9 +201,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         s = specs.get(ticker, {'ms': 0.01, 'sp': 1.0})
                         ms, sp = s['ms'], s['sp']; entry = p['entry_price']
                         contracts = p.get('contracts', 1); pct = p.get('pct', 1.0)
-                        rem = max(0.001, p.get('rem', 1)); tc = 4 * contracts
-                        if p['direction'] == 'long': pnl = (prc - entry) / ms * sp * pct * rem - tc
-                        else: pnl = (entry - prc) / ms * sp * pct * rem - tc
+                        rem = max(0.001, p.get('rem', 1)); tc = specs.get(ticker, {}).get('fee', 4) * 2 * contracts
+                        if p['direction'] == 'long': pnl = (prc - entry) / ms * sp * pct * rem * contracts - tc
+                        else: pnl = (entry - prc) / ms * sp * pct * rem * contracts - tc
                         p['unrealized_pnl'] = round(pnl, 2)
                 except:
                     for p in positions: p['unrealized_pnl'] = 0

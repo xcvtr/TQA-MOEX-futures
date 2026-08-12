@@ -666,7 +666,7 @@ def _close_pos(p, close, ms, sp, specs, ticker, reason):
             pass
     # sim fallback
     exit_px = close - ms if p['direction'] == 'long' else close + ms
-    pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - fee * 2 * p.get('contracts', 1)
+    pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) * p.get('contracts', 1) - fee * 2 * p.get('contracts', 1)
     return exit_px, pnl + p.get('part_pnl', 0)
 
 
@@ -802,7 +802,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                         pnl = pnl_dom + p.get('part_pnl', 0)
                     else:
                         exit_px = close - ms if p['direction'] == 'long' else close + ms
-                        pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
+                        pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) * p.get('contracts', 1) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
                         pnl += p.get('part_pnl', 0)
                     p['pnl'] = pnl
                     p['exit_price'] = exit_px
@@ -835,7 +835,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                     exit_px2, pnl = _close_pos(p, close, ms, sp, specs, ticker, p['exit_reason'])
                     p['exit_price'] = exit_px2
                 else:
-                    pnl = (exit_price - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
+                    pnl = (exit_price - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) * p.get('contracts', 1) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
                     pnl += p.get('part_pnl', 0)
                     p['exit_price'] = exit_price
                 p['pnl'] = pnl
@@ -865,7 +865,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                     exit_px2, pnl = _close_pos(p, close, ms, sp, specs, ticker, p['exit_reason'])
                     p['exit_price'] = exit_px2
                 else:
-                    pnl = (p['entry_price'] - exit_price) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
+                    pnl = (p['entry_price'] - exit_price) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) * p.get('contracts', 1) - specs.get(p.get('ticker',''), {}).get('fee', TRADE_COST) * 2 * p.get('contracts', 1)
                     pnl += p.get('part_pnl', 0)
                     p['exit_price'] = exit_price
                 p['pnl'] = pnl
