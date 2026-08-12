@@ -338,9 +338,9 @@ def calc_mtm_equity(capital, positions, bar_data, specs):
         trade_cost = specs.get(ticker, {}).get("fee", TRADE_COST) * 2 * contracts
         
         if p['direction'] == 'long':
-            pnl = (prc - entry) / ms * sp * pct * rem - trade_cost
+            pnl = (prc - entry) / ms * sp * pct * rem * contracts - trade_cost
         else:  # short
-            pnl = (entry - prc) / ms * sp * pct * rem - trade_cost
+            pnl = (entry - prc) / ms * sp * pct * rem * contracts - trade_cost
         mtm_pnl += pnl
     return capital + mtm_pnl
 
