@@ -825,7 +825,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
             if p.get('trailing_activated') and lo <= p.get('trailing_level', 0):
                 exit_price = p['trailing_level']
                 p['exit_reason'] = 'trailing_tp'
-            elif lo <= p['entry_price'] * (1 - p.get('stop_loss', 0.007)):
+            elif lo <= (p.get('pyra_base_price') or p['entry_price']) * (1 - p.get('stop_loss', 0.007)):
                 exit_price = lo
                 p['exit_reason'] = 'stop_loss'
 
@@ -855,7 +855,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
             if p.get('trailing_activated') and hi >= p.get('trailing_level', 0):
                 exit_price = p['trailing_level']
                 p['exit_reason'] = 'trailing_tp'
-            elif hi >= p['entry_price'] * (1 + p.get('stop_loss', 0.007)):
+            elif hi >= (p.get('pyra_base_price') or p['entry_price']) * (1 + p.get('stop_loss', 0.007)):
                 exit_price = hi
                 p['exit_reason'] = 'stop_loss'
 
