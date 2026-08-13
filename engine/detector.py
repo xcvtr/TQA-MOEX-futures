@@ -77,22 +77,25 @@ def build_bar_data(ticker, strategy=None):
 
 
 def _build_daily_from_m1(ticker):
-    """Дневные close из M1 mt5_continuous (агрегация по дате, 14 дней)."""
+    """Дневные close из M1 mt5_continuous (агрегация по дате, 60 дней).
+    История SPYF/SBRF полная (2024+) — берём 60 дней, хватает для prev_week_return."""
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     r = ch.query(f"""
         SELECT toUnixTimestamp(toDateTime(bt)), prc
         FROM moex.mt5_continuous
-        WHERE ticker = '{ticker}' AND bt >= now() - INTERVAL 14 DAY
+        WHERE ticker = '{ticker}' AND bt >= now() - INTERVAL 60 DAY
         ORDER BY bt
     """).result_rows
     ch.close()
     if not r:
         return None
-    # Агрегация по дате (IRK): последний close дня
+    # Агрегация по дате (IRK): последний close дня, БЕЗ выходных (Сб/Вс — гэп-бары ALLFUT)
     from collections import OrderedDict
     days = OrderedDict()
     for ts, prc in r:
         d = datetime.fromtimestamp(ts).date()
+        if d.weekday() >= 5:  # Сб/Вс — артефакт непрерывного контракта
+            continue
         days[d] = prc
     daily = sorted(days.items())
     if len(daily) < 3:
