@@ -320,7 +320,12 @@ def _ensure_ch_prices_table():
 
 def fetch_market_snapshot() -> dict:
     """Fetch current marketdata snapshot from MOEX ISS.
-    Returns {short_ticker: {opn, hi, lo, prc, vol}} mapped by prefix."""
+    Returns {short_ticker: {opn, hi, lo, prc, vol}} mapped by SHORTNAME prefix.
+
+    ВАЖНО (2026-08-13): ISS marketdata отдаёт КОРОТКИЕ SECID ('92Q6'),
+    а securities — длинные SHORTNAME ('BR-9.26'). Маппинг: короткий → SHORTNAME → prefix.
+    Старый маппинг secid.rstrip(digits)[:-1] давал '92' — мусор.
+    """
     url = "https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.only=marketdata"
     headers = {"User-Agent": "Mozilla/5.0"}
     for attempt in range(RETRY_ATTEMPTS):
@@ -333,13 +338,29 @@ def fetch_market_snapshot() -> dict:
             data = resp.json()
             cols = data["marketdata"]["columns"]
             now = datetime.now()
+            # short SECID ('92Q6') → SHORTNAME ('BR-9.26') из securities
+            secid2name = {}
+            try:
+                r2 = requests.get("https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.only=securities&limit=1000",
+                                  headers=headers, timeout=REQUEST_TIMEOUT)
+                d2 = r2.json()
+                c2 = d2["securities"]["columns"]
+                for row in d2["securities"]["data"]:
+                    md = dict(zip(c2, row))
+                    sid = md.get("SECID", "")
+                    name = md.get("SHORTNAME", "") or ""
+                    if sid and name:
+                        secid2name[sid] = name
+            except Exception as e:
+                log.warning("securities map error: %s", e)
             best = {}
             for row in data["marketdata"]["data"]:
                 md = dict(zip(cols, row))
                 secid = md.get("SECID", "")
                 if not secid or not secid.isascii():
                     continue
-                prefix = secid.rstrip("0123456789")[:-1]
+                short_name = secid2name.get(secid, secid)
+                prefix = short_name.split("-")[0] if "-" in short_name else short_name.rstrip("0123456789").rstrip("-")
                 vt = int(md.get("VOLTODAY", 0) or 0)
                 if prefix not in best or vt > best[prefix]["vol_today"]:
                     best[prefix] = {"vol_today": vt, "opn": float(md.get("OPEN", 0) or 0),
