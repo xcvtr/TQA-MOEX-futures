@@ -97,6 +97,22 @@ def trading_hours_now():
     return (h == 15 and m >= 0) or (15 < h < 23) or (h == 23 and m <= 45)
 
 
+def futoi_should_be_fresh():
+    """futoi должен быть свежим только когда рынок открыт И сборщик успел сработать.
+    Сборщик silent collector: */5 15-23,0-5 IRK → первый тик 15:05.
+    В 06:00-14:59 IRK рынок закрыт — futoi закономерно старый (последний 04:50)."""
+    now = datetime.now(timezone(timedelta(hours=8)))
+    h, m = now.hour, now.minute
+    # Рынок открыт: 15:05-23:45 IRK (даём 5 мин на первый тик сборщика)
+    if h == 15 and m >= 5:
+        return True
+    if 15 < h < 23:
+        return True
+    if h == 23 and m <= 45:
+        return True
+    return False
+
+
 def check():
     issues = []
     info = {}
@@ -114,7 +130,7 @@ def check():
             last = last.replace(tzinfo=timezone(timedelta(hours=5)))  # MSK → IRK
             age = (now - last).total_seconds() / 60
             info['futoi_age_min'] = round(age, 1)
-            if trading_hours_now() and age > FUTOI_STALE_MIN:
+            if futoi_should_be_fresh() and age > FUTOI_STALE_MIN:
                 issues.append(f'⏱ futoi stale: {age:.0f} мин (последний {last})')
         else:
             issues.append('❌ futoi пуст')
