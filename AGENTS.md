@@ -1,6 +1,6 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 226 (2026-08-15)** — Все TZ-баги исправлены: данные в МСК (Europe/Moscow), рассинхрона нет
+**Последний чекпойнт: 227 (2026-08-15)** — dayofweek в live (SBRF 10%/SPYF 25%), MTM DD на M1, Docker-воркер с TZ-фиксами
 - **🚀 LIVE: OI (BR/NG/SV) + dayofweek (SBRF/SPYF) enabled.** dayofweek включён с оптимумом 2026:
   **SBRF risk 10% (2x) + SPYF risk 25% (4x)**, trailing act 0.5%/trail 0.25%, SL 1.5%, timeout 24 (EOD), skip июль
 - **dayofweek 2026 (общий капитал 200К, M1)**: SBRF 2x+SPYF 4x = **+130% ROI, MTM DD 16.1%** (цель 100-200% ✅)

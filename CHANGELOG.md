@@ -1,3 +1,19 @@
+## [227] 2026-08-15
+### Changed
+- **dayofweek включён в live**: SBRF risk 10% (2x), SPYF risk 25% (4x), trailing 0.5/0.25, SL 1.5%, EOD
+- Тюнинг 2026: +130% ROI при MTM DD 16.1% (общий капитал 200К, M1)
+### Fixed
+- trailing_activation/trail в PG были ПРОЦЕНТЫ (0.5=50%), папер ждёт ДОЛИ (0.005) — ломал trailing dayofweek
+- numeric(5,3) округлял 0.0025→0.003 → numeric(6,4)
+### Added
+- ticker_specs: SBRF ГО 6050₽, SPYF ГО 13461₽ (1пкт=82.6₽)
+- bt_dayofweek_m1.py — MTM DD на M1 (честный mark-to-market по lo/hi)
+- bt_dayofweek_016.py — модель 016 (trailing+плечо+пирамида) на полных H1
+### Verified
+- Контроль: без dayofweek-фильтра −72.5% → edge чисто dayofweek
+- Docker-воркер пересобран с TZ-фиксами: OI +1511% N=395 — идентично хосту
+- Checkpoint: checkpoint/227-dayofweek-live-m1-docker.md
+
 ## [226] 2026-08-15
 ### Changed
 - **ВСЕ данные в МСК (Europe/Moscow)**: PG timezone (Etc/UTC→МСК), CH timezone (config.d)
