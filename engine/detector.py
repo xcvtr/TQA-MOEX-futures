@@ -95,7 +95,7 @@ def _build_daily_from_m1(ticker):
             bars = [{'ts': int(_dt(d.year, d.month, d.day, 23, 0).timestamp()),
                      'opn': float(c), 'hi': float(c), 'lo': float(c), 'prc': float(c)}
                     for d, c in rows]
-            bars[-1]['ts'] = int(datetime.now().timestamp())
+            bars[-1]['ts'] = int(datetime.now(timezone.utc).timestamp())
             return {'prc': bars[-1]['prc'], 'hi': bars[-1]['hi'], 'lo': bars[-1]['lo'],
                     'close_hist': [b['prc'] for b in bars],
                     'hi_hist': [b['hi'] for b in bars], 'lo_hist': [b['lo'] for b in bars],
@@ -127,7 +127,7 @@ def _build_daily_from_m1(ticker):
     bars = [{'ts': int(datetime(d.year, d.month, d.day, 23, 0).timestamp()),
              'opn': c, 'hi': c, 'lo': c, 'prc': c} for d, c in daily]
     # ts последнего = сейчас (текущий день ещё формируется)
-    bars[-1]['ts'] = int(datetime.now().timestamp())
+    bars[-1]['ts'] = int(datetime.now(timezone.utc).timestamp())
     return {'prc': bars[-1]['prc'], 'hi': bars[-1]['hi'], 'lo': bars[-1]['lo'],
             'close_hist': [b['prc'] for b in bars],
             'hi_hist': [b['hi'] for b in bars], 'lo_hist': [b['lo'] for b in bars],
@@ -231,7 +231,7 @@ def build_daily_data(ticker):
             bars = [{'ts': int(datetime(d.year, d.month, d.day, 23, 0).timestamp()),
                      'opn': float(c), 'hi': float(c), 'lo': float(c), 'prc': float(c)}
                     for d, c in rows]
-            bars[-1]['ts'] = int(datetime.now().timestamp())
+            bars[-1]['ts'] = int(datetime.now(timezone.utc).timestamp())
             return {'prc': bars[-1]['prc'], 'hi': bars[-1]['hi'], 'lo': bars[-1]['lo'],
                     'close_hist': [b['prc'] for b in bars],
                     'hi_hist': [b['hi'] for b in bars], 'lo_hist': [b['lo'] for b in bars],
@@ -261,7 +261,7 @@ def build_daily_data(ticker):
         bars = [{'ts': int(datetime(d.year, d.month, d.day, 23, 0).timestamp()), 'opn': c, 'hi': c,
                  'lo': c, 'prc': c} for d, c in daily]
         # ts последнего = сейчас (не конец дня)
-        bars[-1]['ts'] = int(datetime.now().timestamp())
+        bars[-1]['ts'] = int(datetime.now(timezone.utc).timestamp())
         return {'prc': bars[-1]['prc'], 'hi': bars[-1]['hi'], 'lo': bars[-1]['lo'],
                 'close_hist': [b['prc'] for b in bars],
                 'hi_hist': [b['hi'] for b in bars], 'lo_hist': [b['lo'] for b in bars],

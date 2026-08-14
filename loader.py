@@ -21,7 +21,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Optional
 
 import requests
@@ -232,11 +232,9 @@ def fetch_oi_snapshot(ticker: str) -> Optional[list[dict]]:
                 try:
                     dt = datetime.strptime(
                         f"{row[2].strip()} {row[3].strip()}", "%Y-%m-%d %H:%M:%S")
-                    # ISS отдаёт время в МСК (UTC+3). CH хранит в таймзоне сервера
-                    # (Asia/Irkutsk, +8). Чтобы unix был правильным (МСК-момент),
-                    # naive datetime интерпретируется CH как IRK → сдвиг −5ч.
-                    # Фикс: добавить 5 часов (МСК → IRK), тогда unix = истинный.
-                    dt = dt + timedelta(hours=5)
+                    # ISS отдаёт время в МСК (UTC+3). Делаем aware МСК — правильный
+                    # момент (unix) для CH и PG независимо от TZ сессии/сервера.
+                    dt = dt.replace(tzinfo=timezone(timedelta(hours=3)))
                 except ValueError:
                     continue
 

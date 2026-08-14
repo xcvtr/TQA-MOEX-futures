@@ -9,7 +9,7 @@ Usage (Wine):
 Writes to: moex.mt5_continuous (CH)
 """
 import sys, os, time, json
-from datetime import datetime
+from datetime import datetime, timezone
 
 CH_HOST = '10.0.0.60'
 CH_PORT = 8123
@@ -117,14 +117,18 @@ def find_active_symbol(mt5, prefix, all_syms):
     return None
 
 def write_bars(ch, ticker, rates):
-    """Write M1 bars to CH mt5_continuous."""
+    """Write M1 bars to CH mt5_continuous + PG bars_1m.
+    Время: FINAM отдаёт МСК as unix → конвертируем в aware UTC (правильный момент).
+    Хранение: unix (момент). Отображение: МСК (PG timezone=Europe/Moscow)."""
     if rates is None or len(rates) == 0:
         return 0
     data = []
     for r in rates:
+        # FINAM time = МСК-часы как unix. МСК = UTC+3 → вычесть 3ч для UTC-момента.
+        ts_utc = datetime.fromtimestamp(r['time'] - 3*3600, tz=timezone.utc)
         data.append([
             ticker,
-            datetime.fromtimestamp(r['time'] - 3*3600),  # FINAM отдаёт МСК как unix → UTC
+            ts_utc,
             float(r['open']),
             float(r['high']),
             float(r['low']),

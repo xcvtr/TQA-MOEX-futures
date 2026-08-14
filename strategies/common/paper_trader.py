@@ -368,7 +368,7 @@ def get_latest_bars(ticker, asset, n_bars=1500):
             import pandas as pd
             df = pd.DataFrame(rows, columns=['bt', 'opn', 'hi', 'lo', 'prc'])
             df = df.sort_values('bt').reset_index(drop=True)
-            age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
+            age = (now - df.iloc[-1]['bt'].astimezone(timezone.utc)).total_seconds() / 60
             if age < 10:  # < 10 min — свежие данные
                 return df
             # Несвежие данные: НЕ торгуем на устаревшем — возвращаем с warning (папер остановится)
@@ -601,7 +601,7 @@ def manage_positions(positions, bar_data, specs, bar_idx):
             et = p['entry_time']
             if isinstance(et, str):
                 et = datetime.fromisoformat(et)
-            age_sec = (datetime.now(timezone.utc) - et.replace(tzinfo=timezone.utc)).total_seconds()
+            age_sec = (datetime.now(timezone.utc) - et.astimezone(timezone.utc)).total_seconds()
         except Exception:
             age_sec = 0
         if p['entry_bar'] >= bar_idx and age_sec < 60:
@@ -876,7 +876,7 @@ def run_tick(strategy_filter=None, mode=None):
                 r = cur.fetchone()
                 cur.close(); conn.close()
                 if r and r[0]:
-                    vol_age_hours = (datetime.now(timezone.utc) - r[0].replace(tzinfo=timezone.utc)).total_seconds() / 3600
+                    vol_age_hours = (datetime.now(timezone.utc) - r[0].astimezone(timezone.utc)).total_seconds() / 3600
             except Exception:
                 pass
         
