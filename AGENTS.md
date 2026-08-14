@@ -1,10 +1,13 @@
 # TQA-MOEX-futures
 
 **Последний чекпойнт: 226 (2026-08-15)** — Все TZ-баги исправлены: данные в МСК (Europe/Moscow), рассинхрона нет
-- **🚀 LIVE: OI (BR/NG/SV) + dayofweek (SBRF/SPYF) enabled.** dayofweek включён с оптимумом:
-  risk SBRF 10%/SPYF 6%, trailing act 0.5%/trail 0.25%, SL 1.5%, timeout 24 (EOD), skip июль
+- **🚀 LIVE: OI (BR/NG/SV) + dayofweek (SBRF/SPYF) enabled.** dayofweek включён с оптимумом 2026:
+  **SBRF risk 10% (2x) + SPYF risk 25% (4x)**, trailing act 0.5%/trail 0.25%, SL 1.5%, timeout 24 (EOD), skip июль
+- **dayofweek 2026 (общий капитал 200К, M1)**: SBRF 2x+SPYF 4x = **+130% ROI, MTM DD 16.1%** (цель 100-200% ✅)
+  Варианты: 2x/6x=+218% DD21%, 4x/6x=+232% DD26%
 - **dayofweek верифицирован на M1**: SBRF +434% MTM DD 10.7% (2023-26), SPYF +63% DD 4.5%,
   портфель +769% CAGR 82% Calmar ~40. Контроль: без фильтра −72.5% → edge чисто dayofweek
+- **Спецификации**: SBRF ГО 6050₽ (1пкт=1₽), SPYF ГО 13461₽ (1пкт=82.6₽) — добавлены в ticker_specs
 - **Конфиг OI**: риски BR 15%/NG 10%/SV 5%, pyr3 (pyra_max=2), max_hold_h=72ч, sizing_eq_cap=2M, stop 1.5%
 - **hold 72ч — ключ к MTM DD ≤ 20%**: 120ч давал DD 55-64% (свинг-просадка), 72ч → 12-13%
 - **Результаты (реалистичная модель, компаунд)**: 2023 +371%, 2024 +484%, 2025 +1567%, 2026 +1036-2604% (старт 200K) — DD ≤ 12-19% во всех годах
