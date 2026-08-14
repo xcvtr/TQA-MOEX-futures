@@ -17,20 +17,33 @@ CH_DB = 'moex'
 
 # MOEX tickers and their MT5 symbol prefix (FINAM format)
 # FINAM uses quarter codes: SiU4, MMU4, GZU4, etc. (U=Sep, Z=Dec, H=Mar, M=Jun)
-MOEX_PREFIXES = {
-    'Si': 'Si',   # USD/RUB
-    'MM': 'MM',   # Moscow Exchange Index
-    'GZ': 'GZ',   # Natural Gas
-    'BR': 'BR',   # Brent Oil
-    'SV': 'SV',   # Sberbank
-    'CR': 'CR',   # Crude Oil
-    'GD': 'GD',   # Gold
-    'RN': 'RN',   # Rosneft
-    'NG': 'NG',   # Norilsk Nickel
-    'Eu': 'Eu',   # Euro/RUB
-    'ED': 'ED',   # Edinaya (RTS)
-    'TT': 'TATN', # Tatneft
-}
+# MOEX_PREFIXES: тикеры читаются из PG futures.portfolio (enabled=true) —
+# НЕ хардкод. Маппинг тикер → MT5 символ: точный, ALLFUT+ticker, или префикс.
+MOEX_PREFIXES = {}
+
+import psycopg2 as _pg
+
+def _load_portfolio_tickers():
+    """Тикеры из futures.portfolio (enabled=true). Падение → пусто."""
+    try:
+        conn = _pg.connect(host='10.0.0.60', port=5432, dbname='moex',
+                           user='postgres', connect_timeout=5)
+        cur = conn.cursor()
+        cur.execute("SELECT DISTINCT ticker FROM futures.portfolio WHERE enabled = true")
+        rows = [r[0] for r in cur.fetchall()]
+        cur.close(); conn.close()
+        return {t: t for t in rows}  # prefix == ticker, find_active_symbol найдёт
+    except Exception as e:
+        print(f"   WARN load portfolio tickers: {e}", flush=True)
+        return {}
+
+def _refresh_moex_prefixes():
+    MOEX_PREFIXES.clear()
+    MOEX_PREFIXES.update(_load_portfolio_tickers())
+    print(f"   Tickers from PG portfolio: {list(MOEX_PREFIXES.keys())}", flush=True)
+
+# initial load
+_refresh_moex_prefixes()
 
 
 def find_active_symbol(mt5, prefix, all_syms):
@@ -60,7 +73,14 @@ def find_active_symbol(mt5, prefix, all_syms):
     except: pass
     
     # Find best by data recency
-    candidates = [(s.name, s) for s in all_syms if s.name.startswith(prefix) and len(s.name) <= len(prefix) + 3]
+    candidates = []
+    # Точное совпадение / ALLFUT+ticker / префикс
+    for s in all_syms:
+        n = s.name
+        if n == prefix or n == 'ALLFUT' + prefix or n.startswith(prefix):
+            candidates.append((n, s))
+        elif len(n) <= len(prefix) + 3 and n.startswith(prefix[:len(n)]):
+            candidates.append((n, s))
     best_sym = None; best_time = 0; best_exp = None
     for sym_name, _ in candidates:
         mt5.symbol_select(sym_name, True)
@@ -115,6 +135,23 @@ def write_bars(ch, ticker, rates):
     
     # CH insert via JSONEachRow — use list of lists format
     ch.insert('moex.mt5_continuous', data, column_names=['ticker','bt','opn','hi','lo','prc','vol','tick_vol'])
+
+    # ── PG dual-write: futures.bars_1m (для live-папера, последние 14 дней + autopurge) ──
+    try:
+        import psycopg2
+        conn = psycopg2.connect(host='10.0.0.60', port=5432, dbname='moex', user='postgres', connect_timeout=3)
+        cur = conn.cursor()
+        for row in data:
+            cur.execute(
+                "INSERT INTO futures.bars_1m (ticker,bt,opn,hi,lo,prc,vol) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (ticker,bt) DO NOTHING",
+                (row[0], row[1], row[2], row[3], row[4], row[5], row[6]))
+        # autopurge: старше 14 дней — удаляем
+        cur.execute("DELETE FROM futures.bars_1m WHERE bt < now() - INTERVAL '14 days'")
+        conn.commit()
+        cur.close(); conn.close()
+    except Exception as e:
+        print(f"   ⚠ PG bars_1m write error: {e}", flush=True)
     return len(data)
 
 
@@ -154,6 +191,8 @@ def main():
             available = [s.name for s in all_syms]
             print(f"   Available symbols: {len(available)} total", flush=True)
         
+        # Refresh tickers from PG portfolio (добавили SBRF/SPYF → подхватятся)
+        _refresh_moex_prefixes()
         # Auto-detect active symbols for each ticker
         active_symbols = {}
         for ticker, prefix in MOEX_PREFIXES.items():
@@ -221,6 +260,7 @@ def _collect_dom():
     if not all_syms:
         mt5_dom.shutdown()
         return
+    _refresh_moex_prefixes()
     for ticker, prefix in MOEX_PREFIXES.items():
         sym = find_active_symbol(mt5_dom, prefix, all_syms)
         if not sym:

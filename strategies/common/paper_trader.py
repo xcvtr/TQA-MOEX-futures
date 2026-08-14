@@ -510,18 +510,21 @@ def fetch_day_net(ticker):
     irk_day(ts) = int((ts - 7*3600) // 86400). НЕ today() (00:00 IRK)!
 
     Отрицательное = физлица за день НАКОПИЛИ продажи (паника → long).
-    Из moex.futoi.
+    Из PG futures.futoi_iss (live-источник; CH futoi — для бэктестов).
     """
     try:
-        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-        rows = ch.query(f"""
-            SELECT toUnixTimestamp(toDateTime(bt)), buy_fiz, sell_fiz, buy_yur, sell_yur
-            FROM moex.futoi
-            WHERE ticker = '{ticker}'
-              AND toUnixTimestamp(toDateTime(bt)) >= %(start_ts)s
+        import psycopg2 as _pg
+        conn = _pg.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER,
+                           password=PG_PASS, connect_timeout=5)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT EXTRACT(EPOCH FROM bt)::bigint, buy_fiz, sell_fiz, buy_yur, sell_yur
+            FROM futures.futoi_iss
+            WHERE ticker = %s AND bt >= now() - INTERVAL '72 hours'
             ORDER BY bt
-        """, {'start_ts': int(datetime.now(timezone.utc).timestamp()) - 72 * 3600}).result_rows
-        ch.close()
+        """, (ticker,))
+        rows = cur.fetchall()
+        cur.close(); conn.close()
         if not rows:
             return None
         # Дневной старт: первая запись текущего IRK-дня (граница 07:00 UTC = 15:00 IRK)
