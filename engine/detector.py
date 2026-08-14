@@ -77,8 +77,32 @@ def build_bar_data(ticker, strategy=None):
 
 
 def _build_daily_from_m1(ticker):
-    """Дневные close из M1 mt5_continuous (агрегация по дате, 60 дней).
+    """Дневные close из PG bars_d1 (live-источник), fallback CH mt5_continuous.
     История SPYF/SBRF полная (2024+) — берём 60 дней, хватает для prev_week_return."""
+    # 1. PG bars_d1 (основной — заполняется load_bars_d1.py из CH)
+    try:
+        conn = pg_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT d, prc FROM futures.bars_d1
+            WHERE ticker = %s AND d >= now()::date - 60
+            ORDER BY d
+        """, (ticker,))
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        if len(rows) >= 3:
+            from datetime import datetime as _dt
+            bars = [{'ts': int(_dt(d.year, d.month, d.day, 23, 0).timestamp()),
+                     'opn': float(c), 'hi': float(c), 'lo': float(c), 'prc': float(c)}
+                    for d, c in rows]
+            bars[-1]['ts'] = int(datetime.now().timestamp())
+            return {'prc': bars[-1]['prc'], 'hi': bars[-1]['hi'], 'lo': bars[-1]['lo'],
+                    'close_hist': [b['prc'] for b in bars],
+                    'hi_hist': [b['hi'] for b in bars], 'lo_hist': [b['lo'] for b in bars],
+                    'bars_list': bars, 'ts': bars[-1]['ts']}
+    except Exception:
+        pass
+    # 2. CH mt5_continuous (fallback)
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     r = ch.query(f"""
         SELECT toUnixTimestamp(toDateTime(bt)), prc
@@ -111,8 +135,7 @@ def _build_daily_from_m1(ticker):
 
 
 def _build_m1(ticker):
-    """M1 из PG bars_1m (live-источник), fallback CH mt5_continuous/prices_5min."""
-    # 1. PG bars_1m — основной (свежий, live)
+    """M1 из PG bars_1m (live-источник). CH не используется для live."""
     try:
         conn = pg_conn()
         cur = conn.cursor()
@@ -128,26 +151,7 @@ def _build_m1(ticker):
             return _bars_from_rows(r)
     except Exception:
         pass
-    # 2. CH mt5_continuous
-    ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-    r = ch.query(f"""
-        SELECT toUnixTimestamp(toDateTime(bt)), opn, hi, lo, prc, vol
-        FROM moex.mt5_continuous
-        WHERE ticker = '{ticker}' AND bt >= now() - INTERVAL 2 DAY
-        ORDER BY bt
-    """).result_rows
-    if not r:
-        # Fallback: prices_5min (для SBRF/SPYF)
-        r = ch.query(f"""
-            SELECT toUnixTimestamp(toDateTime(bt)), opn, hi, lo, prc, vol
-            FROM moex.prices_5min
-            WHERE ticker = '{ticker}' AND bt >= now() - INTERVAL 2 DAY
-            ORDER BY bt
-        """).result_rows
-    ch.close()
-    if not r:
-        return None
-    return _bars_from_rows(r)
+    return None
 
 
 def _bars_from_rows(r):
@@ -210,8 +214,31 @@ def attach_day_net(bd, ticker):
 
 
 def build_daily_data(ticker):
-    """Дневные бары dayofweek из CH 10.0.0.63 (moex.mt5_futures, MOEX-stocks-1).
+    """Дневные бары dayofweek из PG bars_d1 (live-источник), fallback CH 10.0.0.63.
     H1 → агрегируем в дневные close (последний H1 дня). ts = конец дня."""
+    # 1. PG bars_d1 (основной)
+    try:
+        conn = pg_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT d, prc FROM futures.bars_d1
+            WHERE ticker = %s AND d >= now()::date - 60
+            ORDER BY d
+        """, (ticker,))
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        if len(rows) >= 3:
+            bars = [{'ts': int(datetime(d.year, d.month, d.day, 23, 0).timestamp()),
+                     'opn': float(c), 'hi': float(c), 'lo': float(c), 'prc': float(c)}
+                    for d, c in rows]
+            bars[-1]['ts'] = int(datetime.now().timestamp())
+            return {'prc': bars[-1]['prc'], 'hi': bars[-1]['hi'], 'lo': bars[-1]['lo'],
+                    'close_hist': [b['prc'] for b in bars],
+                    'hi_hist': [b['hi'] for b in bars], 'lo_hist': [b['lo'] for b in bars],
+                    'bars_list': bars, 'ts': bars[-1]['ts']}
+    except Exception:
+        pass
+    # 2. CH 10.0.0.63 (fallback)
     try:
         ch = cc.get_client(host='10.0.0.63', port=8123, database='moex',
                            username='default', password='')

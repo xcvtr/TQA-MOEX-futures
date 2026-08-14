@@ -12,7 +12,8 @@ from collections import defaultdict
 # ── Project root ──────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 
-import clickhouse_connect as cc
+# LIVE источник данных: только PostgreSQL (PG). CH — для бэктестов.
+import clickhouse_connect as cc  # noqa: F401 (зарезервирован для тестов; live НЕ использует)
 import psycopg2
 from psycopg2.extras import execute_values
 
@@ -127,29 +128,18 @@ def load_daily_volumes():
                     vol = 0
             if vol > 0:
                 new_vol[prefix] = vol
-        # Фолбэк: tradestats_fo (если ISS не дал)
+        # Фолбэк: если ISS не дал vol — берём из PG futures.daily_vol (кэш лоадера)
         if not new_vol:
-            ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-            rows = ch.query("""
-                SELECT secid, round(sum(vol) / NULLIF(count(DISTINCT tradedate), 0))
-                FROM moex.tradestats_fo
-                WHERE tradedate >= toDate(now()) - INTERVAL 400 DAY AND vol > 0
-                GROUP BY secid
-            """).result_rows
-            sec_vol = {r[0]: float(r[1]) for r in rows}
-            for prefix, sym in active_map.items():
-                if sym in sec_vol:
-                    new_vol[prefix] = sec_vol[sym]
-        # перпетуалы: оценка
-        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-        rows2 = ch.query("""
-            SELECT ticker, round(avg(vol)) FROM moex.mt5_continuous
-            WHERE ticker IN ('USDRUBF','EURRUBF','CNYRUBF','GLDRUBF','Si','Eu','CNY')
-              AND bt >= now() - INTERVAL 400 DAY GROUP BY ticker
-        """).result_rows
-        for tk, avg_vol in rows2:
-            new_vol.setdefault(tk, float(avg_vol) * 1440 * 20)
-        ch.close()
+            try:
+                import psycopg2 as _pg2
+                conn = _pg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
+                cur = conn.cursor()
+                cur.execute("SELECT ticker, avg_vol FROM futures.daily_vol")
+                for tk, av in cur.fetchall():
+                    new_vol[tk] = float(av)
+                cur.close(); conn.close()
+            except Exception:
+                pass
         # мутируем существующий dict (imported references остаются валидными)
         DAILY_VOL.clear()
         DAILY_VOL.update(new_vol)
@@ -360,7 +350,7 @@ def get_latest_bars(ticker, asset, n_bars=1500):
     """
     now = datetime.now(timezone.utc)
     
-    # ── 0. PG bars_1m (primary) ──────────────────────────────────────────
+    # ── 0. PG bars_1m (единственный источник для live) ───────────────────
     try:
         import psycopg2
         conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
@@ -381,114 +371,34 @@ def get_latest_bars(ticker, asset, n_bars=1500):
             age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
             if age < 10:  # < 10 min — свежие данные
                 return df
-            log.info("PG bars_1m age=%.0fm, trying next source", age)
+            # Несвежие данные: НЕ торгуем на устаревшем — возвращаем с warning (папер остановится)
+            log.warning("⚠ PG bars_1m STALE for %s: age=%.0f min — данные устарели, не торгуем", ticker, age)
+            return df
+        log.warning("⚠ PG bars_1m EMPTY for %s — нет данных", ticker)
+        return None
     except Exception as e:
-        log.warning("PG bars_1m error for %s: %s", ticker, e)
-    
-    # ── 1. PG (для paper trader) ────────────────────────────────────────
-    try:
-        import psycopg2
-        conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
-        cur = conn.cursor()
-        cur.execute(f"""
-            SELECT bt, opn, hi, lo, prc
-            FROM futures.bars_1m
-            WHERE ticker = %s
-            ORDER BY bt DESC LIMIT %s
-        """, (ticker, n_bars + 5))
-        rows = cur.fetchall()
-        cur.close(); conn.close()
-        
-        if rows:
-            import pandas as pd
-            df = pd.DataFrame(rows, columns=['bt', 'opn', 'hi', 'lo', 'prc'])
-            df = df.sort_values('bt').reset_index(drop=True)
-            age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
-            if age < 3:  # < 3 min — свежие данные
-                return df
-            log.info("PG bars_1m age=%.0fm, trying next source", age)
-    except Exception as e:
-        log.warning("PG bars_1m error for %s: %s", ticker, e)
-    
-    # ── 2. CH mt5_bars ──────────────────────────────────────────────────────
-    ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-    try:
-        df = ch.query_df(f"""
-            SELECT bt, opn, hi, lo, prc
-            FROM moex.mt5_continuous WHERE ticker = '{ticker}'
-            ORDER BY bt DESC LIMIT {n_bars + 5}
-        """)
-        if not df.empty:
-            df = df.sort_values('bt').reset_index(drop=True)
-            age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
-            if age < 10:
-                ch.close(); return df
-            log.info("mt5_continuous age=%.0fm, trying next", age)
-        ch.close()
-    except Exception as e:
-        log.warning("mt5_continuous error for %s: %s", ticker, e)
-        ch.close()
-    
-    # ── 3. tradestats_fo ────────────────────────────────────────────────────
-    try:
-        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-        df = ch.query_df(f"""
-            SELECT toStartOfInterval(SYSTIME, INTERVAL 5 MINUTE) as bt5,
-                   argMin(pr_open, SYSTIME) as opn,
-                   max(pr_high) as hi, min(pr_low) as lo,
-                   argMax(pr_close, SYSTIME) as prc_close
-            FROM moex.tradestats_fo WHERE asset_code = '{asset}'
-            GROUP BY bt5 ORDER BY bt5 DESC LIMIT {n_bars + 5}
-        """)
-        if not df.empty:
-            df = df.sort_values('bt5').reset_index(drop=True)
-            df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
-            age = (now - df.iloc[-1]['bt'].replace(tzinfo=timezone.utc)).total_seconds() / 60
-            if age < 60:
-                ch.close(); return df
-        ch.close()
-    except Exception as e:
-        log.warning("tradestats_fo error for %s/%s: %s", ticker, asset, e)
-        ch.close()
-    
-    # ── 4. prices_5min (fallback) ────────────────────────────────────────────
-    try:
-        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-        df = ch.query_df(f"""
-            SELECT toStartOfInterval(bt, INTERVAL 5 MINUTE) as bt5,
-                   argMin(prc, bt) as opn, max(prc) as hi, min(prc) as lo,
-                   argMax(prc, bt) as prc_close
-            FROM moex.prices_5min WHERE ticker = '{ticker}'
-            GROUP BY bt5 ORDER BY bt5 DESC LIMIT {n_bars + 5}
-        """)
-        if not df.empty:
-            df = df.sort_values('bt5').reset_index(drop=True)
-            df.rename(columns={'bt5': 'bt', 'prc_close': 'prc'}, inplace=True)
-        ch.close()
-        return df
-    except Exception as e:
-        log.error("CH error for %s (all sources): %s", ticker, e)
-        ch.close()
+        log.error("⚠ PG bars_1m ERROR for %s: %s — live БЕЗ данных, стоп", ticker, e)
         return None
 
 
 def get_volume_data(ticker, n_bars=55):
-    """Get volume data (vol_b, vol_s) from tradestats_fo for CVD calculation.
+    """Get volume data (vol_b, vol_s) for CVD calculation.
+    Источник: PG futures.dom (стакан) — без CH. Для oi_dom (disabled) — пусто.
     Returns (vol_hist, vol_b_hist, vol_s_hist) or ([], [], []) if no data.
     """
     try:
-        ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-        rows = ch.query(f"""
-            SELECT SYSTIME, vol, vol_b, vol_s
-            FROM moex.tradestats_fo
-            WHERE asset_code = '{ticker}'
-            ORDER BY SYSTIME DESC
-            LIMIT {n_bars + 10}
-        """).result_rows
-        ch.close()
+        import psycopg2 as _pg3
+        conn = _pg3.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER,
+                            password=PG_PASS, connect_timeout=3)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT bt, vol, vol_b, vol_s FROM futures.dom
+            WHERE ticker = %s ORDER BY bt DESC LIMIT %s
+        """, (ticker, n_bars + 10))
+        rows = cur.fetchall()
+        cur.close(); conn.close()
         if not rows:
             return [], [], []
-        # Sort chronologically
         rows = list(reversed(rows))
         vol = [float(r[1]) for r in rows if r[1] is not None]
         vol_b = [float(r[2]) for r in rows if r[2] is not None]
@@ -954,15 +864,19 @@ def run_tick(strategy_filter=None, mode=None):
         # Volume data (for CVD + impulse_return)
         vol, vol_b, vol_s = get_volume_data(s.get('asset', ticker))
         
-        # CVD z-score — отключить если tradestats_fo stale (>30ч)
+        # CVD z-score — vol_age из PG futures.dom (без CH)
         vol_age_hours = 0
         if vol:
             try:
-                ch_tmp = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-                r = ch_tmp.query(f"SELECT max(SYSTIME) FROM moex.tradestats_fo WHERE asset_code='{s.get('asset', ticker)}'").result_rows
-                ch_tmp.close()
-                if r and r[0][0]:
-                    vol_age_hours = (datetime.now(timezone.utc) - r[0][0].replace(tzinfo=timezone.utc)).total_seconds() / 3600
+                import psycopg2 as _pg4
+                conn = _pg4.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER,
+                                    password=PG_PASS, connect_timeout=3)
+                cur = conn.cursor()
+                cur.execute("SELECT max(bt) FROM futures.dom WHERE ticker=%s", (s.get('asset', ticker),))
+                r = cur.fetchone()
+                cur.close(); conn.close()
+                if r and r[0]:
+                    vol_age_hours = (datetime.now(timezone.utc) - r[0].replace(tzinfo=timezone.utc)).total_seconds() / 3600
             except Exception:
                 pass
         
