@@ -1,3 +1,20 @@
+## [226] 2026-08-15
+### Changed
+- **ВСЕ данные в МСК (Europe/Moscow)**: PG timezone (Etc/UTC→МСК), CH timezone (config.d)
+- loader: ISS +5ч хак → aware +03:00; мост: naive → aware UTC
+- папер: replace(tzinfo) → astimezone ×3; детектор: datetime.now(utc) ×4
+- oi_watchdog: IRK +8/+5 → МСК +3, toUnixTimestamp
+### Fixed
+- futoi_iss в PG был в БУДУЩЕМ на 8ч (влиял на day_net!) — миграция −8ч
+- _parse_ts: naive CH-строка = МСК (было IRK → сдвиг −5ч, N=395→521)
+- cron update_moex_oi: */5 15-23 → */5 15-23,0-5 (вечерняя сессия не покрывалась)
+- run_moex_oi_silent.sh: python3 → venv tqa-moex-futures (не было clickhouse-connect)
+### Verified
+- CH/PG unix совпадают (bars 19:27, futoi 19:25 МСК)
+- day_net детектор = папер (BR 1.708, NG −1.031, SV −0.651)
+- OI бэктест: N=395, +1511%, DD 7.8%, WR 68.6%
+- Checkpoint: checkpoint/226-tz-fixes-msk.md
+
 ## [225] 2026-08-14
 ### Changed
 - **LIVE=PG**: папер/detector/executor читают только PG (bars_1m, futoi_iss, bars_d1, dom, daily_vol). CH — только бэктесты. Мост dual-write (CH вся глубина + PG 14д autopurge). Проверено: live работает без CH
