@@ -1,3 +1,19 @@
+## [225] 2026-08-14
+### Changed
+- **LIVE=PG**: папер/detector/executor читают только PG (bars_1m, futoi_iss, bars_d1, dom, daily_vol). CH — только бэктесты. Мост dual-write (CH вся глубина + PG 14д autopurge). Проверено: live работает без CH
+- **Docker-воркер**: общий бэктестер tqa_framework в контейнере (пишет в тест-PG :5433, читает прод-CH)
+- **Верификация исслед. стратегий**: Dragon −39%, IR −88%, SH −125% (0 slippage) — ВСЕ ОТБРОШЕНЫ. oi_dom не верифицируем (нет стакана)
+### Fixed
+- Backtester: позиции не закрывались (state терялся) → N=8 вместо 13K
+- Backtester: slippage_ticks добавлен
+- detector: day_net не подгружался для OI (добавлен attach_day_net)
+- futoi_iss autopurge: 2 мес → 14 дней
+### Added
+- futures.bars_d1 (дневные close dayofweek) + load_bars_d1.py (cron 14:00)
+- futures.daily_vol (кэш объёмов ISS)
+- bt_verify_research.py (верификация исслед. стратегий)
+- Checkpoint: checkpoint/225-live-pg-docker-worker-verify-research.md
+
 ## [224] 2026-08-11
 ### Changed
 - Финальный оптимум OI под MTM DD ≤ 20%: риски BR 15%/NG 10%/SV 5%, pyr3 (pyra_max=2), max_hold_h=72ч, sizing_eq_cap=2M
