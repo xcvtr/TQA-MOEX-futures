@@ -133,7 +133,7 @@ def save_oi_records(ticker: str, records: list[dict]) -> int:
                                  buy_yur = EXCLUDED.buy_yur, sell_yur = EXCLUDED.sell_yur""",
                 rows,
             )
-            cur.execute("DELETE FROM futures.futoi_iss WHERE bt < now() - INTERVAL '2 months'")
+            cur.execute("DELETE FROM futures.futoi_iss WHERE bt < now() - INTERVAL '14 days'")
         pg_conn.commit()
         pg_conn.close()
     except Exception as e:

@@ -75,10 +75,23 @@ def save_state(state):
     cur.close(); conn.close()
 
 def get_last_price(ticker):
-    ch = cc.get_client(host=CH_HOST, port=8123, database='moex')
-    r = ch.query(f"SELECT prc FROM moex.mt5_continuous WHERE ticker='{ticker}' ORDER BY bt DESC LIMIT 1").result_rows
-    ch.close()
-    return float(r[0][0]) if r else None
+    """Последняя цена из PG bars_1m (live-источник; CH — для бэктестов)."""
+    try:
+        conn = pg_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT prc FROM futures.bars_1m WHERE ticker=%s ORDER BY bt DESC LIMIT 1", (ticker,))
+        r = cur.fetchone()
+        cur.close(); conn.close()
+        return float(r[0]) if r else None
+    except Exception:
+        # fallback: CH
+        try:
+            ch = cc.get_client(host=CH_HOST, port=8123, database='moex')
+            r = ch.query(f"SELECT prc FROM moex.mt5_continuous WHERE ticker='{ticker}' ORDER BY bt DESC LIMIT 1").result_rows
+            ch.close()
+            return float(r[0][0]) if r else None
+        except Exception:
+            return None
 
 def mark_signal(conn, sid, status, error=None):
     cur = conn.cursor()

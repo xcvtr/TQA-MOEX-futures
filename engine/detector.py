@@ -111,7 +111,24 @@ def _build_daily_from_m1(ticker):
 
 
 def _build_m1(ticker):
-    """M1 из mt5_continuous, fallback prices_5min."""
+    """M1 из PG bars_1m (live-источник), fallback CH mt5_continuous/prices_5min."""
+    # 1. PG bars_1m — основной (свежий, live)
+    try:
+        conn = pg_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT EXTRACT(EPOCH FROM bt)::bigint, opn, hi, lo, prc, vol
+            FROM futures.bars_1m
+            WHERE ticker = %s AND bt >= now() - INTERVAL '2 days'
+            ORDER BY bt
+        """, (ticker,))
+        r = cur.fetchall()
+        cur.close(); conn.close()
+        if r:
+            return _bars_from_rows(r)
+    except Exception:
+        pass
+    # 2. CH mt5_continuous
     ch = cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
     r = ch.query(f"""
         SELECT toUnixTimestamp(toDateTime(bt)), opn, hi, lo, prc, vol
@@ -130,9 +147,15 @@ def _build_m1(ticker):
     ch.close()
     if not r:
         return None
+    return _bars_from_rows(r)
+
+
+def _bars_from_rows(r):
+    """Собрать bar_data из строк (ts, opn, hi, lo, prc, vol)."""
     n = min(200, len(r))
-    bars = [{'ts': r[-n+i][0], 'opn': r[-n+i][1], 'hi': r[-n+i][2],
-             'lo': r[-n+i][3], 'prc': r[-n+i][4], 'vol': r[-n+i][5]} for i in range(n)]
+    bars = [{'ts': int(r[-n+i][0]), 'opn': float(r[-n+i][1]), 'hi': float(r[-n+i][2]),
+             'lo': float(r[-n+i][3]), 'prc': float(r[-n+i][4]), 'vol': float(r[-n+i][5] or 0)}
+            for i in range(n)]
     closes = [b['prc'] for b in bars]
     bd = {
         'prc': closes[-1], 'hi': bars[-1]['hi'], 'lo': bars[-1]['lo'],
@@ -141,6 +164,48 @@ def _build_m1(ticker):
         'bars_list': bars,
         'ts': bars[-1]['ts'],
     }
+    return bd
+
+
+def attach_day_net(bd, ticker):
+    """Присвоить day_net (из PG futoi_iss) каждому бару — для OI-стратегии."""
+    if not bd or not bd.get('bars_list'):
+        return bd
+    try:
+        conn = pg_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT EXTRACT(EPOCH FROM bt)::bigint, buy_fiz, sell_fiz, buy_yur, sell_yur
+            FROM futures.futoi_iss
+            WHERE ticker = %s AND bt >= now() - INTERVAL '72 hours'
+            ORDER BY bt
+        """, (ticker,))
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        if not rows:
+            return bd
+        # day_start = первая запись IRK-дня (07:00 UTC)
+        day_start = {}
+        dn_by_ts = {}
+        for ts, fb, fs, yb, ys in rows:
+            d = int((ts - 7 * 3600) // 86400)
+            if d not in day_start:
+                day_start[d] = int(fb) - int(fs)
+            total = int(fb) + int(fs) + int(yb) + int(ys)
+            if total > 0:
+                dn_by_ts[ts] = (int(fb) - int(fs) - day_start[d]) / total * 100.0
+        import bisect as _bisect
+        dn_ts = sorted(dn_by_ts.keys())
+        for b in bd['bars_list']:
+            i = _bisect.bisect_right(dn_ts, b['ts']) - 1
+            if i >= 0:
+                b['day_net'] = dn_by_ts[dn_ts[i]]
+        # day_net для последнего бара (детект смотрит bars[-1])
+        last = bd['bars_list'][-1]
+        if 'day_net' in last:
+            bd['day_net'] = last['day_net']
+    except Exception:
+        pass
     return bd
 
 
@@ -209,6 +274,9 @@ def main():
         bd = build_bar_data(ticker, strategy=strategy)
         if not bd:
             continue
+        # Для OI: подгрузить day_net из PG futoi_iss
+        if strategy in ('oi', 'oi_dom'):
+            bd = attach_day_net(bd, ticker)
         try:
             signal = fn(bd, ticker, params)
         except Exception as e:
