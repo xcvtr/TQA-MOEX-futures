@@ -168,6 +168,26 @@ Common pool лучше т.к. сигналы редко пересекаются
 
 ---
 
+## 🏗 Архитектура данных (14.08.2026): LIVE = PG, CH = только бэктесты
+
+**Live (папер/detector/executor) читает ТОЛЬКО PG.** CH для live не используется (проверено: блокировка порта 8123 не ломает папер).
+
+| Данные | Где live | Где бэктесты | Обновление |
+|---|---|---|---|
+| M1 бары | `futures.bars_1m` (14 дней, autopurge) | `moex.mt5_continuous` (вся глубина) | мост dual-write |
+| OI (day_net) | `futures.futoi_iss` (14 дней, autopurge) | `moex.futoi` (вся глубина) | loader.py (ISS) |
+| Дневные close (dayofweek) | `futures.bars_d1` (120 дней) | — | load_bars_d1.py (cron 14:00) |
+| Объёмы (лимиты) | `futures.daily_vol` | — | ISS + кэш |
+| Стакан (CVD/oi_dom) | `futures.dom` | `moex.dom_qsh` | мост |
+
+**Мост (mt5_moex_bridge.py, в контейнере mt5-finam)**: пишет M1 в CH (вся глубина) + PG bars_1m (14 дней, autopurge).
+
+**Ключевые файлы**: `run_paper_trader.py` (корень), `strategies/common/paper_trader.py`, `engine/detector.py`, `engine/executor.py` — все без CH-вызовов (только fallback'и в detector для daily, не срабатывают при живом PG).
+
+**Правило**: live НИКОГДА не должен зависеть от CH. Если PG упал — папер стоп (не торгует на устаревшем), это безопаснее чем fallback на CH.
+
+---
+
 ## 📁 Данные и артефакты
 
 ### ClickHouse (10.0.0.60:8123, db=moex)
