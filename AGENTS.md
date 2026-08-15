@@ -1,6 +1,6 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 228 (2026-08-15)** — MOEX-div верифицирован (фьючерс-only базис CAGR 24.5%), TQA-moex-div-framework, отказоустойчивость
+**Последний чекпойнт: 229 (2026-08-15)** — Базис M1-пересчёт: НЕ edge (связка 6.5%, фьючерс −12%). MOEX-div закрыт. M1-пересчёт обязателен после D1-оценки
 - **✅ ВЕРИФИКАЦИЯ (15.08, финальная)**: OI +902%/DD 7.8%/N=406, dayofweek +156%/DD 4%/N=282 — оба через общий Backtester, Docker=хост (воспроизводимо). Live-параметры PG = бэктест.
 - **🚀 LIVE: OI (BR/NG/SV) + dayofweek (SBRF/SPYF) enabled.** dayofweek включён с оптимумом 2026:
   **SBRF risk 10% (2x) + SPYF risk 25% (4x)**, trailing act 0.5%/trail 0.25%, SL 1.5%, timeout 24 (EOD), skip июль
