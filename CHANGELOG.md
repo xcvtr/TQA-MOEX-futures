@@ -1,3 +1,18 @@
+## [228] 2026-08-15
+### Added
+- **Базис-арбитраж фьючерсами**: CAGR 24.5% (2023-26), MTM DD 1.8% — «зачем акции, есть фьючерсы»
+- TQA-moex-div-framework (новый проект): верификация MOEX-div через фреймворк
+- Watchdog'и: мост (авто-рестарт) + freshness (алерты)
+### Verified
+- Дивидендный кэпчур НЕ edge: avg −1.7% (2024 −127%, 2025 −43%)
+- Их 64-367% — артефакты (ОФЗ-экспонента, без комиссии, неполные данные)
+- MT5-дубль на 63 невозможен (нет AVX2); 60=64 один хост
+### Fixed
+- load_m1_from_ch: query mt5_continuous (потерян при рефакторинге)
+### Changed
+- PG failover 60→63 (lag=0), watchdog'и в cron
+- Checkpoint: checkpoint/228-moex-div-basis-futures-failover.md
+
 ## [227] 2026-08-15
 ### Changed
 - **dayofweek включён в live**: SBRF risk 10% (2x), SPYF risk 25% (4x), trailing 0.5/0.25, SL 1.5%, EOD
