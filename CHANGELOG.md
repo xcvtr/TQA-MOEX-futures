@@ -1,3 +1,16 @@
+## [230] 2026-08-15
+### Added
+- dayofweek v2: доп. сигналы Вт L / Пт S (по prev_week_ret) — N 337→679, стабильны по годам
+- dayofweek в live-терминах (risk_pct по ГО): DD 15% = risk 200% → CAGR 175%
+- Портфель OI+DW: w_OI=0.3 + DW risk 200% → ROI +1197%, суммарный DD −15.1% (1 год)
+### Changed
+- strategies/dayofweek/detect.py: +Вт L/Пт S, фикс ночной сессии (hour<7 skip)
+- Методика: leverage-скрипт НЕ эквивалентен live risk_pct (eq×risk/ГО)
+### Warning
+- Портфель требует аудита: 1 год (не 2023-26), data_source OI (bars vs mt5_continuous),
+  Backtester DW (44 сделки) vs M1-скрипт (188) — несопоставимы, конкуренция за капитал
+- Checkpoint: checkpoint/230-dayofweek-v2-portfolio-15dd.md
+
 ## [229] 2026-08-15
 ### Fixed
 - Чекп.228 (базис CAGR 24.5%) АННУЛИРОВАН — D1-модель не учитывала движение фьючерса
