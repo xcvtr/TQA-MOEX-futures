@@ -1,3 +1,13 @@
+## [231] 2026-08-16
+### Added
+- TZ-СТАНДАРТ: всё в МСК (биржевое время), naive datetime
+- План: сканирование → фикс лоадеров → фикс скриптов → пересчёт
+### Fixed
+- TZ-баг dayofweek load_m1 (fromtimestamp +8 IRK) — эталонный паттерн parse naive
+### Changed
+- Запрет toUnixTimestamp+fromtimestamp для МСК-данных (CH63 server UTC трактует как UTC)
+- Checkpoint: checkpoint/231-tz-standard-msk.md
+
 ## [230] 2026-08-15
 ### Added
 - dayofweek v2: доп. сигналы Вт L / Пт S (по prev_week_ret) — N 337→679, стабильны по годам
