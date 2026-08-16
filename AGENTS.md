@@ -1,9 +1,9 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 230 (2026-08-16)** — АУДИТ: портфель OI+DW аннулирован (TZ-фикс, компаунд-масштаб неверен, DD15 недостижим). dayofweek v2: +374% при 33% (после TZ-фикса)
-- **✅ ВЕРИФИКАЦИЯ (15.08, финальная)**: OI +902%/DD 7.8%/N=406, dayofweek +156%/DD 4%/N=282 — оба через общий Backtester, Docker=хост (воспроизводимо). Live-параметры PG = бэктест.
-- **🚀 LIVE: OI (BR/NG/SV) + dayofweek (SBRF/SPYF) enabled.** dayofweek включён с оптимумом 2026:
-  **SBRF risk 10% (2x) + SPYF risk 25% (4x)**, trailing act 0.5%/trail 0.25%, SL 1.5%, timeout 24 (EOD), skip июль
+**Последний чекпойнт: 231 (2026-08-16)** — TZ-стандарт: всё в МСК. Перезалиты mt5_continuous/futures/futoi. 🔴 OI АННУЛИРОВАН (+232% честно vs +4154% артефакт TZ-рассинхрона). dayofweek устоял (63%)
+- **🔴 OI (BR/NG/SV) — НЕ РАБОТАЕТ на чистых данных**: ROI +232%, PF 1.32, WR 47.7% (было +4154%/3.85/69%). Причина: futoi был сдвинут −5ч vs mt5 → look-ahead. ОТКЛЮЧИТЬ из live!
+- **✅ dayofweek (SBRF/SPYF) — ЕДИНСТВЕННЫЙ подтверждённый edge**: risk 33/33% → CAGR 63% DD 3.1%; live (10/25%) → CAGR 38% DD 2.0%
+- **TZ-стандарт (решено раз и навсегда)**: всё в МСК. Лоадеры: MT5 r[time]-3ч → aware UTC. Запись: CH60=МСК-строка, CH63=UTC-строка. Чтение: toTimeZone(toDateTime(bt),'Europe/Moscow'). Битые TZ-данные перезалиты (M1/H1/D1/futoi)
 - **dayofweek 2026 (общий капитал 200К, M1)**: SBRF 2x+SPYF 4x = **+130% ROI, MTM DD 16.1%** (цель 100-200% ✅)
   Варианты: 2x/6x=+218% DD21%, 4x/6x=+232% DD26%
 - **dayofweek верифицирован на M1**: SBRF +434% MTM DD 10.7% (2023-26), SPYF +63% DD 4.5%,
