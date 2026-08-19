@@ -30,6 +30,34 @@ MAP = {
     'CR':   ('CNY',   'CNY_FUT'),
     'SV':   ('SILV',  'SILVRU'),
     'BR':   ('BR',    None),   # Brent нет в XLS ПГО → биржевое ГО
+    'SBRF': ('SBRF',  'SBER_FUT'),
+    'SPYF': ('SPYF',  None),   # нет ПГО
+    'TATN': ('TATN',  None),   # нет в XLS
+    'VTBR': ('VTBR',  'VTBR_FUT'),
+    'LKOH': ('LKOH',  'LKOH_FUT'),
+    'MGNT': ('MGNT',  None),   # нет в XLS
+    'AFLT': ('AFLT',  None),
+    'SBPR': ('SBPR',  'SBERP_FUT'),
+    'SNGR': ('SNGR',  None),
+    'TRNF': ('TRNF',  None),
+    'SNGP': ('SNGP',  'GAZP_FUT'),
+    'RTKM': ('RTKM',  None),
+    'NOTK': ('NOTK',  None),
+    'MTSI': ('MTSI',  None),
+    'HYDR': ('HYDR',  None),
+    'FEES': ('FEES',  None),
+    'ED':   ('ED',    'EDRU'),
+    'X5':   ('X5',    None),
+    'TT':   ('TT',    None),
+    'BTC':  ('BTC',   None),   # нет в XLS → биржевое
+    'ETH':  ('ETH',   'ETHA_FUT'),
+    'HANG': ('HANG',  None),
+    'NASD': ('NASD',  'NASD'),
+    'MIX':  ('MIX',   'MIX'),
+    'RTSI': ('RTSI',  'RTS'),
+    'IMOEXF': ('IMOEXF', 'IMOEXF'),
+    'GLDRUBF': ('GLDRUBF', None),
+    'EURRUBF': ('EURRUBF', None),
 }
 
 XLS_URL = 'https://www.finam.ru/files/u/dw/files/commissionrates/marjsettings/instrumenty__edp_{date}.xlsx'
@@ -122,7 +150,12 @@ def main():
         go_old = float(row[0]) if row else 0
         ratio = f'{kpur/ksur:.4f}' if kpur else '-'
         print(f'{ticker:5s} {code:12s} {med:>8.0f} {kpur if kpur else 0:>6} {ksur if ksur else 0:>6} {ratio:>7s} {go_new:>8.0f} {go_old:>8.0f}')
-        cur.execute("UPDATE futures.ticker_specs SET go = %s WHERE ticker = %s", (go_new, ticker))
+        # UPSERT: если тикера нет в PG (LKOH/BTC/ETH...) — INSERT, иначе UPDATE
+        cur.execute("""
+            INSERT INTO futures.ticker_specs (ticker, go, fee_entry, min_step, step_price, lot_volume)
+            VALUES (%s, %s, 4.0, 0, 0, 1)
+            ON CONFLICT (ticker) DO UPDATE SET go = EXCLUDED.go
+        """, (ticker, go_new))
 
     conn.commit()
     cur.close(); conn.close()
