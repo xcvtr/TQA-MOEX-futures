@@ -138,14 +138,22 @@ def main():
             print(f"   Available symbols: {len(available)} total", flush=True)
         
         # Auto-detect active symbols for each ticker
+        # 🚨 ФИКС: используем ALLFUT-континуумы, НЕ квартальные коды!
+        # MOEX_PREFIXES ('SV'→'SV') находил АКЦИЮ Сбербанка (370₽) вместо
+        # фьючерса SILV (67₽) — мусор в mt5_continuous. ALLFUT — правильные.
+        # Маппинг ALLFUT-имя → канонический тикер CH (SILV→SV, GOLD→GD, CNY→CR)
+        ALLFUT_TO_TICKER = {
+            'ALLFUTSILV': 'SV', 'ALLFUTGOLD': 'GD', 'ALLFUTCNY': 'CR',
+            'ALLFUTEu': 'Eu', 'ALLFUTGZ': 'GZ',
+        }
         active_symbols = {}
-        for ticker, prefix in MOEX_PREFIXES.items():
-            found = find_active_symbol(mt5, prefix, all_syms)
-            if found:
-                active_symbols[ticker] = found
-                print(f"   {ticker} → {found}", flush=True)
-            else:
+        for ticker, sym in ALLFUT_PREFIXES.items():
+            if not mt5.symbol_info(sym):
                 print(f"   {ticker} → not found", flush=True)
+                continue
+            ch_ticker = ALLFUT_TO_TICKER.get(sym, ticker)
+            active_symbols[ch_ticker] = sym
+            print(f"   {ch_ticker} → {sym}", flush=True)
         
         if not active_symbols:
             print("❌ No MOEX symbols found!", flush=True)
