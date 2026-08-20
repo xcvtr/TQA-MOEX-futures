@@ -144,7 +144,7 @@ def main():
         # Маппинг ALLFUT-имя → канонический тикер CH (SILV→SV, GOLD→GD, CNY→CR)
         ALLFUT_TO_TICKER = {
             'ALLFUTSILV': 'SV', 'ALLFUTGOLD': 'GD', 'ALLFUTCNY': 'CR',
-            'ALLFUTEu': 'Eu', 'ALLFUTGZ': 'GZ',
+            'ALLFUTROSN': 'RN', 'ALLFUTGAZR': 'GZ', 'ALLFUTEu': 'Eu', 'ALLFUTGZ': 'GZ',
         }
         active_symbols = {}
         for ticker, sym in ALLFUT_PREFIXES.items():
