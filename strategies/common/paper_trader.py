@@ -735,10 +735,16 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                 p['trailing_level'] = hi * (1 - p.get('trail', 0.003))
 
             exit_price = None
-            if p.get('trailing_activated') and lo <= p.get('trailing_level', 0):
+            # Fixed TP (mean_reversion): движение в нашу сторону на fixed_tp_pct
+            if p.get('fixed_tp_pct'):
+                fixed_tp_level = p['entry_price'] * (1 + float(p['fixed_tp_pct']) / 100)
+                if hi >= fixed_tp_level:
+                    exit_price = fixed_tp_level
+                    p['exit_reason'] = 'fixed_tp'
+            if exit_price is None and p.get('trailing_activated') and lo <= p.get('trailing_level', 0):
                 exit_price = p['trailing_level']
                 p['exit_reason'] = 'trailing_tp'
-            elif lo <= (p.get('pyra_base_price') or p['entry_price']) * (1 - p.get('stop_loss', 0.007)):
+            elif exit_price is None and lo <= (p.get('pyra_base_price') or p['entry_price']) * (1 - p.get('stop_loss', 0.007)):
                 exit_price = lo
                 p['exit_reason'] = 'stop_loss'
 
@@ -765,10 +771,16 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                 p['trailing_level'] = lo * (1 + p.get('trail', 0.003))
 
             exit_price = None
-            if p.get('trailing_activated') and hi >= p.get('trailing_level', 0):
+            # Fixed TP (mean_reversion): движение в нашу сторону на fixed_tp_pct
+            if p.get('fixed_tp_pct'):
+                fixed_tp_level = p['entry_price'] * (1 - float(p['fixed_tp_pct']) / 100)
+                if lo <= fixed_tp_level:
+                    exit_price = fixed_tp_level
+                    p['exit_reason'] = 'fixed_tp'
+            if exit_price is None and p.get('trailing_activated') and hi >= p.get('trailing_level', 0):
                 exit_price = p['trailing_level']
                 p['exit_reason'] = 'trailing_tp'
-            elif hi >= (p.get('pyra_base_price') or p['entry_price']) * (1 + p.get('stop_loss', 0.007)):
+            elif exit_price is None and hi >= (p.get('pyra_base_price') or p['entry_price']) * (1 + p.get('stop_loss', 0.007)):
                 exit_price = hi
                 p['exit_reason'] = 'stop_loss'
 
@@ -1074,6 +1086,8 @@ def run_tick(strategy_filter=None, mode=None):
                 'activation': entry.get('trailing_activation', 0.005),
                 'trail': entry.get('trailing_trail', 0.003),
                 'stop_loss': entry.get('stop_loss', 0.007),
+                'fixed_tp_pct': params.get('fixed_tp_pct'),
+                'timeout_hours': params.get('timeout_hours'),
                 'timeout_bars': timeout_bars,
                 'pct': specs.get(ticker, {}).get('pct', 1.0),
                 }
