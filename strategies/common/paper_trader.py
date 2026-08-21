@@ -28,12 +28,14 @@ def _load_strategies():
     from strategies.dragon.prod.engine import check_signal as dragon_check
     from strategies.oi.prod.engine import check_signal as oi_check
     from strategies.oi_dom.prod.engine import check_signal as oi_dom_check
+    from strategies.mean_reversion.prod.engine import check_signal as mr_check
     STRATEGY_MAP['stop_hunt'] = sh_check
     STRATEGY_MAP['cvd'] = cvd_check
     STRATEGY_MAP['impulse_return'] = imp_check
     STRATEGY_MAP['dragon'] = dragon_check
     STRATEGY_MAP['oi'] = oi_check
     STRATEGY_MAP['oi_dom'] = oi_dom_check
+    STRATEGY_MAP['mean_reversion'] = mr_check
 
 # ── Config ────────────────────────────────────────────────────────────────
 CH_HOST = os.getenv('MOEX_CH_HOST', '10.0.0.60')
@@ -341,8 +343,8 @@ def get_latest_bars(ticker, asset, n_bars=1500):
     """Get last N 1-min OHLC bars.
     
     Priority:
-    0. CH moex.mt5_continuous (FINAM, live, M1→M5 OHLC)
-    1. PG futures.bars_1m (live, autopurge 2mo, для paper trader)
+    0. CH moex.mt5_continuous (FINAM, live) — ЕДИНЫЙ источник с бэктестером!
+    1. PG futures.bars_1m (live, fallback)
     2. CH moex.mt5_bars (полная история, для backtest)
     3. CH moex.tradestats_fo (AlgoPack real OHLC)
     4. CH moex.prices_5min (ISS snapshots, fallback)
@@ -350,7 +352,31 @@ def get_latest_bars(ticker, asset, n_bars=1500):
     """
     now = datetime.now(timezone.utc)
     
-    # ── 0. PG bars_1m (единственный источник для live) ───────────────────
+    # ── 0. CH moex.mt5_continuous (как бэктестер — синхронизация live=тест!) ──
+    try:
+        import clickhouse_connect as _cc
+        ch = _cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+        rows = ch.query(f"""
+            SELECT toTimeZone(toDateTime(bt),'Europe/Moscow') bt, opn, hi, lo, prc
+            FROM moex.mt5_continuous
+            WHERE ticker = %(tk)s
+            ORDER BY bt DESC LIMIT %(n)s
+        """, parameters={'tk': ticker, 'n': n_bars + 5}).result_rows
+        ch.close()
+        if rows:
+            import pandas as pd
+            df = pd.DataFrame(rows, columns=['bt', 'opn', 'hi', 'lo', 'prc'])
+            df = df.sort_values('bt').reset_index(drop=True)
+            age = (now - df.iloc[-1]['bt'].astimezone(timezone.utc)).total_seconds() / 60
+            if age < 10:
+                return df
+            log.warning("⚠ CH mt5_continuous STALE for %s: age=%.0f min", ticker, age)
+        else:
+            log.warning("⚠ CH mt5_continuous EMPTY for %s", ticker)
+    except Exception as e:
+        log.error("⚠ CH mt5_continuous ERROR for %s: %s", ticker, e)
+    
+    # ── 1. PG bars_1m (fallback) ──────────────────────────────────────
     try:
         import psycopg2
         conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
