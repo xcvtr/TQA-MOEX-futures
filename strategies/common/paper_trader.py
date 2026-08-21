@@ -933,10 +933,11 @@ def run_tick(strategy_filter=None, mode=None):
         if not detect_bars:
             continue
         last_d = detect_bars[-1]  # последний ПОЛНЫЙ detect бар
-        # Для bars_list НЕ включаем незакрытый текущий бар:
-        # последний detect бар считается закрытым только если его период завершён.
-        # Здесь last_d — последний полный бар (df уже содержит только закрытые M1).
-        
+        # For bars_list НЕ включаем незакрытый текущий бар:
+        # последний detect бар (текущий период) НЕ закрыт — исключаем!
+        # Иначе mean_reversion сигналит по неполному H1 (look-ahead).
+        # bars_list = ТОЛЬКО закрытые бары (как бэктестер: детект по закрытому).
+        closed_bars = detect_bars[:-1] if len(detect_bars) > 1 else detect_bars
         bar_data[ticker] = {
             'bt': last['bt'],
             'opn': float(last['opn']),
@@ -946,12 +947,12 @@ def run_tick(strategy_filter=None, mode=None):
             'prc_prev': float(second_last['prc']),
             'vol': current_vol,
             'dcvd_z': dcvd_z,
-            'close_hist': [float(b['prc']) for b in detect_bars[:-1]],
+            'close_hist': [float(b['prc']) for b in closed_bars],
             'vol_hist': vol_hist,
-            'bars_list': detect_bars,  # detect бары для check_signal (как бэктест: dh + [db])
+            'bars_list': closed_bars,  # detect бары для check_signal — ТОЛЬКО закрытые (как бэктест)
         }
         # Build hi/lo history for signal check (need 60+ for lookback=40 + buffer)
-        hi_hist = [float(b['hi']) for b in detect_bars[:-1]][-61:]
+        hi_hist = [float(b['hi']) for b in closed_bars][-61:]
         lo_hist = [float(b['lo']) for b in detect_bars[:-1]][-61:]
         bar_data[ticker]['hi_hist'] = hi_hist
         bar_data[ticker]['lo_hist'] = lo_hist
