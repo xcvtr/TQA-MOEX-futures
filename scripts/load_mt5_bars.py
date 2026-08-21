@@ -23,7 +23,7 @@ PG_CONFIG = dict(
 )
 
 RETENTION_DAYS = 60
-TICKERS = ['MM','GZ','NG','BR','SV','CR','GD','RN','Si']
+TICKERS = ['MM','GZ','NG','BR','SV','CR','GD','RN','Si','TATN','SNGP','SBRF','SPYF','VTBR','LKOH','GAZR','Eu','ED','MIX','RTSI','IMOEXF','NASD','HANG','BTC','ETH','AFLT','MTSI','RTKM','SNGR','SBPR','TRNF','MGNT','FEES','HYDR','ES']
 
 def load_bars():
     now = datetime.now(timezone.utc)

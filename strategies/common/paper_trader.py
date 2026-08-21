@@ -343,8 +343,8 @@ def get_latest_bars(ticker, asset, n_bars=1500):
     """Get last N 1-min OHLC bars.
     
     Priority:
-    0. CH moex.mt5_continuous (FINAM, live) — ЕДИНЫЙ источник с бэктестером!
-    1. PG futures.bars_1m (live, fallback)
+    0. PG futures.bars_1m (live, для paper trader — ПРОД-источник!)
+    1. CH moex.mt5_continuous (FINAM, live, fallback)
     2. CH moex.mt5_bars (полная история, для backtest)
     3. CH moex.tradestats_fo (AlgoPack real OHLC)
     4. CH moex.prices_5min (ISS snapshots, fallback)
@@ -352,31 +352,7 @@ def get_latest_bars(ticker, asset, n_bars=1500):
     """
     now = datetime.now(timezone.utc)
     
-    # ── 0. CH moex.mt5_continuous (как бэктестер — синхронизация live=тест!) ──
-    try:
-        import clickhouse_connect as _cc
-        ch = _cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
-        rows = ch.query(f"""
-            SELECT toTimeZone(toDateTime(bt),'Europe/Moscow') bt, opn, hi, lo, prc
-            FROM moex.mt5_continuous
-            WHERE ticker = %(tk)s
-            ORDER BY bt DESC LIMIT %(n)s
-        """, parameters={'tk': ticker, 'n': n_bars + 5}).result_rows
-        ch.close()
-        if rows:
-            import pandas as pd
-            df = pd.DataFrame(rows, columns=['bt', 'opn', 'hi', 'lo', 'prc'])
-            df = df.sort_values('bt').reset_index(drop=True)
-            age = (now - df.iloc[-1]['bt'].astimezone(timezone.utc)).total_seconds() / 60
-            if age < 10:
-                return df
-            log.warning("⚠ CH mt5_continuous STALE for %s: age=%.0f min", ticker, age)
-        else:
-            log.warning("⚠ CH mt5_continuous EMPTY for %s", ticker)
-    except Exception as e:
-        log.error("⚠ CH mt5_continuous ERROR for %s: %s", ticker, e)
-    
-    # ── 1. PG bars_1m (fallback) ──────────────────────────────────────
+    # ── 0. PG bars_1m (единственный источник для live — ПРОД) ────────────
     try:
         import psycopg2
         conn = psycopg2.connect(host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASS, connect_timeout=3)
@@ -401,10 +377,33 @@ def get_latest_bars(ticker, asset, n_bars=1500):
             log.warning("⚠ PG bars_1m STALE for %s: age=%.0f min — данные устарели, не торгуем", ticker, age)
             return df
         log.warning("⚠ PG bars_1m EMPTY for %s — нет данных", ticker)
-        return None
     except Exception as e:
         log.error("⚠ PG bars_1m ERROR for %s: %s — live БЕЗ данных, стоп", ticker, e)
-        return None
+    
+    # ── 1. CH moex.mt5_continuous (fallback) ──────────────────────────────
+    try:
+        import clickhouse_connect as _cc
+        ch = _cc.get_client(host=CH_HOST, port=CH_PORT, database=CH_DB)
+        rows = ch.query(f"""
+            SELECT toTimeZone(toDateTime(bt),'Europe/Moscow') bt, opn, hi, lo, prc
+            FROM moex.mt5_continuous
+            WHERE ticker = %(tk)s
+            ORDER BY bt DESC LIMIT %(n)s
+        """, parameters={'tk': ticker, 'n': n_bars + 5}).result_rows
+        ch.close()
+        if rows:
+            import pandas as pd
+            df = pd.DataFrame(rows, columns=['bt', 'opn', 'hi', 'lo', 'prc'])
+            df = df.sort_values('bt').reset_index(drop=True)
+            age = (now - df.iloc[-1]['bt'].astimezone(timezone.utc)).total_seconds() / 60
+            if age < 10:
+                return df
+            log.warning("⚠ CH mt5_continuous STALE for %s: age=%.0f min", ticker, age)
+        else:
+            log.warning("⚠ CH mt5_continuous EMPTY for %s", ticker)
+    except Exception as e:
+        log.error("⚠ CH mt5_continuous ERROR for %s: %s", ticker, e)
+    return None
 
 
 def get_volume_data(ticker, n_bars=55):
