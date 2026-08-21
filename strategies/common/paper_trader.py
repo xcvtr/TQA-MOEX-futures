@@ -663,6 +663,9 @@ def manage_positions(positions, bar_data, specs, bar_idx):
         # Timeout (by bars or by real time)
         age_bars = bar_idx - p['entry_bar']
         timeout_triggered = age_bars >= p.get('timeout_bars', 12) or age_sec > p.get('timeout_bars', 12) * 300
+        # Для mean_reversion: timeout_hours (часы) — как бэктест (age_sec > timeout_hours*3600)
+        if p.get('strategy') == 'mean_reversion' and p.get('timeout_hours') and not timeout_triggered:
+            timeout_triggered = age_sec > float(p['timeout_hours']) * 3600
         # Для OI: max_hold_h (часы) — как бэктест (age_sec > max_hold_h*3600)
         if p.get('strategy') == 'oi' and not timeout_triggered:
             max_hold_h = p.get('max_hold_h', 120)
@@ -765,18 +768,19 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                 p['trailing_level'] = hi * (1 - p.get('trail', 0.003))
 
             exit_price = None
-            # Fixed TP (mean_reversion): движение в нашу сторону на fixed_tp_pct
-            if p.get('fixed_tp_pct'):
+            # 🚨 Порядок как в бэктестере (broker.py): SL ПЕРВЫМ, потом TP
+            # (worst case: если в баре и SL, и TP — берём SL, консервативно)
+            if lo <= (p.get('pyra_base_price') or p['entry_price']) * (1 - p.get('stop_loss', 0.007)):
+                exit_price = lo
+                p['exit_reason'] = 'stop_loss'
+            elif p.get('fixed_tp_pct'):
                 fixed_tp_level = p['entry_price'] * (1 + float(p['fixed_tp_pct']) / 100)
                 if hi >= fixed_tp_level:
                     exit_price = fixed_tp_level
                     p['exit_reason'] = 'fixed_tp'
-            if exit_price is None and p.get('trailing_activated') and lo <= p.get('trailing_level', 0):
+            elif p.get('trailing_activated') and lo <= p.get('trailing_level', 0):
                 exit_price = p['trailing_level']
                 p['exit_reason'] = 'trailing_tp'
-            elif exit_price is None and lo <= (p.get('pyra_base_price') or p['entry_price']) * (1 - p.get('stop_loss', 0.007)):
-                exit_price = lo
-                p['exit_reason'] = 'stop_loss'
 
             if exit_price:
                 # Исполнение по стакану (dom) или по цене срабатывания (sim)
@@ -801,18 +805,18 @@ def manage_positions(positions, bar_data, specs, bar_idx):
                 p['trailing_level'] = lo * (1 + p.get('trail', 0.003))
 
             exit_price = None
-            # Fixed TP (mean_reversion): движение в нашу сторону на fixed_tp_pct
-            if p.get('fixed_tp_pct'):
+            # 🚨 Порядок как в бэктестере (broker.py): SL ПЕРВЫМ, потом TP
+            if hi >= (p.get('pyra_base_price') or p['entry_price']) * (1 + p.get('stop_loss', 0.007)):
+                exit_price = hi
+                p['exit_reason'] = 'stop_loss'
+            elif p.get('fixed_tp_pct'):
                 fixed_tp_level = p['entry_price'] * (1 - float(p['fixed_tp_pct']) / 100)
                 if lo <= fixed_tp_level:
                     exit_price = fixed_tp_level
                     p['exit_reason'] = 'fixed_tp'
-            if exit_price is None and p.get('trailing_activated') and hi >= p.get('trailing_level', 0):
+            elif p.get('trailing_activated') and hi >= p.get('trailing_level', 0):
                 exit_price = p['trailing_level']
                 p['exit_reason'] = 'trailing_tp'
-            elif exit_price is None and hi >= (p.get('pyra_base_price') or p['entry_price']) * (1 + p.get('stop_loss', 0.007)):
-                exit_price = hi
-                p['exit_reason'] = 'stop_loss'
 
             if exit_price:
                 # Исполнение по стакану (dom) или по цене срабатывания (sim)
