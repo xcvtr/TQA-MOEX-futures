@@ -112,16 +112,22 @@ SPECS_CACHE = {}
 FEES_CACHE = {}
 
 def get_spec(tk):
-    """(ms, sp) тикера из PG ticker_specs (с кэшем)."""
+    """(ms, sp) тикера из PG ticker_specs (с кэшем). Защита от ms<=0/sp<=0 — иначе ZeroDivisionError."""
     if tk not in SPECS_CACHE:
+        ms, sp = 0.01, 1.0
         try:
             r = sh(f"psql -h {PG_HOST} -U postgres -d moex -t -A -c \"SELECT min_step, step_price FROM futures.ticker_specs WHERE ticker='{tk}'\"")
             parts = r.split('|') if r else []
-            ms = float(parts[0]) if len(parts) > 0 and parts[0] else 0.01
-            sp = float(parts[1]) if len(parts) > 1 and parts[1] else 1.0
-            SPECS_CACHE[tk] = (ms, sp)
+            if len(parts) > 0 and parts[0]:
+                ms = float(parts[0])
+            if len(parts) > 1 and parts[1]:
+                sp = float(parts[1])
+            if ms <= 0 or sp <= 0:
+                print(f"⚠️ ticker_specs {tk}: min_step={ms}, step_price={sp} — использую fallback (0.01, 1.0)", file=sys.stderr)
+                ms, sp = 0.01, 1.0
         except Exception:
-            SPECS_CACHE[tk] = (0.01, 1.0)
+            ms, sp = 0.01, 1.0
+        SPECS_CACHE[tk] = (ms, sp)
     return SPECS_CACHE[tk]
 
 def fee2(tk):
@@ -150,13 +156,19 @@ def fmt_pos(p):
     # UPnL открытой позиции: p['pnl']=0 до закрытия — считаем по текущей цене (MTM)
     pnl = float(p.get('pnl', 0))
     if pnl == 0:
-        px = get_last_price(tk)
-        if px and ep > 0:
-            ms, sp = get_spec(tk)
-            if d == 'long':
-                pnl = (px - ep) / ms * sp * ct - fee2(tk) * ct
-            else:
-                pnl = (ep - px) / ms * sp * ct - fee2(tk) * ct
+        try:
+            px = get_last_price(tk)
+            if px and ep > 0:
+                ms, sp = get_spec(tk)
+                if d == 'long':
+                    pnl = (px - ep) / ms * sp * ct - fee2(tk) * ct
+                else:
+                    pnl = (ep - px) / ms * sp * ct - fee2(tk) * ct
+        except Exception as e:
+            print(f"⚠️ fmt_pos {tk}: pnl calc error: {e}", file=sys.stderr)
+            pnl = None
+    if pnl is None:
+        pnl_s = "UPnL n/a"
     hold_h = p.get('max_hold_h', 72)
     et_raw = p.get('entry_time', '')
     age_h = 0.0

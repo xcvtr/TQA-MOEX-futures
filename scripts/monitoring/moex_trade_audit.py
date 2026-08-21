@@ -18,9 +18,9 @@ PAUSE_FILE = os.path.expanduser('~/.hermes/scripts/.moex_pause_flag')
 REVIEW_FILE = os.path.expanduser('~/.hermes/scripts/.moex_review_pending')
 DEAL_FILE = os.path.expanduser('~/.hermes/scripts/.moex_deal_pending')  # флаг для глубокого ИИ-отчёта
 
-PORTFOLIO = {'BR', 'NG', 'SV'}          # live OI тикеры
-RISKS = {'BR': 0.15, 'NG': 0.10, 'SV': 0.05}
-GO = {'BR': 27606, 'NG': 6093, 'SV': 10971}  # ПГО (актуальные)
+PORTFOLIO = {'BR', 'NG', 'SV', 'TATN', 'SNGP'}  # fallback; в main() переопределяется из PG futures.portfolio (enabled)
+RISKS = {'BR': 0.15, 'NG': 0.10, 'SV': 0.05, 'TATN': 0.35, 'SNGP': 0.35}  # mean_reversion: 0.35 из params
+GO = {'BR': 27606, 'NG': 6093, 'SV': 10971, 'TATN': 17305, 'SNGP': 8284}  # ПГО (актуальные; TATN/SNGP из ticker_specs)
 PAUSE_DD = 20.0                          # DD > 20% → пауза
 PAUSE_HOURS = 6                          # авто-снятие паузы через 6ч
 STALE_PCT = 1.5                          # вход по ушедшей цене >1.5% → force_close
@@ -76,6 +76,17 @@ def main():
 
     conn = get_pg()
     cur = conn.cursor()
+
+    # Живой портфель — из PG (enabled), НЕ хардкод: 19.08 в live добавлены mean_reversion (TATN/SNGP),
+    # а хардкод {'BR','NG','SV'} force-закрывал их как «вне портфеля» (баг 21.08, аудит_close ×3).
+    portfolio = set(PORTFOLIO)
+    try:
+        cur.execute("SELECT DISTINCT ticker FROM futures.portfolio WHERE enabled")
+        live = {r[0] for r in cur.fetchall()}
+        if live:
+            portfolio = live
+    except Exception:
+        pass
 
     # ── 0. АВТО-ВОЗОБНОВЛЕНИЕ: пауза старше лимита → снять ──
     resumed = False
@@ -181,8 +192,8 @@ def main():
 
     for p in open_pos:
         tk = p.get('ticker', '')
-        if tk and tk not in PORTFOLIO:
-            auto_close.append((p, f"тикер {tk} вне портфеля (BR/NG/SV) — legacy/мусор"))
+        if tk and tk not in portfolio:
+            auto_close.append((p, f"тикер {tk} вне портфеля (live: {sorted(portfolio)}) — legacy/мусор"))
             alerts.append(f"🚨 ЗАКРЫВАЮ {tk}: вне портфеля!")
 
     # Лот вне формулы (risk × min(eq, cap) / GO)

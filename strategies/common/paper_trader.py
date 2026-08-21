@@ -232,8 +232,8 @@ def load_specs(tickers):
     return {
         str(r[0]): {
             'go': float(r[1]) if r[1] else 0,
-            'sp': float(r[2]) if r[2] else 1.0,
-            'ms': float(r[3]) if r[3] else 0.01,
+            'sp': float(r[2]) if r[2] and float(r[2]) > 0 else 1.0,
+            'ms': float(r[3]) if r[3] and float(r[3]) > 0 else 0.01,
             'lot': int(r[4]) if r[4] else 1,
             'pct': float(r[5]) if r[5] else 1.0,
             'asset': str(r[6]),
@@ -604,7 +604,12 @@ def _close_pos(p, close, ms, sp, specs, ticker, reason):
             pass
     # sim fallback
     exit_px = close - ms if p['direction'] == 'long' else close + ms
-    pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) * p.get('contracts', 1) - fee * 2 * p.get('contracts', 1)
+    ct = p.get('contracts', 1)
+    if p['direction'] == 'long':
+        pnl = (exit_px - p['entry_price']) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) * ct - fee * 2 * ct
+    else:
+        # short: профит при exit < entry → (entry - exit), НЕ (exit - entry) (был баг знака!)
+        pnl = (p['entry_price'] - exit_px) / ms * sp * p.get('pct', 1.0) * max(0.001, p.get('rem', 1)) * ct - fee * 2 * ct
     return exit_px, pnl + p.get('part_pnl', 0)
 
 
