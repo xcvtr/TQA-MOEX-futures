@@ -62,7 +62,7 @@ def load_bars():
         if not rows:
             continue
         
-        batch = [(ticker, r[0].astimezone(timezone.utc).replace(tzinfo=None), 
+        batch = [(ticker, r[0].replace(tzinfo=None), 
                   float(r[1]), float(r[2]), float(r[3]), float(r[4]),
                   int(r[5]) if r[5] else 0) for r in rows]
         
