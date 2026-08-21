@@ -23,7 +23,10 @@ RISKS = {'BR': 0.15, 'NG': 0.10, 'SV': 0.05, 'TATN': 0.35, 'SNGP': 0.35}  # mean
 GO = {'BR': 27606, 'NG': 6093, 'SV': 10971, 'TATN': 17305, 'SNGP': 8284}  # ПГО (актуальные; TATN/SNGP из ticker_specs)
 PAUSE_DD = 20.0                          # DD > 20% → пауза
 PAUSE_HOURS = 6                          # авто-снятие паузы через 6ч
-STALE_PCT = 1.5                          # вход по ушедшей цене >1.5% → force_close
+STALE_PCT = 5.0                          # вход по ушедшей цене >5% → force_close
+                                          # (было 1.5% — слишком жёстко для mean_reversion:
+                                          #  волатильные TATN/SNGP двигаются 1-2% за час — это
+                                          #  НЕ ошибка входа, а нормальное движение)
 
 import psycopg2
 import clickhouse_connect

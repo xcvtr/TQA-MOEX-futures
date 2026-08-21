@@ -1076,6 +1076,17 @@ def run_tick(strategy_filter=None, mode=None):
                     contracts = max(1, int(equity * 0.1 / s.get('go', 1)))
                     contracts = min(contracts, max_lots)
 
+                # 🚨 GO-лимит (как бэктестер executor.py): суммарное ГО всех
+                # открытых позиций + новая ≤ 50% equity. Без него папер открыл бы
+                # все 3 ноги сразу (ГО ~105% eq) — риск 2x от бэктеста!
+                go_used = sum((specs.get(p['ticker'], {}).get('go', 0)) * max(p.get('contracts', 1), 1)
+                              for p in positions if not p.get('closed', False))
+                go_new = s.get('go', 0) * contracts
+                if go_used + go_new > equity * 0.5:
+                    log.info("GO-limit: %s skip (used=%.0f + new=%.0f > %.0f)",
+                             ticker, go_used, go_new, equity * 0.5)
+                    continue
+
                 # Realistic slippage: 1 тик (лимитка по текущей цене, как бэктест LONG+h120)
                 # НЕ 2-5 тиков: на NG (ms=0.001, цена ~2.7) 3 тика = 0.11% — убивает edge
                 ms_val = ms
