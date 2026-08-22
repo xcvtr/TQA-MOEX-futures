@@ -9,7 +9,7 @@ Usage (Wine):
 Writes to: moex.mt5_continuous (CH)
 """
 import sys, os, time, json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 CH_HOST = '10.0.0.60'
 CH_PORT = 8123
@@ -167,6 +167,14 @@ def main():
         
         total = 0
         symbols_ok = 0
+        # Выходные (Сб/Вс) по МСК: MOEX закрыт, MT5 генерирует фантомные бары
+        # (повтор последней цены каждую минуту) — НЕ пишем мусор в CH.
+        msk_now = now + timedelta(hours=3)
+        if msk_now.weekday() >= 5:
+            print("   Weekend — skip (MOEX closed, MT5 phantom bars)", flush=True)
+            mt5.shutdown()
+            time.sleep(60)
+            continue
         for ticker, mt5_sym in active_symbols.items():
             rates = mt5.copy_rates_from_pos(mt5_sym, mt5.TIMEFRAME_M1, 0, 5)
             
