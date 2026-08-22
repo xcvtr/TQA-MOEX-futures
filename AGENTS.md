@@ -1,6 +1,17 @@
 # TQA-MOEX-futures
 
-**Последний чекпойнт: 231 (2026-08-16)** — TZ-стандарт: всё в МСК. Перезалиты mt5_continuous/futures/futoi. 🔴 OI АННУЛИРОВАН (+232% честно vs +4154% артефакт TZ-рассинхрона). dayofweek устоял (63%)
+**Последний чекпойнт: 234 (2026-08-22)** — Аудит equity папера mean_reversion: phantom PnL 21.08 найден, equity исправлен (198,497.77 → 199,760.73). Дашборд на :8091. Weekend-фикс моста.
+
+## ✅ LIVE: mean_reversion (SV/TATN/SNGP) — единственный подтверждённый edge
+- **Стратегия**: SHORT-only после роста: SV/TATN — H1-бар ret>0.6% → SHORT (TP/SL 1.2%/1.0%, hold 3ч/5ч); SNGP — окно 60м ret>0.6% → SHORT (TP/SL 2.0%, hold 5ч). Вход на открытии следующего бара, сопровождение M1 (SL первым), комиссия per-ticker (SV 7.66₽, TATN 5.05₽, SNGP 4₽), slip 2т, GO-лимит ≤50% eq
+- **Бэктест (risk 30%, чистые данные)**: портфель +2,235% (3г) DD 25.3% Calmar ~88; последний год +311% DD 29.5%. Все годы плюс у всех ног. Остальные 35 фьючерсов — нет edge (~4000 тестов)
+- **Live-папер** (с 21.08): Eq=199,760.73 (capital 200K, −0.12%), 4 сделки (TATN +627.60, TATN +339.60, SNGP +295.76, SV −1,502.23 timeout). Суббота/воскресенье — папер не торгует (cron 1-5)
+- **PG portfolio (futures.portfolio)**: enabled только mean_reversion (SV h1/1.2%/3ч/risk0.30, TATN h1/1.0%/5ч/0.30, SNGP window60/2.0%/5ч/0.30). OI/dayofweek/dragon/impulse_return/oi_dom — disabled
+- **Дашборд**: http://10.0.0.60:8091/ (карточки тикеров, Plotly equity+DD, сделки)
+- **Ватчдоги**: Hermes cron no_agent — 1d20af894165 (MR paper monitor), d3cef08223f0 (MR price watchdog); системный cron: папер + лоадер каждые 5 мин будни
+- **Цепочка данных (всё МСК)**: MT5 (ALLFUT-континуумы) → мост mt5_moex_bridge.py (контейнер /app/engine/, ALLFUT_TO_TICKER: SILV→SV/GOLD→GD/CNY→CR/ROSN→RN/GAZR→GZ, weekend-skip) → CH moex.mt5_continuous → load_mt5_bars.py (36 тикеров) → PG bars_1m → папер (CH — fallback)
+- **🔴 Уроки 21-22.08**: (1) phantom PnL при audit_close: баг знака шортов + min_step=0 в ticker_specs → PnL ×100 (SNGP «−36,040»); (2) ручное восстановление equity — только пересчётом из paper_trades; (3) субботние бары MT5 — фантомы, мост пропускает Сб/Вс
+
 - **🔴 OI (BR/NG/SV) — НЕ РАБОТАЕТ на чистых данных**: ROI +232%, PF 1.32, WR 47.7% (было +4154%/3.85/69%). Причина: futoi был сдвинут −5ч vs mt5 → look-ahead. ОТКЛЮЧИТЬ из live!
 - **✅ dayofweek (SBRF/SPYF) — ЕДИНСТВЕННЫЙ подтверждённый edge**: risk 33/33% → CAGR 63% DD 3.1%; live (10/25%) → CAGR 38% DD 2.0%
 - **TZ-стандарт (решено раз и навсегда)**: всё в МСК. Лоадеры: MT5 r[time]-3ч → aware UTC. Запись: CH60=МСК-строка, CH63=UTC-строка. Чтение: toTimeZone(toDateTime(bt),'Europe/Moscow'). Битые TZ-данные перезалиты (M1/H1/D1/futoi)

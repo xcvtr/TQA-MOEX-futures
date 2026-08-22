@@ -1,3 +1,19 @@
+## [234] 2026-08-22
+### Fixed
+- 🔴 Аудит equity папера mean_reversion: phantom PnL 21.08 (баг знака шортов + min_step=0 → SNGP «−36,040» вместо +295) — плюсовые +1,263₽ не были зачислены в equity при восстановлении state. Equity исправлен: 198,497.77 → 199,760.73 (честный итог −239₽, а не −1,502₽)
+- Мост: weekend-skip в Сб/Вс (MT5 генерирует фантомные бары закрытого рынка) — 6,977 мусорных баров удалены из CH
+### Added
+- Дашборд mean_reversion: http://10.0.0.60:8091/ (карточки тикеров, Plotly equity+DD, сделки, авто-refresh 30с)
+### Changed
+- Checkpoint: checkpoint/234-equity-audit-phantom-pnl-dashboard.md
+
+## [233] 2026-08-17..22
+### Added
+- 🔴 Финальный аудит: все старые стратегии MOEX (Dragon/IR/SH/OI/dayofweek/oi_dom) мёртвы на чистых данных — артефакты look-ahead/selection-bias
+- ✅ НОВЫЙ edge: mean_reversion (SV+TATN+SNGP, SHORT-only) — портфель risk 30%: +2,235% (3г) DD 25.3%, последний год +311% DD 29.5%; live-папер запущен 21.08
+- Папер: 12 багов исправлено (мост акции vs фьючерсы, TZ −3ч, look-ahead, timeout 15ч→3ч, SL/TP порядок, GO-лимит, STRATEGY_MAP, источник PG)
+- Checkpoint: checkpoint/233-final-audit-moex-empty.md
+
 ## [232] 2026-08-16
 ### Added
 - Критический аудит dayofweek на чистых данных: Top5 7%, 1 убыточный месяц из 40, slippage 20т → CAGR 116%
